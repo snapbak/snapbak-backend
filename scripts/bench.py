@@ -524,9 +524,12 @@ def expected_words(item: Item) -> set[str]:
 
 
 def wrong_script(item: Item, output: str) -> tuple[int, int]:
-    """(words in a script, of them those in the other script than the row's that no answer or the speaker has)."""
+    """(words in a script, of them those in the other script than the speaker's that no answer or the speaker has).
+    The speaker's script is the one most of the said words are in, whatever the language tag says (founder, 13 Oct)."""
     heard = known(item)
-    other = LATIN if item.language == "hi" else DEVANAGARI
+    said = words_of(item.said)
+    devanagari = sum(bool(DEVANAGARI.search(word)) for word in said)
+    other = LATIN if devanagari > len(said) - devanagari else DEVANAGARI
     scripted = [word for word in words_of(output) if LATIN.search(word) or DEVANAGARI.search(word)]
     wrong = sum(bool(other.search(word)) and word not in heard for word in scripted)
     return len(scripted), wrong

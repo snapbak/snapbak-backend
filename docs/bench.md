@@ -76,6 +76,15 @@ server writes lists for that style (`in_style` in `ai/guardrail/shape.py`).
 a counted and an announced list per style (12 Oct 2026: 24 of 24 exact over two
 live runs).
 
+`language-kept.jsonl.gz` holds the founder's language rule (13 Oct 2026):
+English stays English, Hindi stays Hindi in Devanagari, and Hinglish keeps its
+own mix, an English-heavy sentence keeping its few Roman Hindi words and a
+Hindi-heavy one its English words. The text decides, not the `language` tag the
+app sends, so each row is tagged wrong on purpose (English tagged `hi` or
+`hinglish`, Devanagari tagged `en`, Roman tagged `hi`). The "script kept" gate
+takes the speaker's script from what was said (the script most said words are
+in), not from the tag. Live, the round 7 build: 16 of 16 exact over two runs.
+
 | File                          | Slice                                         |
 | ----------------------------- | --------------------------------------------- |
 | `backtracking.jsonl.gz`       | English corrections and trap cases, 500 items |
@@ -83,6 +92,7 @@ live runs).
 | `formatting.jsonl.gz`         | punctuation, lists, numbers, addresses, 577   |
 | `grammar.jsonl.gz`            | grammar slips and correct sentences, 512      |
 | `platform.jsonl.gz`           | lists per app style in every language, 12     |
+| `language-kept.jsonl.gz`      | the input's language kept under any tag, 8    |
 | `hinglish-{feature}.jsonl.gz` | Hinglish in Roman script, from `just corpus`  |
 | `hi-{feature}.jsonl.gz`       | Hindi in Devanagari, from `just corpus`       |
 

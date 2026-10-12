@@ -1597,3 +1597,36 @@ def test_marks_a_careful_editor_writes_either_way_are_read_one_way(output: str, 
 )
 def test_marks_that_change_the_text_still_count(output: str, expected: str, language: str) -> None:
     assert not bench.exact(output, [expected], language)
+
+
+def test_the_language_slice_keeps_the_inputs_language_whatever_the_tag_says() -> None:
+    # Founder, 13 Oct: English stays English, Hindi stays Hindi, Hinglish keeps its own mix; the text decides.
+    with gzip.open(bench.CORPUS / "language-kept.jsonl.gz", "rt", encoding="utf-8") as lines:
+        rows = [json.loads(line) for line in lines]
+    devanagari = re.compile(r"[ऀ-ॿ]")
+    tagged = {(bool(devanagari.search(row["said"])), row["language"]) for row in rows}
+    assert {(False, "hi"), (False, "hinglish"), (True, "en"), (True, "hi"), (False, "en")} <= tagged
+    for row in rows:
+        said_script = bool(devanagari.search(row["said"]))
+        assert all(bool(devanagari.search(out)) == said_script for out in row["expected"]), row["id"]
+
+
+def test_the_script_gate_judges_by_the_script_the_speaker_used_not_the_tag() -> None:
+    # Founder, 13 Oct: the text decides the language; a Roman dictation the app tagged Hindi stays Roman.
+    roman = bench.Item(
+        "language-kept",
+        "Roman mix kept under the hi tag",
+        "bhai aaj ka plan kya hai",
+        "",
+        [],
+        "hi",
+        "other",
+        ["Bhai, aaj ka plan kya hai?"],
+    )
+    devanagari = bench.Item(
+        "language-kept", "Devanagari kept under the en tag", "कल मीटिंग है", "", [], "en", "other", ["कल मीटिंग है।"]
+    )
+    assert bench.wrong_script(roman, "Bhai, aaj ka plan kya hai?") == (6, 0)
+    assert bench.wrong_script(roman, "भाई, आज का प्लान क्या है?") == (6, 6)
+    assert bench.wrong_script(devanagari, "कल मीटिंग है।") == (3, 0)
+    assert bench.wrong_script(devanagari, "Kal meeting hai.") == (3, 3)
