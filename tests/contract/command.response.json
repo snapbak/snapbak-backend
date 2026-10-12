@@ -1,0 +1,6 @@
+{
+  "text": "Could you please send the deck by the end of the day?",
+  "engine": "groq:llama-3.3-70b-versatile",
+  "ms": 530,
+  "tokens": 96
+}

@@ -37,13 +37,37 @@ curl -s localhost:8787/v1/polish -H 'Authorization: Bearer dev' \
    corrections, Hinglish, Hindi and long chunks.
 3. The model gets a fixed system prompt, worked examples and the request as
    JSON, and answers `{"revision", "text"}`.
-4. The guardrail checks the answer: no unheard words or numbers, no rewrite of
-   over 30 %, no dropped sentence, no flipped negation, tense or speaker gender,
-   no dropped qualifier, no reply. A rejected small answer is retried once on the
-   big model if the deadline allows. If it is still rejected, the request text
-   comes back unchanged with `rejected: true`.
-5. If a provider fails or times out, the fallback engine is tried once. If that
-   fails too, the answer is `502 {"error": "provider"}`.
+4. The guardrail checks the answer (a stutter like "it's it's" may lose a copy,
+   and a word the recognizer misheard may become the word that sounds like it):
+   no unheard words or numbers, no lost or invented dictionary term, no rewrite
+   of over 30 %, no dropped sentence, no flipped negation, tense or speaker
+   gender, no dropped qualifier, no reply, no question left out of order. An
+   answer refused only for a mark or a list's shape is mended without a model
+   when it can be. A refused answer, small or big, is corrected once by the big
+   model with reasoning if at least 1.5 s is left: it gets its answer back and
+   the request again, with the rule and the words the guardrail named in a
+   `checker` field. If the correction is refused too, the request text comes
+   back unchanged with `rejected: true`.
+5. A provider's `429` or `5xx` answer is asked again with backoff while time is
+   left. If a provider fails, the fallback engine is tried once. If it hasn't
+   answered after 10 s (a correction: after half the time it has left), the
+   fallback is asked too, without reasoning, and the first answer wins. If none
+   answers in time, the answer is `502 {"error": "provider"}`. The app gives
+   each chunk up to 20 s.
+
+## Code
+
+`src/snapbak_backend/`, top to bottom; each part imports only those above it.
+
+| Path            | Holds                                                                                                                                  |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `config/`       | `settings.py` reads the environment; `pricing.py` holds the price table                                                                |
+| `ai/`           | the model layer: `prompts/`, `providers/`, `routing.py` (which tier), `chain.py` (a tier, then the fallback, in time) and `guardrail/` |
+| `schemas/`      | the request and response models                                                                                                        |
+| `transformers/` | a request as model turns, and the model's JSON back as an answer                                                                       |
+| `services/`     | the polish and command flows, and the counts-only log line                                                                             |
+| `api/`          | the token check, the error bodies and one module per route                                                                             |
+| `main.py`       | the app: startup, error handlers and routes                                                                                            |
 
 ## Docs
 

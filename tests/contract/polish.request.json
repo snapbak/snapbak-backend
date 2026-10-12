@@ -1,0 +1,10 @@
+{
+  "text": "no wait make it thursday not friday",
+  "prior": "Let's meet on Friday at noon.",
+  "terms": ["GMMCO", "Priya"],
+  "app": "Slack",
+  "style": "chat",
+  "language": "en",
+  "continues": false,
+  "deadline_ms": 6000
+}

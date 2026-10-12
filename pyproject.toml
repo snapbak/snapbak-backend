@@ -1,0 +1,43 @@
+[project]
+name = "snapbak-backend"
+version = "0.1.0"
+description = "Snapbak Cloud AI: polish and command for dictation"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.143.0",
+    "httpx[http2]>=0.28.1",
+    "pydantic>=2.14.0",
+    "uvicorn>=0.54.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.9,<0.13"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["scripts"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+# Word tables read best as one wrapped string split into words.
+ignore = ["SIM905"]
+
+[tool.pyright]
+include = ["src", "tests", "scripts"]
+extraPaths = ["scripts"]
+pythonVersion = "3.14"
+typeCheckingMode = "standard"
+venvPath = "."
+venv = ".venv"
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.414",
+    "pytest>=9.1.1",
+    "respx>=0.23.1",
+    "ruff>=0.16.10",
+]

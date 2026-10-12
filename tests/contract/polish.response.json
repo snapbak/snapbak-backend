@@ -1,0 +1,9 @@
+{
+  "text": "",
+  "revision": "Let's meet on Thursday at noon.",
+  "rejected": false,
+  "engine": "groq:llama-3.3-70b-versatile",
+  "tier": "big",
+  "ms": 412,
+  "tokens": 188
+}
