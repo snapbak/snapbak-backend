@@ -38,7 +38,7 @@ REGISTRY: dict[str, Callable[[str, str], Provider]] = {
         f"groq:{model}", "https://api.groq.com/openai/v1", model, key, SAMPLING.get(model, TEMPERATURE_0)
     ),
     "openai": lambda model, key: OpenAICompatible(
-        f"openai:{model}", "https://api.openai.com/v1", model, key, SAMPLING.get(model, TEMPERATURE_0)
+        f"openai:{model}", "https://api.openai.com/v1", model, key, SAMPLING.get(model, TEMPERATURE_0), fast=True
     ),
     "anthropic": lambda model, key: Anthropic(f"anthropic:{model}", model, key),
     "gemini": lambda model, key: Gemini(f"gemini:{model}", model, key),

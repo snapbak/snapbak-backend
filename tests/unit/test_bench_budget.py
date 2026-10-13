@@ -11,7 +11,8 @@ from snapbak_backend.ai.chain import Tiers
 from snapbak_backend.ai.providers.base import ProviderError, Turn, Usage
 from snapbak_backend.ai.providers.fake import Fake
 
-# gpt-6-luna lists $0.10 per million input tokens, so each call below costs $0.10.
+# gpt-6-luna lists $0.10 per million input tokens and an OpenAI call is billed at the priority estimate, twice
+# that (13 Oct), so each call below costs $0.20.
 MILLION = Usage(1_000_000, 0)
 
 
@@ -74,9 +75,9 @@ def test_a_run_appends_its_cost_to_the_ledger_and_prints_this_run_and_the_total(
     run_main(monkeypatch, Priced(), 3, ledger, 40)
     written = entries(ledger)
     assert written[0] == earlier
-    assert written[1]["usd"] == pytest.approx(0.3)
+    assert written[1]["usd"] == pytest.approx(0.6)
     assert (written[1]["items"], written[1]["spec"], written[1]["note"]) == (3, "openai:gpt-6-luna", "ok")
-    assert "$ this run: 0.3000; ledger total: 1.3000" in capsys.readouterr().out
+    assert "$ this run: 0.6000; ledger total: 1.6000" in capsys.readouterr().out
 
 
 def test_a_missing_ledger_is_created_with_the_runs_line(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -103,12 +104,12 @@ def test_the_run_stops_at_the_budget_and_scores_only_what_finished(
 ) -> None:
     ledger = tmp_path / "spend.jsonl"
     provider = Priced()
-    code = run_main(monkeypatch, provider, 5, ledger, 0.25)
+    code = run_main(monkeypatch, provider, 5, ledger, 0.5)
     out = capsys.readouterr().out
     assert (code, provider.sent) == (1, 3)
     assert "openai:gpt-6-luna: 3 items" in out
-    assert "budget reached: $0.30 of $0.25" in out
-    assert entries(ledger)[0]["usd"] == pytest.approx(0.3)
+    assert "budget reached: $0.60 of $0.50" in out
+    assert entries(ledger)[0]["usd"] == pytest.approx(0.6)
 
 
 def test_the_ledger_line_is_written_when_the_run_crashes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -117,7 +118,7 @@ def test_the_ledger_line_is_written_when_the_run_crashes(monkeypatch: pytest.Mon
         run_main(monkeypatch, Priced(crash_after=1), 2, ledger, 40)
     [entry] = entries(ledger)
     # The answered call, and the crashed one charged as the dearest so far.
-    assert entry["usd"] == pytest.approx(0.2)
+    assert entry["usd"] == pytest.approx(0.4)
     assert entry["note"] == "crashed: RuntimeError"
 
 
@@ -134,7 +135,7 @@ def test_a_call_that_failed_without_usage_is_charged_as_the_dearest_call_so_far(
     budget = bench.Budget(40, 0)
     budget.charge("openai:gpt-6-luna", MILLION)
     budget.charge("openai:gpt-6-luna", None)
-    assert budget.spent == pytest.approx(0.2)
+    assert budget.spent == pytest.approx(0.4)
 
 
 def test_an_item_whose_provider_failed_is_charged_as_one_call() -> None:
@@ -146,7 +147,7 @@ def test_an_item_whose_provider_failed_is_charged_as_one_call() -> None:
     asyncio.run(bench.run(first, tiers, gate, budget))
     failed = asyncio.run(bench.run(second, tiers, gate, budget))
     assert failed is not None and failed.failed
-    assert (budget.spent, budget.items) == (pytest.approx(0.2), 2)
+    assert (budget.spent, budget.items) == (pytest.approx(0.4), 2)
 
 
 def test_the_real_escalation_runs_with_the_small_model_as_its_fallback_as_the_server_does() -> None:

@@ -1,5 +1,6 @@
 import pytest
 
+from snapbak_backend.ai import routing
 from snapbak_backend.ai.routing import has_cue, tier
 
 LONG = " ".join(["word"] * 151)
@@ -73,3 +74,32 @@ def test_ordinary_words_are_not_cues(text: str) -> None:
 
 def test_hindi_rather_is_a_correction_cue() -> None:
     assert has_cue("रविवार को नहीं बल्कि शनिवार को")
+
+
+@pytest.mark.parametrize(
+    ("text", "language", "reasons"),
+    [
+        ("kal milte hain", "hinglish", True),
+        ("कल मिलते हैं", "hi", True),
+        ("ship it on monday no wait tuesday", "en", True),
+        (" ".join(["word"] * 151), "en", False),
+        ("ship it today", "en", False),
+    ],
+)
+def test_reasoning_goes_where_it_measured_a_gain(text: str, language: str, reasons: bool) -> None:
+    # Round b3 measured medium reasoning lifting Hindi and Hinglish rows (150 against 131 of 216); founder 13 Oct:
+    # an English chunk that is big only for its length answers without it, which is faster.
+    assert routing.reasons(text, language) is reasons
+
+
+def test_a_long_chunk_splits_where_a_paragraph_is_said_between_long_paragraphs() -> None:
+    # Founder, 13 Oct: each paragraph is polished at once, in parallel, so a long dictation takes its slowest part.
+    first = " ".join(["first"] * 30)
+    second = " ".join(["second"] * 30)
+    assert routing.paragraphs(f"{first} new paragraph {second}") == [first, second]
+    assert routing.paragraphs(f"{first} naya paragraph {second}") == [first, second]
+    assert routing.paragraphs(f"{first} नया पैराग्राफ {second}") == [first, second]
+    # A short side, or a paragraph named rather than asked for at the edge, stays one chunk.
+    short = f"{first} new paragraph two words"
+    assert routing.paragraphs(short) == [short]
+    assert routing.paragraphs("ship it") == ["ship it"]

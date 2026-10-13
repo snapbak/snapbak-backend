@@ -169,7 +169,8 @@ def test_money_prices_each_tier_per_thousand_dictations() -> None:
     small = Call("openai:gpt-4.1-nano", Usage(1000, 20), "ok")
     retried = [Call("openai:gpt-4.1-nano", Usage(1000, 20), "unheard"), Call("openai:gpt-4.1", Usage(1000, 20), "ok")]
     dollars = bench.money([result(entry, "", "small", [small]), result(entry, "", "big", retried)])
-    assert dollars == pytest.approx({"small": 0.108, "big": 1.08})
+    # OpenAI calls are billed at the priority estimate, twice the list price (13 Oct).
+    assert dollars == pytest.approx({"small": 0.216, "big": 2.16})
 
 
 def test_report_prints_the_share_of_prompt_tokens_served_from_the_cache(capsys: pytest.CaptureFixture[str]) -> None:
@@ -183,7 +184,7 @@ def test_money_prices_cached_prompt_tokens_at_the_cached_price() -> None:
     entry = item("grammar", "tense", "she go home", "She goes home.")
     cached = Call("openai:gpt-4.1-nano", Usage(1000, 20, 1000), "ok")
     dollars = bench.money([result(entry, "", "small", [cached])])
-    assert dollars == pytest.approx({"small": 0.033, "big": 0.0})
+    assert dollars == pytest.approx({"small": 0.066, "big": 0.0})
 
 
 class Scripted:

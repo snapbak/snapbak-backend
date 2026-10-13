@@ -369,3 +369,25 @@ def ended(sentence: str) -> str:
         return sentence
     stop = "।" if DEVANAGARI_END.search(sentence) else "."
     return sentence + stop
+
+
+# Both versions kept around a cue ("Friday, I mean, Monday"): the guardrail names the old one, the cue and the new one
+# (founder, 13 Oct: mended without a correction call). Marks and spaces between them go with the old version.
+BETWEEN = r"[\s,;:\u2013\u2014-]*"
+EDGE_BEFORE = r"(?<![\wऀ-ॿ])"
+EDGE_AFTER = r"(?![\wऀ-ॿ])"
+
+
+def one_version(text: str, kept: tuple[str, ...]) -> str | None:
+    """The answer with the old version and the cue taken out, the new version kept; None when they are not written
+    as named. The new version takes the old one's capital at a sentence's start."""
+    old, *cue, new = kept
+    run = BETWEEN.join(re.escape(word) for word in [old, *cue])
+    found = re.search(rf"{EDGE_BEFORE}{run}{BETWEEN}(?={re.escape(new)}{EDGE_AFTER})", text, re.IGNORECASE)
+    if found is None:
+        return None
+    rest = text[found.end() :]
+    if found.group()[:1].isupper():
+        rest = rest[:1].upper() + rest[1:]
+    mended = text[: found.start()] + rest
+    return mended

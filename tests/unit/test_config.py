@@ -65,3 +65,16 @@ def test_cached_input_tokens_cost_the_cached_price() -> None:
 
 def test_an_engine_without_a_cached_price_bills_cached_tokens_as_input() -> None:
     assert cost("groq:llama-3.1-8b-instant", 1_000_000, 0, 1_000_000) == pytest.approx(0.05)
+
+
+def test_an_openai_call_is_billed_at_the_priority_estimate_and_others_at_list_price() -> None:
+    from snapbak_backend.config.pricing import billed
+
+    # OpenAI calls ask for priority processing (13 Oct); its price was not published where we could read it, so the
+    # ledger counts it at twice the Standard price, an estimate on the safe side.
+    assert billed("openai:gpt-6-luna", 1_000_000, 1_000_000) == pytest.approx(
+        2 * cost("openai:gpt-6-luna", 1_000_000, 1_000_000)
+    )
+    assert billed("groq:llama-3.1-8b-instant", 1_000_000, 0) == pytest.approx(
+        cost("groq:llama-3.1-8b-instant", 1_000_000, 0)
+    )

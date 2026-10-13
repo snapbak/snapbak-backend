@@ -64,6 +64,17 @@ unknown.
 | `SNAPBAK_BIG`      | the big tier (required)                               |
 | `SNAPBAK_FALLBACK` | tried once when a tier errors or times out (optional) |
 
+## Priority processing and the prompt cache
+
+Every OpenAI call asks for priority processing (`service_tier: "priority"`) and
+sends a `prompt_cache_key` made from the system prompt's hash, so every request
+of one prompt version lands where its long fixed prefix is cached (founder,
+13 Oct 2026: faster at the same accuracy). gpt-5.6-luna answers with
+`service_tier: "priority"` and gpt-6-luna with `"fast"`. Groq gets neither. The
+priority price was not readable from OpenAI's pages, so `billed` in
+`config/pricing.py` counts an OpenAI call at twice the list price, an estimate
+on the safe side for the bench ledger and the replay.
+
 ## The fake provider
 
 For the app's end-to-end tests, `fake:<mode>` answers without a model. A

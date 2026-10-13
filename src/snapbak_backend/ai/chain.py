@@ -13,6 +13,8 @@ MARGIN_MS = 250
 # 3.4 s at the median and 10.6 s at p95 (round b3, 376 bench rows), and gpt-5.6-luna answers in about 1.5 s without
 # it; an earlier hedge let the unreasoned fallback win most long answers.
 HEDGE_S = 10.0
+# An answer that does not reason is backed up sooner by the fallback, which answers it alike (founder, 13 Oct).
+FAST_HEDGE_S = 3.0
 
 
 @dataclass(frozen=True)

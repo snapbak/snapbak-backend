@@ -566,3 +566,85 @@ async def test_a_chat_piece_goes_on_with_a_list_typed_with_round_bullets() -> No
     response, _ = await polish(said("book the room", prior=prior, style="chat"), tiers)
     assert small.asked["prior"] == ANNOUNCED
     assert (response.text, response.rejected) == ("• Book the room", False)
+
+
+@pytest.mark.anyio
+async def test_a_long_english_chunk_goes_to_the_big_tier_without_reasoning() -> None:
+    text = " ".join(["ship it"] * 80)
+    big = Scripted("test:big", answer(text.capitalize() + "."))
+    tiers = Tiers(small=UNUSED, big=big, fallback=None)
+    response, _ = await polish(said(text), tiers)
+    assert (response.tier, big.reasoned) == ("big", False)
+
+
+@pytest.mark.anyio
+async def test_a_call_without_reasoning_is_backed_up_early_and_a_reasoning_one_keeps_its_time(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Founder, 13 Oct: an answer that does not reason is backed up after FAST_HEDGE_S by the fallback, which answers
+    # alike; a reasoning answer keeps HEDGE_S, since the fallback does not reason (round b3).
+    monkeypatch.setattr(chain, "HEDGE_S", 5.0)
+    monkeypatch.setattr(chain, "FAST_HEDGE_S", 0.1)
+    small = Scripted("test:small", answer("Ship it now."), delay=2.0)
+    fallback = Scripted("test:fallback", answer("Ship it."), delay=0.05)
+    started = time.monotonic()
+    response, _ = await polish(said("ship it", deadline_ms=6000), Tiers(small=small, big=UNUSED, fallback=fallback))
+    assert time.monotonic() - started < 0.6
+    assert (response.text, response.engine) == ("Ship it.", "test:fallback")
+    big = Scripted("test:big", answer("Ship it."), delay=0.4)
+    late = Scripted("test:fallback", answer("Ship it now."), delay=0.05)
+    request = said("ship it", language="hinglish", deadline_ms=6000)
+    response, _ = await polish(request, Tiers(small=UNUSED, big=big, fallback=late))
+    assert (response.engine, late.calls) == ("test:big", 0)
+
+
+@pytest.mark.anyio
+async def test_a_dictation_with_a_said_paragraph_is_polished_one_paragraph_per_call_at_once() -> None:
+    first = " ".join(["we ship the build today"] * 6)
+    second = " ".join(["they test the app tonight"] * 6)
+
+    class Echo(Scripted):
+        async def complete(self, turns, max_tokens, timeout, reason=False):  # type: ignore[override]
+            # Each call echoes its own request; the parent's `asked` is shared by calls in flight together.
+            text = json.loads(turns[-1][1])["text"]
+            await super().complete(turns, max_tokens, timeout, reason)
+            return answer(text.capitalize() + "."), self.usage
+
+    small = Echo("test:small", answer("unused"), delay=0.3)
+    started = time.monotonic()
+    response, _ = await polish(said(f"{first} new paragraph {second}"), Tiers(small=small, big=UNUSED, fallback=None))
+    assert time.monotonic() - started < 0.55, "the paragraphs are asked at the same time"
+    assert small.calls == 2
+    assert response.text == f"{first.capitalize()}.\n\n{second.capitalize()}."
+    assert response.rejected is False
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("text", "kept", "mended"),
+    [
+        ("ship it on friday i mean monday", "Ship it on Friday, I mean, Monday.", "Ship it on Monday."),
+        ("print five no wait six copies", "Print five, no wait, six copies.", "Print six copies."),
+        ("बैठक सोमवार नहीं नहीं मंगलवार को है", "बैठक सोमवार, नहीं नहीं, मंगलवार को है।", "बैठक मंगलवार को है।"),
+    ],
+)
+async def test_both_versions_kept_around_a_cue_are_mended_without_a_second_call(
+    text: str, kept: str, mended: str
+) -> None:
+    # Founder, 13 Oct: the guardrail names the old version, the cue and the new one; the old one and the cue go and
+    # the answer is judged again, so no correction call is needed. A mend the guardrail refuses still gets the call.
+    big = Scripted("test:big", answer(kept))
+    response, _ = await polish(
+        said(text, language="hi" if "ह" in text else "en"), Tiers(small=UNUSED, big=big, fallback=None)
+    )
+    assert (response.text, response.rejected, big.calls) == (mended, False, 1)
+
+
+def test_a_piece_that_opens_with_its_cue_is_not_mended_by_taking_words_out() -> None:
+    # The guardrail names only the cue here ("galti se bola"): the piece needs a revision of the prior, not a cut.
+    from snapbak_backend.ai.guardrail.judge import Reason, Reject
+    from snapbak_backend.transformers.polish import mendings
+
+    request = said("galti se bola parso milte hain", prior="Kal milte hain.", language="hinglish")
+    reason = Reason(Reject.KEPT_CORRECTION, ("galti", "se", "bola"))
+    assert mendings(request, "Galti se bola, parso milte hain.", reason) == []

@@ -151,6 +151,34 @@ one run each, ledger `acc2/spend.jsonl`): 31 → 32 passed, but words right 36 �
 35, clean text unchanged 100 → 92.3 and false lists 0 → 2.6, so it showed no
 accuracy gain and the small tier keeps those chunks.
 
+## Speed at the same accuracy, 13 Oct 2026
+
+The founder asked for lower latency at round 7's accuracy. Built, measured only
+where noted:
+
+- **Reasoning where it pays.** A big-tier chunk reasons (medium effort) when it
+  is Hindi or Hinglish or holds a correction cue, where round b3 measured the
+  gain (150 against 131 of 216 non-English rows). An English chunk that is big
+  only for its length answers without reasoning (`routing.reasons`).
+- **An earlier backup.** An answer that does not reason is joined by the
+  fallback after `FAST_HEDGE_S` (3 s); a reasoning answer keeps `HEDGE_S`
+  (10 s), since the fallback does not reason.
+- **Paragraphs in parallel.** When "new paragraph" (or "naya paragraph", "नया
+  पैराग्राफ") is said with at least 30 words on each side, each paragraph is
+  polished at once (`routing.paragraphs`); the chunk takes its slowest
+  paragraph, and a refused paragraph alone comes back as said.
+- **One mend more.** Both versions kept around a cue ("Friday, I mean,
+  Monday") are mended without a correction call: the old version and the cue
+  go, and the answer is judged again (`shape.one_version`).
+- **Priority processing and a cache key** on every OpenAI call
+  (`docs/providers.md`). On the founder rows, two runs: p50 2.58 and 2.59 →
+  2.38 and 2.03 s, p95 6.27 and 6.56 → 5.89 and 5.86 s, 129 of 132 exact as
+  before.
+
+The app cuts shorter chunks too, so the last chunk is about a sentence
+(`DICTATION-AI.md` in the app repo). The rest is not yet measured against round
+7 on the frozen sample (`~/.snapbak-bench/frozen-r7-sample.json`).
+
 ## Retry
 
 When the guardrail refuses an answer, small or big tier, the big tier corrects

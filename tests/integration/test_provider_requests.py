@@ -23,15 +23,20 @@ def sent(route: respx.Route) -> dict:
     return json.loads(request.content)
 
 
+# OpenAI is asked for priority processing and a cache key from the fixed prompt, so the long prompt is served from
+# its cache and the answer comes back sooner (founder, 13 Oct: faster at the same accuracy). Groq gets neither.
+OPENAI_SPEED = {"service_tier": "priority", "prompt_cache_key": "snapbak-c53b0f3aaea46bbe"}
+
+
 @pytest.mark.anyio
 @pytest.mark.parametrize(
-    ("spec", "url", "key"),
+    ("spec", "url", "key", "speed"),
     [
-        ("groq:llama-3.3-70b-versatile", "https://api.groq.com/openai/v1/chat/completions", "gsk-1"),
-        ("openai:gpt-4.1-nano", "https://api.openai.com/v1/chat/completions", "sk-1"),
+        ("groq:llama-3.3-70b-versatile", "https://api.groq.com/openai/v1/chat/completions", "gsk-1", {}),
+        ("openai:gpt-4.1-nano", "https://api.openai.com/v1/chat/completions", "sk-1", OPENAI_SPEED),
     ],
 )
-async def test_openai_style_providers_post_the_turns_as_a_chat(spec: str, url: str, key: str) -> None:
+async def test_openai_style_providers_post_the_turns_as_a_chat(spec: str, url: str, key: str, speed: dict) -> None:
     provider = make_provider(spec, KEYS)
     with respx.mock(assert_all_called=True) as mock:
         route = mock.post(url).respond(
@@ -51,7 +56,24 @@ async def test_openai_style_providers_post_the_turns_as_a_chat(spec: str, url: s
         "max_completion_tokens": 64,
         "response_format": {"type": "json_object"},
         "messages": [{"role": role, "content": content} for role, content in TURNS],
+        **speed,
     }
+    await provider.aclose()
+
+
+@pytest.mark.anyio
+async def test_the_openai_cache_key_follows_the_fixed_prompt_not_the_dictation() -> None:
+    provider = make_provider("openai:gpt-6-luna", KEYS)
+    reply = {"choices": [{"message": {"content": REPLY}}], "usage": {"prompt_tokens": 120, "completion_tokens": 9}}
+    with respx.mock() as mock:
+        route = mock.post("https://api.openai.com/v1/chat/completions").respond(json=reply)
+        await provider.complete(TURNS, 64, 2.0)
+        first = sent(route)["prompt_cache_key"]
+        await provider.complete([*TURNS[:-1], ("user", '{"text": "ship it"}')], 64, 2.0)
+        same = sent(route)["prompt_cache_key"]
+        await provider.complete([("system", "other rules"), *TURNS[1:]], 64, 2.0)
+        other = sent(route)["prompt_cache_key"]
+    assert first == same != other
     await provider.aclose()
 
 

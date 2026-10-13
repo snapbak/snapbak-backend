@@ -21,6 +21,7 @@ from snapbak_backend.ai.guardrail.shape import (
     announced_list,
     asked_marked,
     bullets_numbered,
+    one_version,
     paragraphed,
     rejoined,
     unasked_marked,
@@ -111,6 +112,10 @@ def mendings(request: PolishRequest, text: str, reason: Reason) -> list[str]:
         mended = [bullets_numbered(text, next_item(request.prior))]
     elif rule == Reject.UNLISTED and reason.words:
         mended = [announced_list(text, reason.words[0])]
+    elif (
+        rule == Reject.KEPT_CORRECTION and len(reason.words) >= 3 and not routing.CUE.fullmatch(" ".join(reason.words))
+    ):
+        mended = [one_version(text, reason.words)]
     else:
         mended = []
     found = [answer for answer in mended if answer is not None]

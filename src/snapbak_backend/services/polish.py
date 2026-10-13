@@ -1,5 +1,6 @@
 """Polish: the tier, the fallback, and one big-tier correction of a refused answer (docs/api.md)."""
 
+import asyncio
 import time
 
 from snapbak_backend.ai import chain, routing
@@ -22,6 +23,32 @@ RETRY_HEDGE_SHARE = 0.5
 
 
 async def polish(request: PolishRequest, tiers: Tiers) -> tuple[PolishResponse, list[Call]]:
+    """A chunk polished whole, or, when a paragraph is said between long paragraphs, one call per paragraph at once
+    (founder, 13 Oct): the chunk then takes its slowest paragraph, and a refused paragraph alone comes back as said."""
+    parts = routing.paragraphs(request.text)
+    if len(parts) == 1:
+        return await polished_chunk(request, tiers)
+    started = time.monotonic()
+    asked = [
+        request.model_copy(update={"text": part, "prior": request.prior if index == 0 else ""})
+        for index, part in enumerate(parts)
+    ]
+    answered = await asyncio.gather(*(polished_chunk(part, tiers) for part in asked))
+    responses = [response for response, _ in answered]
+    calls = [call for _, made in answered for call in made]
+    response = PolishResponse(
+        text="\n\n".join(part.text for part in responses),
+        revision=responses[0].revision,
+        rejected=all(part.rejected for part in responses),
+        engine=responses[0].engine,
+        tier="big" if any(part.tier == "big" for part in responses) else "small",
+        ms=elapsed_ms(started),
+        tokens=total(calls),
+    )
+    return response, calls
+
+
+async def polished_chunk(request: PolishRequest, tiers: Tiers) -> tuple[PolishResponse, list[Call]]:
     started = time.monotonic()
     deadline = deadline_of(started, request.deadline_ms)
     # The guardrail reads lists as "- " and "1. "; a chat app's round bullets typed before are read as dashes, and the
@@ -30,11 +57,13 @@ async def polish(request: PolishRequest, tiers: Tiers) -> tuple[PolishResponse, 
     asked = fold(request)
     turns = polish_turns(asked)
     tier = routing.tier(request.text, request.language)
-    reason = tier == "big"
+    reason = tier == "big" and routing.reasons(request.text, request.language)
     max_tokens = len(request.text) + len(request.prior) + 100 + (REASONING_TOKENS if reason else 0)
     calls: list[Call] = []
     first = tiers.chain(tier)
-    output = await ask(first, turns, max_tokens, deadline, calls, reason)
+    output = await ask(
+        first, turns, max_tokens, deadline, calls, reason, chain.HEDGE_S if reason else chain.FAST_HEDGE_S
+    )
     polished = read(request, asked, output)
     calls[-1].verdict = polished.rejected or "ok"
     if polished.rejected and polished.reason and deadline - time.monotonic() >= MIN_RETRY_S:

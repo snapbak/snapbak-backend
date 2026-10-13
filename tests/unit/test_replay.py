@@ -30,15 +30,15 @@ def test_a_month_of_english_retries_a_share_on_the_big_tier(monkeypatch: pytest.
     # b3, 6,807 since round b2 and 4,667 since round b1). The founder put accuracy over cost (D8):
     # the month is a report, so the prompt may grow.
     assert (totals["requests"], totals["big"], totals["input"], totals["output"]) == (9000, 0, 117_756_000, 90_000)
-    assert totals["small $"] == pytest.approx(11.8116)
-    assert totals["big $"] == pytest.approx(12.0915)
+    assert totals["small $"] == pytest.approx(23.6232)
+    assert totals["big $"] == pytest.approx(24.183)
 
 
 def test_a_month_of_hinglish_sends_every_chunk_to_the_big_tier(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(replay, "CACHE_HIT", 0)
     totals = replay.month([("ship it", "en")], "hinglish", "openai:gpt-4.1-nano", "openai:gpt-4.1")
     assert (totals["requests"], totals["big"], totals["small $"], totals["input"]) == (9000, 9000, 0, 117_774_000)
-    assert totals["big $"] == pytest.approx(251.6733)
+    assert totals["big $"] == pytest.approx(503.3466)
 
 
 def test_utterances_take_their_language_the_way_the_bench_does() -> None:
@@ -60,7 +60,7 @@ def test_the_cached_share_of_the_fixed_prompt_is_billed_at_the_cached_price(monk
     monkeypatch.setattr(replay, "CACHE_HIT", 1.0)
     monkeypatch.setattr(replay, "RETRY_SHARE", 0)
     totals = replay.month([("ship it", "en")], None, "openai:gpt-4.1-nano", "openai:gpt-4.1")
-    assert totals["small $"] == pytest.approx(2.98935)
+    assert totals["small $"] == pytest.approx(5.9787)
 
 
 def test_a_correction_chunk_bills_its_reasoning_tokens(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -79,7 +79,7 @@ def test_every_big_tier_chunk_bills_its_reasoning_tokens() -> None:
 def test_half_the_fixed_prompt_is_billed_as_cached_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(replay, "RETRY_SHARE", 0)
     totals = replay.month([("ship it", "en")], None, "openai:gpt-4.1-nano", "openai:gpt-4.1")
-    assert totals["small $"] == pytest.approx(7.400475)
+    assert totals["small $"] == pytest.approx(14.80095)
 
 
 def test_the_month_is_priced_for_the_founders_pair_and_reported_not_gated(
@@ -103,8 +103,8 @@ def test_a_refused_answer_on_either_tier_is_corrected_on_the_big_tier_with_its_a
     )
     answer = replay.estimate('{"revision": null, "text": "ship it"}')
     corrected = request + answer + replay.CORRECTION_TOKENS
-    one = replay.cost("openai:gpt-4.1", corrected, answer + replay.REASONED_TOKENS, 0)
+    one = replay.billed("openai:gpt-4.1", corrected, answer + replay.REASONED_TOKENS, 0)
     assert english["big $"] == pytest.approx(9000 * replay.RETRY_SHARE * one)
     # Every Hinglish chunk is a big call, and some of them are corrected on top.
-    big_call = replay.cost("openai:gpt-4.1", request, answer + replay.REASONED_TOKENS, 0)
+    big_call = replay.billed("openai:gpt-4.1", request, answer + replay.REASONED_TOKENS, 0)
     assert hinglish["big $"] > 9000 * (big_call + replay.RETRY_SHARE * one)

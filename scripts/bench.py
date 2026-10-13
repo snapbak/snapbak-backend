@@ -34,7 +34,7 @@ from snapbak_backend.ai.guardrail.shape import in_style
 from snapbak_backend.ai.providers.base import Provider, Turn, Usage
 from snapbak_backend.ai.providers.factory import make_provider
 from snapbak_backend.ai.routing import CUE, LETTER
-from snapbak_backend.config.pricing import PRICES, cost
+from snapbak_backend.config.pricing import PRICES, billed
 from snapbak_backend.config.settings import KEYS
 from snapbak_backend.schemas.polish import MAX_PRIOR_WORDS, PolishRequest
 from snapbak_backend.services.polish import polish
@@ -659,7 +659,7 @@ class Budget:
         if usage is None:
             self.spent += self.dearest
             return
-        dollars = cost(engine, usage.input, usage.output, usage.cached)
+        dollars = billed(engine, usage.input, usage.output, usage.cached)
         self.dearest = max(self.dearest, dollars)
         self.spent += dollars
 
@@ -1011,7 +1011,7 @@ def money(results: list[Result]) -> dict[str, float]:
     for result in results:
         for number, call in enumerate(result.calls):
             tier = "big" if result.tier == "big" and number == len(result.calls) - 1 else "small"
-            per_tier[tier] += cost(call.engine, call.usage.input, call.usage.output, call.usage.cached)
+            per_tier[tier] += billed(call.engine, call.usage.input, call.usage.output, call.usage.cached)
     return {tier: 1000 * dollars / max(len(results), 1) for tier, dollars in per_tier.items()}
 
 

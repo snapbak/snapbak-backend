@@ -15,7 +15,7 @@ from snapbak_backend.ai.guardrail.judge import Reason, Reject
 from snapbak_backend.ai.prompts.examples import EXAMPLES
 from snapbak_backend.ai.prompts.polish import SYSTEM, correction, message
 from snapbak_backend.ai.routing import tier
-from snapbak_backend.config.pricing import cost
+from snapbak_backend.config.pricing import billed
 from snapbak_backend.schemas.polish import MAX_PRIOR_WORDS
 
 # The PRD's cost target, shown for reference: the founder put accuracy over cost and time (11 Oct).
@@ -83,12 +83,12 @@ def month(pool: list[tuple[str, str]], forced_language: str | None, small: str, 
             totals["input"] += input_tokens
             totals["output"] += output_tokens
             corrected = input_tokens + answer + CORRECTION_TOKENS
-            totals["big $"] += RETRY_SHARE * cost(big, corrected, answer + REASONED_TOKENS, cached_tokens)
+            totals["big $"] += RETRY_SHARE * billed(big, corrected, answer + REASONED_TOKENS, cached_tokens)
             if chosen == "big":
                 totals["big"] += 1
-                totals["big $"] += cost(big, input_tokens, output_tokens, cached_tokens)
+                totals["big $"] += billed(big, input_tokens, output_tokens, cached_tokens)
                 continue
-            totals["small $"] += cost(small, input_tokens, output_tokens, cached_tokens)
+            totals["small $"] += billed(small, input_tokens, output_tokens, cached_tokens)
     return totals
 
 

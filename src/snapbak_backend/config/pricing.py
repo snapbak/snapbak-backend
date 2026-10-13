@@ -61,3 +61,15 @@ def cost(engine: str, input_tokens: int, output_tokens: int, cached_tokens: int 
     fresh = input_tokens - cached_tokens
     dollars = (fresh * per_input + cached_tokens * per_cached + output_tokens * per_output) / 1_000_000
     return dollars
+
+
+# OpenAI calls ask for priority processing (founder, 13 Oct). Its price was not readable from OpenAI's pages, so a
+# priority call is billed at twice the Standard price: an estimate on the safe side for the bench ledger and the replay.
+PRIORITY = 2.0
+
+
+def billed(engine: str, input_tokens: int, output_tokens: int, cached_tokens: int = 0) -> float:
+    """`cost` at the tier the call is sent on: OpenAI's priority estimate, list price elsewhere."""
+    listed = cost(engine, input_tokens, output_tokens, cached_tokens)
+    dollars = listed * PRIORITY if engine.startswith("openai:") else listed
+    return dollars

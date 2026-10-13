@@ -1,5 +1,6 @@
 """OpenAI and OpenAI-compatible chat completions, such as Groq (docs/providers.md)."""
 
+import hashlib
 from typing import Any
 
 from snapbak_backend.ai.providers.base import Http, Turn, Usage
@@ -11,10 +12,16 @@ REASONING: dict[str, Any] = {"reasoning_effort": "medium"}
 
 
 class OpenAICompatible(Http):
-    def __init__(self, engine: str, base: str, model: str, key: str, sampling: dict[str, Any]) -> None:
+    """`fast` (OpenAI only, founder 13 Oct) asks for priority processing and keys the prompt cache on the fixed prompt,
+    so every request of one prompt version lands where its long prefix is cached."""
+
+    def __init__(
+        self, engine: str, base: str, model: str, key: str, sampling: dict[str, Any], fast: bool = False
+    ) -> None:
         super().__init__(engine, f"{base}/chat/completions", {"Authorization": f"Bearer {key}"})
         self.model = model
         self.sampling = sampling
+        self.fast = fast
 
     async def complete(
         self, turns: list[Turn], max_tokens: int, timeout: float, reason: bool = False
@@ -29,6 +36,10 @@ class OpenAICompatible(Http):
             "response_format": {"type": "json_object"},
             "messages": [{"role": role, "content": content} for role, content in turns],
         }
+        if self.fast:
+            fixed = next((content for role, content in turns if role == "system"), "")
+            body["service_tier"] = "priority"
+            body["prompt_cache_key"] = "snapbak-" + hashlib.sha256(fixed.encode()).hexdigest()[:16]
         answer = await self.ask(body, timeout, self.parse)
         return answer
 
