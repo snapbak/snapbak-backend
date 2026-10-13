@@ -50,7 +50,7 @@ class ProviderFailed(Exception):
 
 
 async def complete(
-    provider: Provider, turns: list[Turn], max_tokens: int, deadline: float, reason: bool
+    provider: Provider, turns: list[Turn], max_tokens: int, deadline: float, reason: str
 ) -> tuple[str, Usage]:
     remaining = deadline - time.monotonic()
     if remaining <= 0:
@@ -66,7 +66,7 @@ async def ask(
     max_tokens: int,
     deadline: float,
     calls: list[Call],
-    reason: bool = False,
+    reason: str = "",
     hedge_s: float | None = None,
 ) -> str:
     """The first answer along `chain` (a tier, then the fallback) that arrives before the deadline. A tier that fails
@@ -86,7 +86,7 @@ async def ask(
             done, _ = await asyncio.wait(asking, timeout=wait, return_when=asyncio.FIRST_COMPLETED)
             if not done and backups and time.monotonic() < deadline:
                 backup = backups.pop(0)
-                asking[asyncio.create_task(complete(backup, turns, max_tokens, deadline, False))] = backup
+                asking[asyncio.create_task(complete(backup, turns, max_tokens, deadline, ""))] = backup
                 continue
             if not done:
                 failed.extend("timeout" for _ in asking)

@@ -13,16 +13,17 @@ prompt, the worked examples, then the request.
 `make_provider("provider:model", keys)` builds one from the registry in
 `src/snapbak_backend/ai/providers/factory.py`; each provider has its own module
 beside it. Each keeps one pooled HTTP/2 client for the life of the server, and
-its idle connections for 5 minutes. `/healthz` warms each tier's connection at
-most every 30 s. A `429` (rate limit) or `500`, `502`, `503` or `504` answer is
-asked again before the chain moves to the fallback, within the call's own time:
-after the provider's `Retry-After` (plus up to 15 % jitter), else after 0.25 s
-doubling each time, times a jitter of 0.5 to 1.5, and never when the wait would
-pass the deadline (founder dictations failed with "HTTP/2 429 Too Many Requests"
-on both models, 11 Oct). An account out of credits (`insufficient_quota`,
-`credit_balance_exhausted`) is not asked again. The log line counts every call's
-retries (`retries=N`). Any network error, other error status or unexpected
-answer becomes a `ProviderError`, which carries its retries.
+its idle connections for 5 minutes. `/healthz` warms each tier's connection and
+the fallback's at most every 30 s. A `429` (rate limit) or `500`, `502`, `503`
+or `504` answer is asked again before the chain moves to the fallback, within
+the call's own time: after the provider's `Retry-After` (plus up to 15 %
+jitter), else after 0.25 s doubling each time, times a jitter of 0.5 to 1.5, and
+never when the wait would pass the deadline (founder dictations failed with
+"HTTP/2 429 Too Many Requests" on both models, 11 Oct). An account out of
+credits (`insufficient_quota`, `credit_balance_exhausted`) is not asked again.
+The log line counts every call's retries (`retries=N`). Any network error, other
+error status or unexpected answer becomes a `ProviderError`, which carries its
+retries.
 
 | Provider    | Request                                                                  | Key                 |
 | ----------- | ------------------------------------------------------------------------ | ------------------- |
@@ -46,11 +47,14 @@ newest refuse temperature 0, so they get only the effort:
 
 Each row is the lowest effort the API accepted on 10 Oct 2026, and temperature 0
 only where it was accepted. A call that reasons (a big-tier chunk, see
-`escalation.md`) sends only `reasoning_effort: medium` to every model that has a
-`reasoning_effort` row (`low` until round b3, which all 15 accepted on 10 Oct
-2026). The other models ignore it. The OpenAI-style and Gemini requests ask for
-a JSON answer. Gemini turns thinking off (`thinkingBudget: 0`). Anthropic sends
-`anthropic-version: 2023-06-01`, as the app's old `cloud.rs` did.
+`escalation.md`) sends only its route's effort from `routing.EFFORTS` (today
+`medium` on every route) to every model that has a `reasoning_effort` row (`low`
+until round b3, which all 15 accepted on 10 Oct 2026). The other models ignore
+it. OpenAI reports the reasoning tokens inside the output
+(`completion_tokens_details`), and `Usage.reasoning` carries them. The
+OpenAI-style and Gemini requests ask for a JSON answer. Gemini turns thinking
+off (`thinkingBudget: 0`). Anthropic sends `anthropic-version: 2023-06-01`, as
+the app's old `cloud.rs` did.
 
 The server refuses to start when a named provider has no key, or when a name is
 unknown.
@@ -86,7 +90,7 @@ rest of the prior back as the revision:
 | ------- | ----------------------------------------------------------------------- | ------------------------- |
 | `echo`  | `text` unchanged                                                        | the selection             |
 | `edit`  | `text` with its last `.`, `?` or `!` turned into `!`, or `!` added      | the selection in capitals |
-| `edit`  | for `<sentence> no wait <word>`: the sentence, last word swapped        | the same as above         |
+| `edit`  | for `<sentence> no wait <word>` (a comma may follow "no", and a comma or "!" may follow "wait"): the sentence, last word swapped | the same as above         |
 | `edit`  | for `<sentence> nahi nahi <word>`, or its Hindi: first day word swapped | the same as above         |
 | `fail`  | a provider error, so a 502                                              | the same                  |
 | `slow`  | waits 5 s, then echoes, so a short deadline gives a 502                 | the same                  |
@@ -103,8 +107,9 @@ These are list prices and change, so check them before you trust a cost report.
 An engine not in the table costs 0.
 
 OpenAI reports the cached part of each prompt (`prompt_tokens_details`), and
-`Usage.cached` carries it. The fixed prompt and examples (about 2,050 tokens)
-are the same on every call, so they are what gets cached. The bench measured:
+`Usage.cached` carries it. The fixed prompt and examples (about 13,800 tokens on
+13 Oct 2026; 77 % of prompt tokens came from the cache on the bench) are the
+same on every call, so they are what gets cached. The bench measured:
 
 - 90 % of prompt tokens cached for `gpt-4.1` models at 16 requests in flight;
 - 25 % for `gpt-5.6-*` and `gpt-6-*`, and 0 % for `gpt-5.2`, `gpt-5.4-nano` and

@@ -10,9 +10,7 @@ class Gemini(Http):
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
         super().__init__(engine, url, {"x-goog-api-key": key})
 
-    async def complete(
-        self, turns: list[Turn], max_tokens: int, timeout: float, reason: bool = False
-    ) -> tuple[str, Usage]:
+    async def complete(self, turns: list[Turn], max_tokens: int, timeout: float, reason: str = "") -> tuple[str, Usage]:
         body = {
             "systemInstruction": {"parts": [{"text": turns[0][1]}]},
             "contents": [

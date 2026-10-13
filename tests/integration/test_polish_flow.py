@@ -26,13 +26,11 @@ class Scripted:
         self.usage = usage
         self.calls = 0
         self.max_tokens = 0
-        self.reasoned = False
+        self.reasoned = ""
         self.asked: dict[str, str] = {}
         self.turns: list[Turn] = []
 
-    async def complete(
-        self, turns: list[Turn], max_tokens: int, timeout: float, reason: bool = False
-    ) -> tuple[str, Usage]:
+    async def complete(self, turns: list[Turn], max_tokens: int, timeout: float, reason: str = "") -> tuple[str, Usage]:
         self.calls += 1
         self.max_tokens = max_tokens
         self.reasoned = reason
@@ -138,7 +136,7 @@ async def test_a_rejected_big_answer_is_corrected_once_with_reasoning() -> None:
     big = Scripted("test:big", answer("Sure, ship it."))
     outputs = iter([answer("Sure, ship it."), answer("Ship it.")])
 
-    async def complete(turns: list[Turn], max_tokens: int, timeout: float, reason: bool = False) -> tuple[str, Usage]:
+    async def complete(turns: list[Turn], max_tokens: int, timeout: float, reason: str = "") -> tuple[str, Usage]:
         big.calls += 1
         big.reasoned = reason
         return next(outputs), USAGE
@@ -148,7 +146,7 @@ async def test_a_rejected_big_answer_is_corrected_once_with_reasoning() -> None:
     response, calls = await polish(request, Tiers(small=UNUSED, big=big, fallback=None))
     assert (response.text, response.rejected, response.tier) == ("Ship it.", False, "big")
     assert [call.verdict for call in calls] == ["reply", "ok"]
-    assert (big.calls, big.reasoned) == (2, True)
+    assert (big.calls, big.reasoned) == (2, "medium")
 
 
 @pytest.mark.anyio
@@ -290,7 +288,7 @@ async def test_a_slow_tier_is_backed_up_by_the_fallback_and_the_first_answer_win
     response, calls = await polish(request, Tiers(small=UNUSED, big=big, fallback=fallback))
     assert time.monotonic() - started < 0.6
     assert (response.text, response.engine) == ("Ship it.", "test:fallback")
-    assert (fallback.calls, fallback.reasoned) == (1, False)
+    assert (fallback.calls, fallback.reasoned) == (1, "")
     assert [call.engine for call in calls if call.verdict == "ok"] == ["test:fallback"]
 
 
@@ -419,8 +417,8 @@ async def test_a_correction_reasons_with_room_for_the_reasoning_tokens() -> None
     small = Scripted("test:small", answer("Deploy on Tuesday."))
     await polish(said("deploy on tuesday"), Tiers(small=small, big=UNUSED, fallback=None))
     # Round b3: medium reasoning needs room of its own, 4,000 tokens (1,000 cut some answers off empty).
-    assert (big.reasoned, big.max_tokens) == (True, 4136)
-    assert (small.reasoned, small.max_tokens) == (False, 117)
+    assert (big.reasoned, big.max_tokens) == ("medium", 4136)
+    assert (small.reasoned, small.max_tokens) == ("", 117)
 
 
 @pytest.mark.anyio
@@ -431,7 +429,7 @@ async def test_a_correction_reasons_with_room_for_the_reasoning_tokens() -> None
 async def test_every_big_tier_chunk_reasons_with_room_for_the_reasoning_tokens(text: str, language: str) -> None:
     big = Scripted("test:big", answer(text))
     await polish(said(text, language=language), Tiers(small=UNUSED, big=big, fallback=None))
-    assert (big.reasoned, big.max_tokens) == (True, len(text) + 4100)
+    assert (big.reasoned, big.max_tokens) == ("medium", len(text) + 4100)
 
 
 @pytest.mark.anyio
@@ -574,7 +572,7 @@ async def test_a_long_english_chunk_goes_to_the_big_tier_without_reasoning() -> 
     big = Scripted("test:big", answer(text.capitalize() + "."))
     tiers = Tiers(small=UNUSED, big=big, fallback=None)
     response, _ = await polish(said(text), tiers)
-    assert (response.tier, big.reasoned) == ("big", False)
+    assert (response.tier, big.reasoned) == ("big", "")
 
 
 @pytest.mark.anyio

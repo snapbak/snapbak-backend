@@ -73,11 +73,17 @@ def tier(text: str, language: str) -> Tier:
     return "big" if hard else "small"
 
 
-def reasons(text: str, language: str) -> bool:
-    """Whether a big-tier answer reasons: Hindi, Hinglish and corrections, where round b3 measured medium reasoning's
-    gain; an English chunk that is big only for its length answers without it (founder, 13 Oct: faster)."""
-    reasoned = has_cue(text) or language in BIG_LANGUAGES
-    return reasoned
+# The reasoning effort each route asks for: a chunk with a correction cue, Hindi, Hinglish, and the correction of a
+# refused answer. Round b3 measured medium's gain on Hindi, Hinglish and cues (150 against 131 of 216 rows).
+EFFORTS = {"cue": "medium", "hinglish": "medium", "hi": "medium", "correction": "medium"}
+STRENGTH = ["", "minimal", "low", "medium", "high"]
+
+
+def effort(text: str, language: str) -> str:
+    """The effort a big-tier answer reasons at, "" for none: the higher of its routes' (a cue, Hindi or Hinglish); an
+    English chunk that is big only for its length answers without it (founder, 13 Oct: faster)."""
+    routes = [EFFORTS["cue"] if has_cue(text) else "", EFFORTS.get(language, "") if language in BIG_LANGUAGES else ""]
+    return max(routes, key=STRENGTH.index)
 
 
 # A paragraph said between two long paragraphs splits a chunk; each part is polished at once (founder, 13 Oct).

@@ -10,9 +10,10 @@ router = APIRouter()
 
 @router.get("/healthz")
 async def healthz(request: Request, background: BackgroundTasks) -> dict[str, bool]:
-    """The app calls this on key-down; after answering, each tier's provider connection is opened."""
+    """The app calls this on key-down; after answering, each tier's and the fallback's provider connection is opened,
+    so a backup call skips the TLS handshake too."""
     tiers = deps.tiers(request)
-    for provider in (tiers.small, tiers.big):
+    for provider in (tiers.small, tiers.big, tiers.fallback):
         if isinstance(provider, Http):
             background.add_task(provider.warm)
     return {"ok": True}

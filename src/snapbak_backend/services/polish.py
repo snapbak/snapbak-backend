@@ -13,8 +13,9 @@ from snapbak_backend.transformers.polish import correction_turn, fold, polish_tu
 # items, 11 Oct 2026), or it mostly times out and only delays the rules text. A refused big answer is corrected too:
 # gpt-6-luna sometimes repairs a garbled phrase with an unheard word, and told which word, takes it out (D1).
 MIN_RETRY_S = 1.5
-# A big-tier chunk is polished with medium reasoning (round b3, D8); its reasoning tokens count against the output
-# budget, so they get room of their own: 1,000 cut off some answers at medium effort and left them empty.
+# A big-tier chunk is polished with reasoning at its route's effort (`routing.EFFORTS`); its reasoning tokens count
+# against the output budget, so they get room of their own: 1,000 cut off some answers at medium effort and left them
+# empty.
 REASONING_TOKENS = 4000
 # A correction starts late, often 10 s into a long dictation, and the big tier reasoning over it can run past the
 # deadline before `HEDGE_S`; the fallback joins it once this share of the time left has gone (round b5: 4 of 8 long
@@ -57,7 +58,7 @@ async def polished_chunk(request: PolishRequest, tiers: Tiers) -> tuple[PolishRe
     asked = fold(request)
     turns = polish_turns(asked)
     tier = routing.tier(request.text, request.language)
-    reason = tier == "big" and routing.reasons(request.text, request.language)
+    reason = routing.effort(request.text, request.language) if tier == "big" else ""
     max_tokens = len(request.text) + len(request.prior) + 100 + (REASONING_TOKENS if reason else 0)
     calls: list[Call] = []
     first = tiers.chain(tier)
@@ -73,7 +74,8 @@ async def polished_chunk(request: PolishRequest, tiers: Tiers) -> tuple[PolishRe
         max_tokens += 0 if reason else REASONING_TOKENS
         hedge_s = min(chain.HEDGE_S, (deadline - time.monotonic()) * RETRY_HEDGE_SHARE)
         try:
-            output = await ask(tiers.chain("big"), corrected, max_tokens, deadline, calls, True, hedge_s)
+            effort = routing.EFFORTS["correction"]
+            output = await ask(tiers.chain("big"), corrected, max_tokens, deadline, calls, effort, hedge_s)
             tier = "big"
             polished = read(request, asked, output)
             calls[-1].verdict = polished.rejected or "ok"

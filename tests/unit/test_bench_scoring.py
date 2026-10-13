@@ -193,9 +193,7 @@ class Scripted:
     def __init__(self, answer: dict) -> None:
         self.answer = answer
 
-    async def complete(
-        self, turns: list[Turn], max_tokens: int, timeout: float, reason: bool = False
-    ) -> tuple[str, Usage]:
+    async def complete(self, turns: list[Turn], max_tokens: int, timeout: float, reason: str = "") -> tuple[str, Usage]:
         return json.dumps(self.answer), Usage(10, 2)
 
     async def aclose(self) -> None:
@@ -559,9 +557,7 @@ def test_each_item_gets_the_deadline_the_app_gives_the_last_chunk() -> None:
 
 
 class Late(Scripted):
-    async def complete(
-        self, turns: list[Turn], max_tokens: int, timeout: float, reason: bool = False
-    ) -> tuple[str, Usage]:
+    async def complete(self, turns: list[Turn], max_tokens: int, timeout: float, reason: str = "") -> tuple[str, Usage]:
         await asyncio.sleep(0.5)
         return await super().complete(turns, max_tokens, timeout, reason)
 
@@ -1631,3 +1627,28 @@ def test_the_script_gate_judges_by_the_script_the_speaker_used_not_the_tag() -> 
     assert bench.wrong_script(roman, "भाई, आज का प्लान क्या है?") == (6, 6)
     assert bench.wrong_script(devanagari, "कल मीटिंग है।") == (3, 0)
     assert bench.wrong_script(devanagari, "Kal meeting hai.") == (3, 3)
+
+
+def test_a_result_is_timed_under_the_route_that_answered_it() -> None:
+    ok = Call("openai:small", Usage(100, 10), "ok")
+    refused = Call("openai:big", Usage(100, 10), "unheard")
+    english = item("formatting", "run-on", "hey sam can you ship it", "Hey Sam, can you ship it?")
+    cue = item("backtracking", "cue", "send it friday no wait monday", "Send it Monday.")
+    assert bench.route(result(english, "x", "small", [ok])) == "small"
+    assert bench.route(result(english, "x", "big", [ok])) == "big plain"
+    assert bench.route(result(cue, "x", "big", [ok])) == "big reasoned"
+    assert bench.route(result(cue, "x", "big", [refused, ok])) == "corrected"
+    assert bench.route(result(cue, "x", "big", [Call("openai:big", Usage(0, 0), "error"), ok])) == "big reasoned"
+    # A chunk split where "new paragraph" was said answers once per paragraph, all accepted: no correction.
+    assert bench.route(result(cue, "x", "big", [ok, ok])) == "paragraphs"
+    assert bench.route(result(cue, "x", "big", [ok, refused, ok])) == "corrected"
+
+
+def test_each_route_reports_its_latency_and_the_tokens_its_calls_wrote() -> None:
+    english = item("formatting", "run-on", "hey sam can you ship it", "Hey Sam, can you ship it?")
+    timed = [
+        bench.Result(english, "x", False, "small", ms, [Call("e", Usage(100, 20, reasoning=5), "ok")], False)
+        for ms in (100, 200, 300, 400)
+    ]
+    failed = bench.Result(english, "x", False, "-", 9000, [], True)
+    assert bench.by_route([*timed, failed]) == {"small": bench.Timing(4, 250, 300, 20.0, 5.0)}

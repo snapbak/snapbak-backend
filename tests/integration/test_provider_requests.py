@@ -120,9 +120,22 @@ async def test_a_call_that_reasons_asks_reasoning_models_for_medium_effort(model
         route = mock.post("https://api.openai.com/v1/chat/completions").respond(
             json={"choices": [{"message": {"content": REPLY}}], "usage": {"prompt_tokens": 1, "completion_tokens": 1}}
         )
-        await provider.complete(TURNS, 64, 2.0, reason=True)
+        await provider.complete(TURNS, 64, 2.0, reason="medium")
     body = sent(route)
     assert {name: body[name] for name in ("temperature", "reasoning_effort") if name in body} == sampling
+    await provider.aclose()
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("effort", ["minimal", "low", "medium"])
+async def test_a_call_that_reasons_asks_for_the_effort_its_route_was_given(effort: str) -> None:
+    provider = make_provider("openai:gpt-6-luna", KEYS)
+    with respx.mock(assert_all_called=True) as mock:
+        route = mock.post("https://api.openai.com/v1/chat/completions").respond(
+            json={"choices": [{"message": {"content": REPLY}}], "usage": {"prompt_tokens": 1, "completion_tokens": 1}}
+        )
+        await provider.complete(TURNS, 64, 2.0, reason=effort)
+    assert sent(route)["reasoning_effort"] == effort
     await provider.aclose()
 
 
@@ -136,6 +149,19 @@ async def test_openai_reports_the_prompt_tokens_it_served_from_its_cache() -> No
         )
         output = await provider.complete(TURNS, 64, 2.0)
     assert output == (REPLY, Usage(1600, 30, 1536))
+    await provider.aclose()
+
+
+@pytest.mark.anyio
+async def test_openai_reports_the_reasoning_tokens_inside_its_output() -> None:
+    provider = make_provider("openai:gpt-6-luna", KEYS)
+    usage = {"prompt_tokens": 1600, "completion_tokens": 130, "completion_tokens_details": {"reasoning_tokens": 100}}
+    with respx.mock(assert_all_called=True) as mock:
+        mock.post("https://api.openai.com/v1/chat/completions").respond(
+            json={"choices": [{"message": {"content": REPLY}}], "usage": usage}
+        )
+        _, counted = await provider.complete(TURNS, 64, 2.0, reason="medium")
+    assert counted.reasoning == 100
     await provider.aclose()
 
 

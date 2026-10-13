@@ -5,11 +5,6 @@ from typing import Any
 
 from snapbak_backend.ai.providers.base import Http, Turn, Usage
 
-# A call that reasons (a big-tier call or a correction, docs/escalation.md) asks a reasoning model for medium effort:
-# on the big tier's 261 of 376 bench rows it passed 150 of the 216 non-English ones against 131 at low effort (round
-# b3, D8); others ignore it.
-REASONING: dict[str, Any] = {"reasoning_effort": "medium"}
-
 
 class OpenAICompatible(Http):
     """`fast` (OpenAI only, founder 13 Oct) asks for priority processing and keys the prompt cache on the fixed prompt,
@@ -23,12 +18,11 @@ class OpenAICompatible(Http):
         self.sampling = sampling
         self.fast = fast
 
-    async def complete(
-        self, turns: list[Turn], max_tokens: int, timeout: float, reason: bool = False
-    ) -> tuple[str, Usage]:
+    async def complete(self, turns: list[Turn], max_tokens: int, timeout: float, reason: str = "") -> tuple[str, Usage]:
         sampling = self.sampling
+        # A call that reasons asks a reasoning model for its route's effort (docs/escalation.md); others ignore it.
         if reason and "reasoning_effort" in sampling:
-            sampling = REASONING
+            sampling = {"reasoning_effort": reason}
         body = {
             "model": self.model,
             **sampling,
@@ -48,5 +42,6 @@ class OpenAICompatible(Http):
         text = answer["choices"][0]["message"]["content"]
         counts = answer["usage"]
         cached = counts.get("prompt_tokens_details", {}).get("cached_tokens", 0)
-        usage = Usage(counts["prompt_tokens"], counts["completion_tokens"], cached)
+        reasoning = counts.get("completion_tokens_details", {}).get("reasoning_tokens", 0)
+        usage = Usage(counts["prompt_tokens"], counts["completion_tokens"], cached, reasoning=reasoning)
         return text, usage

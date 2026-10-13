@@ -77,19 +77,30 @@ def test_hindi_rather_is_a_correction_cue() -> None:
 
 
 @pytest.mark.parametrize(
-    ("text", "language", "reasons"),
+    ("text", "language", "effort"),
     [
-        ("kal milte hain", "hinglish", True),
-        ("कल मिलते हैं", "hi", True),
-        ("ship it on monday no wait tuesday", "en", True),
-        (" ".join(["word"] * 151), "en", False),
-        ("ship it today", "en", False),
+        ("kal milte hain", "hinglish", "medium"),
+        ("कल मिलते हैं", "hi", "medium"),
+        ("ship it on monday no wait tuesday", "en", "medium"),
+        (" ".join(["word"] * 151), "en", ""),
+        ("ship it today", "en", ""),
     ],
 )
-def test_reasoning_goes_where_it_measured_a_gain(text: str, language: str, reasons: bool) -> None:
+def test_reasoning_goes_where_it_measured_a_gain(text: str, language: str, effort: str) -> None:
     # Round b3 measured medium reasoning lifting Hindi and Hinglish rows (150 against 131 of 216); founder 13 Oct:
     # an English chunk that is big only for its length answers without it, which is faster.
-    assert routing.reasons(text, language) is reasons
+    assert routing.effort(text, language) == effort
+
+
+def test_each_route_reasons_at_its_own_effort_and_a_chunk_on_two_routes_takes_the_higher(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setitem(routing.EFFORTS, "hinglish", "low")
+    monkeypatch.setitem(routing.EFFORTS, "cue", "minimal")
+    assert routing.effort("kal milte hain", "hinglish") == "low"
+    assert routing.effort("ship it monday no wait tuesday", "en") == "minimal"
+    assert routing.effort("kal milte hain nahi nahi parso", "hinglish") == "low"
+    assert routing.effort("कल मिलते हैं", "hi") == "medium"
 
 
 def test_a_long_chunk_splits_where_a_paragraph_is_said_between_long_paragraphs() -> None:

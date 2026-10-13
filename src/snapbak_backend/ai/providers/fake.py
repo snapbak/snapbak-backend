@@ -22,9 +22,7 @@ class Fake:
         self.mode = mode
         self.engine = f"fake:{mode}"
 
-    async def complete(
-        self, turns: list[Turn], max_tokens: int, timeout: float, reason: bool = False
-    ) -> tuple[str, Usage]:
+    async def complete(self, turns: list[Turn], max_tokens: int, timeout: float, reason: str = "") -> tuple[str, Usage]:
         if self.mode == "fail":
             raise ProviderError("fake:fail")
         if self.mode == "slow":
@@ -48,7 +46,7 @@ class Fake:
         pass
 
 
-CORRECTION = re.compile(r"(?P<head>.*\S)\s+no,?\s+wait,?\s+(?P<word>[^\s.?!।]+)[.?!।]?", re.IGNORECASE)
+CORRECTION = re.compile(r"(?P<head>.*\S)\s+no,?\s+wait[,!]?\s+(?P<word>[^\s.?!।]+)[.?!।]?", re.IGNORECASE)
 DOUBLED_NAHI = re.compile(
     r"(?P<head>.*\S)\s+(?:nahi nahi|nahin nahin|नहीं नहीं),?\s+(?P<word>[^\s.?!।]+)[.?!।]?", re.IGNORECASE
 )

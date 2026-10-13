@@ -104,6 +104,7 @@ async def test_fake_fail_raises_a_provider_error() -> None:
     [
         ("Ship it today! no wait friday", "Ship it friday!"),
         ("We ship it today. No, wait, Friday.", "We ship it Friday."),
+        ("We ship it today! No, wait! Friday", "We ship it Friday!"),
         ("मीटिंग सोमवार। no wait मंगलवार", "मीटिंग मंगलवार।"),
         ("no wait friday", "no wait friday!"),
         ("Ship it today! now wait for it", "Ship it today! now wait for it!"),

@@ -11,9 +11,7 @@ class Anthropic(Http):
         super().__init__(engine, "https://api.anthropic.com/v1/messages", headers)
         self.model = model
 
-    async def complete(
-        self, turns: list[Turn], max_tokens: int, timeout: float, reason: bool = False
-    ) -> tuple[str, Usage]:
+    async def complete(self, turns: list[Turn], max_tokens: int, timeout: float, reason: str = "") -> tuple[str, Usage]:
         body = {
             "model": self.model,
             "max_tokens": max_tokens,

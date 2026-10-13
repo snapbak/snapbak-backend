@@ -55,6 +55,19 @@ def test_healthz_warms_each_provider_connection_at_most_every_half_minute(monkey
     assert (first, warmed.call_count) == (2, 2)
 
 
+def test_healthz_warms_the_fallback_too_so_a_backup_call_skips_the_handshake(monkeypatch: pytest.MonkeyPatch) -> None:
+    models = {
+        "SNAPBAK_SMALL": "openai:gpt-4.1-nano",
+        "SNAPBAK_BIG": "openai:gpt-4.1",
+        "SNAPBAK_FALLBACK": "openai:gpt-4.1-mini",
+        "OPENAI_API_KEY": "sk-test",
+    }
+    with respx.mock() as mock, serve(monkeypatch, **models) as client:
+        warmed = mock.head("https://api.openai.com/v1/chat/completions").respond(405)
+        client.get("/healthz")
+    assert warmed.call_count == 3
+
+
 def test_healthz_answers_when_warming_fails(monkeypatch: pytest.MonkeyPatch) -> None:
     models = {"SNAPBAK_SMALL": "openai:gpt-4.1-nano", "SNAPBAK_BIG": "openai:gpt-4.1", "OPENAI_API_KEY": "sk-test"}
     with respx.mock() as mock, serve(monkeypatch, **models) as client:

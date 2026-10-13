@@ -159,7 +159,7 @@ where noted:
 - **Reasoning where it pays.** A big-tier chunk reasons (medium effort) when it
   is Hindi or Hinglish or holds a correction cue, where round b3 measured the
   gain (150 against 131 of 216 non-English rows). An English chunk that is big
-  only for its length answers without reasoning (`routing.reasons`).
+  only for its length answers without reasoning (`routing.effort`).
 - **An earlier backup.** An answer that does not reason is joined by the
   fallback after `FAST_HEDGE_S` (3 s); a reasoning answer keeps `HEDGE_S`
   (10 s), since the fallback does not reason.
@@ -178,6 +178,47 @@ where noted:
 The app cuts shorter chunks too, so the last chunk is about a sentence
 (`DICTATION-AI.md` in the app repo). The rest is not yet measured against round
 7 on the frozen sample (`~/.snapbak-bench/frozen-r7-sample.json`).
+
+## Where the time goes, 13 Oct 2026
+
+The founder asked for every answer to be much faster at the same models, with
+no gate allowed to drop. On 500 dev rows (seed 7) and the 66 founder rows, two
+runs each with the default pair, the time is all the model's: the guardrail
+takes about 0.6 ms a chunk.
+
+| Route        | Dev rows | p50 ms | p95 ms | Output tokens | Reasoning |
+| ------------ | -------- | ------ | ------ | ------------- | --------- |
+| small        | 289      | 1429   | 1935   | 38            | 0         |
+| big reasoned | 657      | 2247   | 4986   | 218           | 168       |
+| paragraphs   | 24       | 4408   | 7965   | -             | -         |
+| corrected    | 30       | 8187   | 12016  | about 1,100   | about 830 |
+
+A reasoned answer is about 50 tokens; the rest is the model thinking. A
+correction (2.8 % of rows, most of them `unheard`) is where answers take 10 s.
+
+Each route's effort is in `routing.EFFORTS`, so one can be benched alone. Low
+effort, two runs each on the rows it changes, against the same rows' baseline:
+
+| Route      | p50 ms      | p95 ms      | Gates that fell                                 |
+| ---------- | ----------- | ----------- | ----------------------------------------------- |
+| Hinglish   | 2424 → 1943 | 7965 → 5358 | grammar 86.3 → 77.2, misheard 96.9 → 90.7, more |
+| Hindi      | 2288 → 2039 | 5843 → 4537 | backtracking 92.4 → 87.8, capitals 94.2 → 88.6  |
+| English cue | 1533 → 1424 | 2915 → 2292 | numbers 90.0 → 80.0, backtracking 94.4 → 91.7   |
+| Correction | 2020 → 1909 | 5636 → 5618 | within noise; no speed gained                   |
+
+Every route stays at medium. The two baseline runs differ by up to 9 points on
+a Hinglish gate, so a smaller drop can't be told from noise. Also not taken:
+
+- **Mending `unheard` by rule.** Most of those refusals are the model rightly
+  fixing a misheard word ("in the entire" → "in the interim"); putting the said
+  word back would type the mishearing. The correction call stays.
+- **Predicted outputs.** OpenAI answers `'prediction' is not supported with this
+  model` for `gpt-5.6-luna` and `gpt-6-luna`.
+- **Two copies of a call, first answer wins.** On four runs of each dev row, the
+  faster of two would take p95 from 5500 to 4694 ms only.
+
+The wait after key-up is mostly the app's: it polishes one chunk at a time, so
+chunks cut during a slow answer queue up (`DICTATION-AI.md` in the app repo).
 
 ## Retry
 

@@ -27,9 +27,7 @@ class Priced:
         self.crash_after = crash_after
         self.fail_after = fail_after
 
-    async def complete(
-        self, turns: list[Turn], max_tokens: int, timeout: float, reason: bool = False
-    ) -> tuple[str, Usage]:
+    async def complete(self, turns: list[Turn], max_tokens: int, timeout: float, reason: str = "") -> tuple[str, Usage]:
         self.sent += 1
         if self.crash_after and self.sent > self.crash_after:
             raise RuntimeError("crash")

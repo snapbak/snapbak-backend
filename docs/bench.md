@@ -576,9 +576,13 @@ until it is fixed and run again. A miss whose gold is wrong is fixed in the
 corpus, with a second model's check and a note, never by moving a bar. Done is
 every area at 9.5 or more on held-out.
 
-The report also prints p50 and p95 server time, the share of chunks that ended
-on the big tier, US$ per 1,000 dictations for each tier, priced from `PRICES`
-and `CACHED`, and the share of prompt tokens the provider served from its cache.
+The report also prints p50 and p95 server time, then the same for each route
+with its mean output and reasoning tokens per chunk: `small`, `big reasoned`,
+`big plain`, `paragraphs` (a chunk split where a paragraph was said) and
+`corrected` (an answer after a refused one). It also prints the share of chunks
+that ended on the big tier, US$ per 1,000 dictations for each tier, priced from
+`PRICES` and `CACHED`, and the share of prompt tokens the provider served from
+its cache.
 
 ## Results, 10 Oct 2026
 

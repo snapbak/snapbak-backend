@@ -9,8 +9,8 @@ fixtures.
 
 No token. Answers `200 {"ok": true}`. The app calls it on key-down to open a
 warm connection. After answering, the server opens each tier's provider
-connection too, with a `HEAD` at most every 30 s whose answer is ignored, so the
-first chunk skips both TLS handshakes.
+connection and the fallback's too, with a `HEAD` at most every 30 s whose answer
+is ignored, so the first chunk, and a backup call, skip their TLS handshakes.
 
 Run the server with `--timeout-keep-alive 75`, as `just serve` does. The app's
 first chunk comes at least 5.7 s after key-down, so uvicorn's default of 5 s

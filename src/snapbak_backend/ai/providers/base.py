@@ -32,6 +32,8 @@ class Usage(NamedTuple):
     output: int
     cached: int = 0
     retries: int = 0
+    # Of `output`, the tokens a reasoning model spent thinking before its answer (OpenAI only).
+    reasoning: int = 0
 
 
 class ProviderError(Exception):
@@ -44,7 +46,7 @@ class Provider(Protocol):
     engine: str
 
     async def complete(
-        self, turns: list[Turn], max_tokens: int, timeout: float, reason: bool = False
+        self, turns: list[Turn], max_tokens: int, timeout: float, reason: str = ""
     ) -> tuple[str, Usage]: ...
 
     async def aclose(self) -> None: ...

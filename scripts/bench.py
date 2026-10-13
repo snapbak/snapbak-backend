@@ -33,7 +33,7 @@ from snapbak_backend.ai.guardrail.respell import SPELLING_KEY
 from snapbak_backend.ai.guardrail.shape import in_style
 from snapbak_backend.ai.providers.base import Provider, Turn, Usage
 from snapbak_backend.ai.providers.factory import make_provider
-from snapbak_backend.ai.routing import CUE, LETTER
+from snapbak_backend.ai.routing import CUE, LETTER, effort
 from snapbak_backend.config.pricing import PRICES, billed
 from snapbak_backend.config.settings import KEYS
 from snapbak_backend.schemas.polish import MAX_PRIOR_WORDS, PolishRequest
@@ -672,9 +672,7 @@ class Metered:
         self.budget = budget
         self.engine = provider.engine
 
-    async def complete(
-        self, turns: list[Turn], max_tokens: int, timeout: float, reason: bool = False
-    ) -> tuple[str, Usage]:
+    async def complete(self, turns: list[Turn], max_tokens: int, timeout: float, reason: str = "") -> tuple[str, Usage]:
         try:
             answer = await self.provider.complete(turns, max_tokens, timeout, reason)
         except BaseException:
@@ -1029,6 +1027,46 @@ def gold_refused(item: Item) -> bool:
     return judged.rejected is not None
 
 
+@dataclass(frozen=True)
+class Timing:
+    """A route's answered results: how many, p50 and p95 ms, and the mean output and reasoning tokens per result."""
+
+    count: int
+    p50: float
+    p95: int
+    output: float
+    reasoning: float
+
+
+def route(result: Result) -> str:
+    """How a result was answered: corrected (an answer after a refused one), paragraphs (one accepted answer per
+    paragraph said), else its tier, with the big tier split by whether it reasoned (docs/escalation.md)."""
+    answered = [call for call in result.calls if call.verdict != "error"]
+    if any(call.verdict != "ok" for call in answered[:-1]):
+        return "corrected"
+    if len(answered) > 1:
+        return "paragraphs"
+    if result.tier == "small":
+        return "small"
+    return "big reasoned" if effort(result.item.text, result.item.language) else "big plain"
+
+
+def by_route(results: list[Result]) -> dict[str, Timing]:
+    timed: dict[str, list[Result]] = {}
+    for result in results:
+        if not result.failed:
+            timed.setdefault(route(result), []).append(result)
+    timings: dict[str, Timing] = {}
+    for name, group in timed.items():
+        latencies = sorted(result.ms for result in group)
+        usages = [call.usage for result in group for call in result.calls]
+        output = sum(usage.output for usage in usages) / len(group)
+        reasoning = sum(usage.reasoning for usage in usages) / len(group)
+        p95 = latencies[max(int(len(latencies) * 0.95) - 1, 0)]
+        timings[name] = Timing(len(group), statistics.median(latencies), p95, output, reasoning)
+    return timings
+
+
 def report(spec: str, results: list[Result]) -> bool:
     failed = sum(result.failed for result in results)
     print(f"\n{spec}: {len(results)} items, {failed} provider failures")
@@ -1074,6 +1112,11 @@ def report(spec: str, results: list[Result]) -> bool:
         f"  latency ms: p50 {statistics.median(latencies):.0f}, p95 {p95}; timed out {100 * late / len(results):.1f} %;"
         f" big tier {100 * big / len(results):.1f} %"
     )
+    for name, timing in sorted(by_route(results).items()):
+        print(
+            f"  {name}: {timing.count} items, p50 {timing.p50:.0f}, p95 {timing.p95} ms;"
+            f" tokens out {timing.output:.0f}, reasoning {timing.reasoning:.0f}"
+        )
     dollars = money(results)
     usages = [call.usage for result in results for call in result.calls]
     cached = percent(sum(usage.cached for usage in usages), sum(usage.input for usage in usages)) or 0.0
