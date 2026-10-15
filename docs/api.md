@@ -9,9 +9,10 @@ fixtures; `tests/integration/test_contract.py` compares them with the app's when
 ## GET /healthz
 
 No token. Answers `200 {"ok": true}`. The app calls it on key-down to open a
-warm connection. After answering, the server opens each tier's provider
-connection and the fallback's too, with a `HEAD` at most every 30 s whose answer
-is ignored, so the first chunk, and a backup call, skip their TLS handshakes.
+warm connection. After answering, the server opens each model's provider
+connection (polish, big, correction and fallback), with a `HEAD` at most every
+30 s whose answer is ignored, so the first chunk, a retry and a backup call skip
+their TLS handshakes.
 
 Run the server with `--timeout-keep-alive 75`, as `just serve` does. The app's
 first chunk comes at least 5.7 s after key-down, so uvicorn's default of 5 s
@@ -22,27 +23,28 @@ minutes.
 
 One chunk of a dictation, with the text polished before it.
 
-| Field         | Type     | Limit                                                 |
-| ------------- | -------- | ----------------------------------------------------- |
-| `text`        | string   | 0 to 8,000 characters; empty only when `prior` is not |
-| `prior`       | string   | at most 300 words; `""` for the first chunk           |
-| `terms`       | string[] | at most 200, each 1 to 100 characters                 |
-| `app`         | string   | at most 100 characters; `""` when unknown             |
-| `style`       | string   | `chat`, `email`, `code`, `docs` or `other`            |
-| `continues`   | bool     | optional, default `false`; see below                  |
-| `deadline_ms` | int      | 300 to 20,000                                         |
+| Field         | Type     | Limit                                                                                        |
+| ------------- | -------- | -------------------------------------------------------------------------------------------- |
+| `text`        | string   | 0 to 8,000 characters; empty only when `prior` is not                                        |
+| `prior`       | string   | at most 300 words; `""` for the first chunk                                                  |
+| `terms`       | string[] | at most 200, each 1 to 100 characters                                                        |
+| `app`         | string   | at most 100 characters; `""` when unknown                                                    |
+| `style`       | string   | `chat`, `email`, `code`, `docs` or `other`                                                   |
+| `continues`   | bool     | optional, default `false`; see below                                                         |
+| `deadline_ms` | int      | 300 to 20,000                                                                                |
+| `features`    | string[] | optional, default `null`; each `backtracking`, `lists`, `numbers`, `dictionary` or `grammar` |
 
 The answer:
 
-| Field      | Meaning                                                           |
-| ---------- | ----------------------------------------------------------------- |
-| `text`     | the polished chunk; `""` when a correction took all of it back    |
-| `revision` | the corrected `prior` when a correction reaches back, else `null` |
-| `rejected` | `true` when the guardrail refused the answer and its correction   |
-| `engine`   | `provider:model` that gave the answer                             |
-| `tier`     | `small` or `big`                                                  |
-| `ms`       | time spent on the server                                          |
-| `tokens`   | input plus output tokens over every model call                    |
+| Field      | Meaning                                                             |
+| ---------- | ------------------------------------------------------------------- |
+| `text`     | the polished chunk; `""` when a correction took all of it back      |
+| `revision` | the corrected `prior` when a correction reaches back, else `null`   |
+| `rejected` | `true` when the guardrail refused the answer and its correction     |
+| `engine`   | `provider:model` that gave the answer                               |
+| `tier`     | `small` when the polish model answered, `big` when a correction did |
+| `ms`       | time spent on the server                                            |
+| `tokens`   | input plus output tokens over every model call                      |
 
 When `rejected` is `true`, `text` is the request text unchanged and `revision`
 is `null`.
@@ -51,11 +53,11 @@ Lists come back the way the app renders them (founder, 12 Oct 2026). The
 guardrail judges the plain form ("- " bullets, "1. " numbers); once the answer
 is accepted, `style` writes its lists:
 
-| `style`                   | Lists                                                |
-| ------------------------- | ---------------------------------------------------- |
-| `chat`                    | "• " bullets; numbered lists stay "1. "              |
-| `email`, `docs`, `other`  | "- " bullets and "1. " numbers                       |
-| `code`                    | no list: each item is a sentence after its lead line |
+| `style`                  | Lists                                                |
+| ------------------------ | ---------------------------------------------------- |
+| `chat`                   | "• " bullets; numbered lists stay "1. "              |
+| `email`, `docs`, `other` | "- " bullets and "1. " numbers                       |
+| `code`                   | no list: each item is a sentence after its lead line |
 
 A `prior` the app typed with "• " bullets is read as "- " before judging, so a
 chunk can go on with a chat list. `text` and `revision` both come back styled.
@@ -63,6 +65,14 @@ chunk can go on with a chat list. `text` and `revision` both come back styled.
 Snapbak is English only (14 Oct 2026): the request has no `language` field. An
 older app that still sends one gets a normal answer; the field is ignored and
 never reaches the model.
+
+`features` (15 Oct 2026) are what the app's gate found the chunk needs; each
+adds its module of rules to the prompt (What the model sees). The grammar module
+always comes with them: punctuation, casing and grammar apply to any chunk sent,
+so `["backtracking"]` gets grammar and backtracking, and `[]` grammar alone
+(lead, 15 Oct). `null`, as an older app sends, means every module, the prompt as
+before. The field never reaches the model as a field. The app sends no request
+when its gate finds nothing to fix.
 
 `continues` is `true` for a first chunk (`prior` empty) when the text before the
 cursor ends mid-sentence, as in "hey" before "sam ship it": the model then
@@ -72,7 +82,7 @@ flag leaves the Mac, never the field's text.
 ## POST /v1/command
 
 Rewrites a selection as a spoken instruction asks. It always runs on the big
-tier.
+model (`SNAPBAK_BIG`).
 
 Request: `selection` (1 to 20,000 characters), `instruction` (1 to 2,000), `app`
 (at most 100) and `deadline_ms` (300 to 10,000). Answer: `text`, `engine`, `ms`
@@ -96,11 +106,70 @@ tier ran out of time and none was left for the fallback.
 
 ## What the model sees
 
-The system prompt and the worked examples never change between requests, so a
-provider can cache them. The last user turn is the request as JSON without
-`deadline_ms`, and without `prior`, `terms`, `app` or a `false` `continues`. The
-model answers `{"revision": string|null, "text": string}` for polish and
-`{"text": string}` for a command.
+The system prompt and the worked examples are the same for every request with
+the same `features`, so a provider can cache them. The last user turn is the
+request as JSON without `deadline_ms` and `features`, and without `prior`,
+`terms`, `app` or a `false` `continues`. The model answers
+`{"revision": string|null, "text": string}` for polish and `{"text": string}`
+for a command.
+
+### Modules, 15 Oct 2026
+
+The polish system prompt (`ai/prompts/polish.py`) is `CORE`, the grammar module
+and then the module of each other feature the request flags (`flags()`), always
+in this order, so each feature set is one prefix to cache (`providers.md`): 16
+sets, and every module for a request without features. The rules moved there
+verbatim from the one prompt of 15 Oct; only the rule numbers went (each rule is
+a "- " line) and two sentences lost a word that tied them to that order ("But
+never change" is "Never change", and "the one rule 6 allows" is "the one the
+grammar rule allows"). A unit test checks every sentence of the old prompt is in
+the prompt with every module.
+
+| Part           | Rules                                                                                                                                                                            | Tokens |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| `CORE`         | the request and answer shape, `prior` and `continues`, `checker`; never answer or translate; meaning (names, numbers, negations, time); terms spelled exactly; style; plain text | 501    |
+| `grammar`      | sentences and punctuation, casing, misheard words, grammar, a joining word left at the end                                                                                       | 2,548  |
+| `lists`        | paragraphs and line breaks, lists                                                                                                                                                | 1,121  |
+| `numbers`      | numbers, money, dates, addresses                                                                                                                                                 | 508    |
+| `backtracking` | corrections, and a chunk that revises the prior                                                                                                                                  | 872    |
+| `dictionary`   | when a heard word is or isn't a dictionary term                                                                                                                                  | 237    |
+
+Tokens are characters over 4. Every module is 5,791 tokens against 5,779 before
+the split. Each of the 92 worked examples (`ai/prompts/examples.py`) is tagged
+with the modules it shows, or `core` (a right sentence returned unchanged, an
+instruction polished and never answered). `SNAPBAK_EXAMPLES_POLICY` picks which
+go before the request:
+
+| Policy       | Examples                                                                        | With every module |
+| ------------ | ------------------------------------------------------------------------------- | ----------------- |
+| `all`        | all 92, as before (3,674 tokens)                                                | 9,465 tokens      |
+| `per_module` | the core's 2 and 2 to 4 per flagged module (`PER_MODULE`), in their usual order | 6,626 tokens      |
+| `none`       | none                                                                            | 5,791 tokens      |
+
+The `per_module` picks differ in shape within each module: for backtracking a
+cue that revises the prior, a cue that swaps one word mid-sentence, cue words
+used plainly, and a chunk that is only a cue and a word; for lists a counted
+list with its lead, an announced list bulleted, things named in one sentence,
+and a list going on from the prior; for numbers money with an address and a
+date, a count beside a time, and a digit already written; for dictionary a term
+that is also a plain word, a sound-alike of a term, and a pronoun that matches a
+term's letters; for grammar agreement with a question, a sound-alike fixed by a
+phrase said earlier, a question put in order and answered, and a tense set by a
+time word. The policy picks the examples of the modules the request gets,
+grammar's included. A request's prompt, rules and examples, in tokens:
+
+| `features`         | Rules | `all` | `per_module`   |
+| ------------------ | ----- | ----- | -------------- |
+| none sent          | 5,791 | 9,465 | 6,626 (20 ex.) |
+| `[]` (grammar)     | 3,050 | 6,724 | 3,294 (6 ex.)  |
+| `["lists"]`        | 4,172 | 7,846 | 4,606 (10 ex.) |
+| `["numbers"]`      | 3,559 | 7,233 | 3,934 (9 ex.)  |
+| `["backtracking"]` | 3,922 | 7,596 | 4,318 (10 ex.) |
+| `["dictionary"]`   | 3,287 | 6,961 | 3,648 (9 ex.)  |
+
+With `none` a request's prompt is its rules alone. The bench picks the policy.
+The turns before the request are built once per feature set and policy and
+reused (2.8 µs a request to build the turns, 7.1 µs before).
 
 When the chunk holds a correction cue and `prior` is not empty, the prior's last
 sentence moves to the front of `text` and only the rest goes as `prior` (a full
@@ -243,8 +312,9 @@ languages (the gender check judged only their verbs).
 
 ## Correction
 
-When the guardrail refuses an answer, small or big tier, the big tier gets one
-chance to correct it, with reasoning, when at least 1,500 ms are left: the same
+When the guardrail refuses an answer, the correction model
+(`SNAPBAK_CORRECTION`, the big model by default, or none) gets one chance to
+correct it, with reasoning at medium, when at least 1,500 ms are left: the same
 turns, then the refused answer as the assistant's turn, then the request asked
 again as JSON with a `checker` field naming the rule and the words the guardrail
 found ("That answer was refused: you wrote 'okay', which the speaker never said;
@@ -316,19 +386,20 @@ Each model call gets only the time left. A provider's `429` or `5xx` answer is
 asked again within that time, before the fallback (`providers.md`). The fallback
 starts only while time is left: at once when the tier fails, or after 10,000 ms
 when the tier is still asking (`HEDGE_S`; then without reasoning, the first
-answer wins and the other is cancelled, because gpt-6-luna at medium reasoning
-answers in 3.4 s at the median and 10.6 s at the p95, round b3). The correction
-starts only with at least 1,500 ms left (about the big model's median answer
-time, so one that would mostly time out doesn't hold up the rules text), and
-both are cut off when time runs out. The correction is hedged within the time it
-has: the fallback joins it once half the time left has gone, or after 10,000 ms
-if that comes first (`RETRY_HEDGE_SHARE` in `services/polish.py`, round b5). A
-long dictation's correction starts about 10 s in, and the big tier reasoning
-over it used to run past the deadline before the fallback was asked: 4 of the 8
-long dictations AI-skipped in round b5 ended that way.
+answer wins and the other is cancelled, because gpt-6-luna at medium
+reasoning answers in 3.4 s at the median and 10.6 s at the p95, round b3). The
+correction starts only with at least 1,500 ms left (about the big model's median
+answer time, so one that would mostly time out doesn't hold up the rules text),
+and both are cut off when time runs out. The correction is hedged within the
+time it has: the fallback joins it once half the time left has gone, or after
+10,000 ms if that comes first (`RETRY_HEDGE_SHARE` in `services/polish.py`,
+round b5). A long dictation's correction starts about 10 s in, and the big tier
+reasoning over it used to run past the deadline before the fallback was asked: 4
+of the 8 long dictations AI-skipped in round b5 ended that way.
 
-Every chunk, on either tier, and every correction asks for medium reasoning (14
-Oct 2026; before, only big-tier chunks), with 4,000 more output tokens of room
+Every polish chunk asks for `SNAPBAK_POLISH_EFFORT` (`none` since the R7 round,
+15 Oct 2026; medium from 14 Oct, before that only big-tier chunks reasoned), and
+every correction for medium reasoning, with 4,000 more output tokens of room
 (`escalation.md`; low effort and 1,000 tokens until round b3). On the whole
 corpus (3,101 items, 10 Oct 2026) the default pair answered in p50 1459 to 1521
 ms and p95 2530 to 2535 ms; on the dev and held-out samples, where three in four
@@ -859,6 +930,29 @@ exact (with the shaping rules above); judged as a model's answer, no gold answer
 changes except that row's own gold, which the guardrail had cut and now keeps;
 refusals and catches are the same, in 0.58 to 0.60 → 0.52 ms a gold (interleaved
 A/B on a quiet machine; 1.06 → 1.00 to 1.06 under load).
+
+R7 replay, 15 Oct: five more shaping rules from the misses of the shipped
+config's four stored R7 runs (`bench.md`), each a spelling or layout the speech
+settles. A web address the model capitalised like a name is written in lowercase
+(`Yoko.care` yoko.care), but at a sentence's start, where a term spells it
+(`Snapbak.app`), and when it runs on from a capitalised word (`Green Leaf.in`);
+an address's name said with its marks as words is written as said
+(`HR-team@` hr-team@ for "hr dash team at"). A blank line after a name the
+speaker addressed runs on, and a word after it that is never a name loses its
+capital (`Omar,`, blank line, `The proposal` Omar, the proposal); a greeting's
+blank line stays. When a greeting's blank line made up the count of paragraphs
+said later, each spoken "new paragraph" gets its blank line where it was said,
+only after a full sentence (`paragraphed(strict=True)`); a place the model
+already broke stays as it is, also in the repair. A name written mid-sentence
+that sounds like a term spelled another way takes the term's spelling (`tell him
+Riya` Rhea, `Cafe Culture` Kafe Kulture): the sound reads vowels by class and
+drops a silent "h", and a word that is itself a term, a lowercase word and a
+sentence's first word stay (`names_as_terms` in `ai/guardrail/shape.py`).
+Replayed without a model on every stored run (39): 67 rows newly exact, none
+worse; no gold answer of the corpus (11,916) changes. `digits_as_said` now
+compiles its patterns once and skips a speech with no digit (21.8 µs a gold
+before), which pays for the new rules: 0.303 to 0.321 → 0.289 to 0.292 ms a
+gold judged (interleaved ABBA, best of 5, three rounds).
 
 Round b1 (11 Oct), on the corpus's 9,186 first expected answers (scratch
 harness, before → after): 2 → 2 refused, generated bad answers caught 99.50 % →

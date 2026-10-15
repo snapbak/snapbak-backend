@@ -25,7 +25,7 @@ def polish(
     """The response, and every request body the models got."""
     env = {
         "SNAPBAK_TOKEN": "dev",
-        "SNAPBAK_SMALL": f"openai:{SMALL}",
+        "SNAPBAK_POLISH": f"openai:{SMALL}",
         "SNAPBAK_BIG": f"openai:{BIG}",
         "SNAPBAK_FALLBACK": "",
         "OPENAI_API_KEY": "sk-test",
@@ -86,12 +86,13 @@ BACKTRACKING = [
 
 
 @pytest.mark.parametrize(("text", "prior", "output", "revision"), BACKTRACKING)
-def test_backtracking_drops_the_retracted_words_on_the_big_model(
+def test_backtracking_drops_the_retracted_words_on_the_one_polish_model(
     monkeypatch: pytest.MonkeyPatch, text: str, prior: str, output: str, revision: str | None
 ) -> None:
-    body, asked = polish(monkeypatch, {BIG: said(output, revision)}, text, prior=prior)
-    assert (body["text"], body["revision"], body["rejected"], body["tier"]) == (output, revision, False, "big")
-    assert models(asked) == [BIG]
+    # 15 Oct 2026: one model polishes every chunk; a cue no longer sends it to the big model.
+    body, asked = polish(monkeypatch, {SMALL: said(output, revision)}, text, prior=prior)
+    assert (body["text"], body["revision"], body["rejected"], body["tier"]) == (output, revision, False, "small")
+    assert models(asked) == [SMALL]
 
 
 @pytest.mark.parametrize(
@@ -109,7 +110,7 @@ def test_backtracking_drops_the_retracted_words_on_the_big_model(
 def test_a_correction_is_asked_with_the_last_sentence_and_answered_as_text_and_revision(
     monkeypatch: pytest.MonkeyPatch, text: str, prior: str, output: str, revision: str
 ) -> None:
-    body, asked = polish(monkeypatch, {BIG: said(output)}, text, prior=prior)
+    body, asked = polish(monkeypatch, {SMALL: said(output)}, text, prior=prior)
     last_turn = json.loads(asked[0]["messages"][-1]["content"])
     assert (last_turn.get("prior", ""), last_turn["text"].removesuffix(f" {text}")) == (
         revision,
@@ -140,9 +141,9 @@ def test_an_ordinary_no_stays_and_stays_on_the_small_model(
     ],
 )
 def test_an_ordinary_cue_word_stays(monkeypatch: pytest.MonkeyPatch, text: str, output: str) -> None:
-    body, asked = polish(monkeypatch, {BIG: said(output)}, text)
-    assert (body["text"], body["rejected"], body["tier"]) == (output, False, "big")
-    assert models(asked) == [BIG]
+    body, asked = polish(monkeypatch, {SMALL: said(output)}, text)
+    assert (body["text"], body["rejected"], body["tier"]) == (output, False, "small")
+    assert models(asked) == [SMALL]
 
 
 @pytest.mark.parametrize(

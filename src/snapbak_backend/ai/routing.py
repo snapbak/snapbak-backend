@@ -1,39 +1,15 @@
-"""Which tier polishes a chunk: the small model unless the chunk is hard (docs/escalation.md)."""
+"""What a chunk holds: a correction cue, and the paragraphs said in it (docs/escalation.md)."""
 
+import json
 import re
+from pathlib import Path
 from typing import Literal
 
+# An answer's tier in the response: "small" when the polish model answered, "big" when a correction did.
 type Tier = Literal["small", "big"]
 
-CUES = [
-    "no,",
-    "no no",
-    "no wait",
-    "no actually",
-    "wait",
-    "scratch that",
-    "i mean",
-    "actually",
-    "make that",
-    "rather",
-    "sorry",
-    "change that",
-    "i meant",
-    "oops",
-    "nope",
-    "let me rephrase",
-    "make it",
-    "correction",
-    "strike that",
-    "my bad",
-    "ignore that",
-    "cancel that",
-    "no sorry",
-    "delete that",
-    "no don't do this",
-    "no don't do that",
-]
-MAX_SMALL_WORDS = 150
+# The correction cues, shared with the app: it embeds a byte-identical copy of this file (15 Oct 2026).
+CUES: list[str] = json.loads((Path(__file__).parent / "cues.json").read_text(encoding="utf-8"))
 
 LETTER = r"\w"
 _alternatives = "|".join(re.escape(cue).replace(r"\ ", r"\s+") for cue in CUES)
@@ -43,23 +19,6 @@ CUE = re.compile(rf"(?<![{LETTER}])(?:{_alternatives})(?![{LETTER}])")
 def has_cue(text: str) -> bool:
     found = CUE.search(text.lower())
     return found is not None
-
-
-def tier(text: str) -> Tier:
-    hard = has_cue(text) or len(text.split()) > MAX_SMALL_WORDS
-    return "big" if hard else "small"
-
-
-# The reasoning effort each route asks for: a chunk with a correction cue, any other chunk, on either tier, and the
-# correction of a refused answer. The 14 Oct 2026 English sweep kept every route at medium: none and low fell outside
-# medium's noise band, and the models refuse "minimal" (docs/escalation.md).
-EFFORTS = {"cue": "medium", "plain": "medium", "correction": "medium"}
-
-
-def effort(text: str) -> str:
-    """The effort an answer reasons at: its route's."""
-    route = "cue" if has_cue(text) else "plain"
-    return EFFORTS[route]
 
 
 # A paragraph said between two long paragraphs splits a chunk; each part is polished at once (founder, 13 Oct).

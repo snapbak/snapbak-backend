@@ -28,6 +28,8 @@ COMMAND = {"selection": "hey", "instruction": "formal", "app": "", "deadline_ms"
         {"deadline_ms": 300},
         # The app waits up to 20 s for the AI: accuracy over speed (D2, 11 Oct).
         {"deadline_ms": 20_000},
+        {"features": []},
+        {"features": ["backtracking", "lists", "numbers", "dictionary", "grammar"]},
     ],
 )
 def test_polish_requests_at_the_limits_are_valid(changes: dict) -> None:
@@ -48,6 +50,8 @@ def test_polish_requests_at_the_limits_are_valid(changes: dict) -> None:
         {"deadline_ms": 299},
         {"deadline_ms": 20_001},
         {"text": None},
+        {"features": ["spelling"]},
+        {"features": "lists"},
     ],
 )
 def test_polish_requests_past_the_limits_are_invalid(changes: dict) -> None:
@@ -65,6 +69,12 @@ def test_requests_carry_no_language_and_an_older_apps_language_is_dropped(model:
 def test_continues_is_false_unless_the_app_says_the_cursor_is_mid_sentence() -> None:
     assert PolishRequest.model_validate(POLISH).continues is False
     assert PolishRequest.model_validate({**POLISH, "continues": True}).continues is True
+
+
+def test_features_are_none_unless_the_app_sends_them() -> None:
+    # An older app sends no features and gets every prompt module, as before (15 Oct).
+    assert PolishRequest.model_validate(POLISH).features is None
+    assert PolishRequest.model_validate({**POLISH, "features": ["lists"]}).features == ["lists"]
 
 
 @pytest.mark.parametrize("missing", list(POLISH))

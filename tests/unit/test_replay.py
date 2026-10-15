@@ -21,16 +21,18 @@ def test_a_short_hold_is_one_chunk() -> None:
     assert replay.chunks("ship it") == [("", "ship it")]
 
 
-def test_a_month_of_english_retries_a_share_on_the_big_tier(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_a_month_polishes_every_chunk_on_the_one_model_at_the_priority_estimate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(replay, "CACHE_HIT", 0)
     totals = replay.month(["ship it"], "openai:gpt-4.1-nano", "openai:gpt-4.1")
-    # The fixed prompt is 10,201 tokens since 14 Oct made Snapbak English only and swapped the other languages' rules
-    # and examples for English ones (it was 13,619 before, 13,070 since round b6, 12,356 since round b5, 11,444 since
-    # round b4, 10,081 since round b3, 6,807 since round b2 and 4,667 since round b1). The founder put accuracy over
-    # cost (D8): the month is a report, so the prompt may grow.
-    assert (totals["requests"], totals["big"], totals["input"], totals["output"]) == (9000, 0, 91_899_000, 90_000)
-    assert totals["small $"] == pytest.approx(18.4518)
-    assert totals["big $"] == pytest.approx(19.0116)
+    # The fixed prompt with every module and example is 10,213 tokens since 15 Oct split it into a core and modules
+    # (10,201 before; 13,619 before 14 Oct made Snapbak English only, 13,070 since round b6, 12,356 since round b5,
+    # 11,444 since round b4, 10,081 since round b3, 6,807 since round b2 and 4,667 since round b1). The founder put
+    # accuracy over cost (D8): the month is a report, so the prompt may grow. OpenAI calls are billed at the priority
+    # estimate, twice the list price (back since R7, 15 Oct).
+    assert (totals["requests"], totals["input"], totals["output"]) == (9000, 92_007_000, 90_000)
+    assert totals["polish $"] == pytest.approx(18.4734)
 
 
 def test_utterances_leave_out_the_generated_suite_growth_rows() -> None:
@@ -46,36 +48,37 @@ def test_the_cached_share_of_the_fixed_prompt_is_billed_at_the_cached_price(monk
     monkeypatch.setattr(replay, "CACHE_HIT", 1.0)
     monkeypatch.setattr(replay, "RETRY_SHARE", 0)
     totals = replay.month(["ship it"], "openai:gpt-4.1-nano", "openai:gpt-4.1")
-    assert totals["small $"] == pytest.approx(4.68045)
+    assert totals["polish $"] == pytest.approx(4.68585)
 
 
-def test_a_correction_chunk_bills_its_reasoning_tokens(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_a_chunk_with_a_cue_costs_what_any_chunk_costs_on_the_one_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Before 15 Oct a cue sent the chunk to the big tier, which reasoned 46 tokens more.
     monkeypatch.setattr(replay, "CACHE_HIT", 0)
     plain = replay.month(["ship it today"], "openai:gpt-4.1-nano", "openai:gpt-4.1")
     corrected = replay.month(["ship it actually today"], "openai:gpt-4.1-nano", "openai:gpt-4.1")
     assert plain["output"] == 6000 * 11
-    assert corrected["output"] == 4500 * (14 + 46)
+    assert corrected["output"] == 4500 * 14
 
 
 def test_half_the_fixed_prompt_is_billed_as_cached_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(replay, "RETRY_SHARE", 0)
     totals = replay.month(["ship it"], "openai:gpt-4.1-nano", "openai:gpt-4.1")
-    assert totals["small $"] == pytest.approx(11.5668)
+    assert totals["polish $"] == pytest.approx(11.5803)
 
 
-def test_the_month_is_priced_for_the_founders_pair_and_reported_not_gated(
+def test_the_month_is_priced_for_the_servers_defaults_and_reported_not_gated(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    # The founder (11 Oct): same models, accuracy over cost and time, so the month is a report, not a gate.
+    # The founder (11 Oct): accuracy over cost and time, so the month is a report, not a gate.
     monkeypatch.setattr(sys, "argv", ["replay.py"])
     assert replay.main() == 0
-    assert "small openai:gpt-5.6-luna, big openai:gpt-6-luna" in capsys.readouterr().out
+    assert "polish openai:gpt-6-luna, correction openai:gpt-6-luna" in capsys.readouterr().out
 
 
-def test_a_refused_answer_on_either_tier_is_corrected_on_the_big_tier_with_its_answer_and_the_reasons(
+def test_a_refused_answer_is_corrected_on_the_correction_model_with_its_answer_and_the_reasons(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # D1: the correction asks the big tier again, with reasoning, sending the request, the refused answer and why.
+    # D1: the correction asks again, with reasoning, sending the request, the refused answer and why.
     monkeypatch.setattr(replay, "CACHE_HIT", 0)
     english = replay.month(["ship it"], "openai:gpt-4.1-nano", "openai:gpt-4.1")
     request = replay.STATIC + replay.estimate(
@@ -84,4 +87,4 @@ def test_a_refused_answer_on_either_tier_is_corrected_on_the_big_tier_with_its_a
     answer = replay.estimate('{"revision": null, "text": "ship it"}')
     corrected = request + answer + replay.CORRECTION_TOKENS
     one = replay.billed("openai:gpt-4.1", corrected, answer + replay.REASONED_TOKENS, 0)
-    assert english["big $"] == pytest.approx(9000 * replay.RETRY_SHARE * one)
+    assert english["correction $"] == pytest.approx(9000 * replay.RETRY_SHARE * one)

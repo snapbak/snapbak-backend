@@ -46,12 +46,19 @@ newest refuse temperature 0, so they get only the effort:
 | `gpt-6-astra`, `gpt-6.1-sol`                                      | `reasoning_effort: low`                    |
 
 Each row is the lowest effort the API accepted on 10 Oct 2026, and temperature 0
-only where it was accepted. A call that reasons (every polish chunk, on either
-tier, see `escalation.md`) sends only its route's effort from `routing.EFFORTS`
-(today `medium` on every route) to every model that has a `reasoning_effort` row
-(`low` until round b3, which all 15 accepted on 10 Oct 2026; `minimal` is
-refused by `gpt-5.6-luna` and `gpt-6-luna`, 14 Oct 2026). The other models
-ignore it. OpenAI reports the reasoning tokens inside the output
+only where it was accepted. Since 15 Oct the polish model is made with
+`SNAPBAK_POLISH_TEMPERATURE` (default 0) in place of that 0, and every model
+sent a temperature also gets `seed: 7`, so a run repeats as closely as the API
+allows; a row without a temperature never gets one. Only the OpenAI-style
+providers (`openai`, `groq`) take the setting; Anthropic and Gemini stay at 0.
+The seed is not yet checked against the live API (no paid call was made). A
+call that reasons (every polish chunk and every correction, see
+`escalation.md`) sends only its effort to every model that has a
+`reasoning_effort` row: the polish model's `SNAPBAK_POLISH_EFFORT` (default
+`none` since R7, 15 Oct 2026; `medium` before), a correction `medium` (`low`
+until round b3, which all 15 accepted on 10 Oct 2026; `minimal` is refused by
+`gpt-5.6-luna` and `gpt-6-luna`, 14 Oct 2026). The other models ignore it, and
+a call that sends an effort sends no temperature. OpenAI reports the reasoning tokens inside the output
 (`completion_tokens_details`), and `Usage.reasoning` carries them. The
 OpenAI-style and Gemini requests ask for a JSON answer. Gemini turns thinking
 off (`thinkingBudget: 0`). Anthropic sends `anthropic-version: 2023-06-01`, as
@@ -62,23 +69,42 @@ unknown.
 
 ## Settings
 
-| Variable           | Meaning                                               |
-| ------------------ | ----------------------------------------------------- |
-| `SNAPBAK_TOKEN`    | the bearer token (required)                           |
-| `SNAPBAK_SMALL`    | the small tier, `provider:model` (required)           |
-| `SNAPBAK_BIG`      | the big tier (required)                               |
-| `SNAPBAK_FALLBACK` | tried once when a tier errors or times out (optional) |
+| Variable                     | Meaning                                                                                                           |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `SNAPBAK_TOKEN`              | the bearer token (required)                                                                                       |
+| `SNAPBAK_POLISH`             | the one polish model, `provider:model` (default `openai:gpt-6-luna`, the R7 pick, `bench.md`)                      |
+| `SNAPBAK_POLISH_TEMPERATURE` | the polish model's temperature, 0 to 2, on models that take one (default 0)                                       |
+| `SNAPBAK_POLISH_EFFORT`      | the polish model's `reasoning_effort`, on models that reason (default `none`)                                     |
+| `SNAPBAK_EXAMPLES_POLICY`    | `all` (default), `per_module` or `none`: the worked examples before each request (`api.md`)                       |
+| `SNAPBAK_BIG`                | the big model, which runs every command (required)                                                                |
+| `SNAPBAK_CORRECTION`         | the model that corrects a refused polish answer once, at medium effort, or `none` for no retry (default the big model) |
+| `SNAPBAK_FALLBACK`           | tried once when a model errors or times out (optional; `.env.example` sets the polish model)                      |
 
-## Priority processing and the prompt cache
+The server refuses to start when the temperature is not a number from 0 to 2 or
+the examples policy is not one of the three. Until 15 Oct the settings were
+`SNAPBAK_SMALL` and `SNAPBAK_BIG`, the two tiers (`escalation.md`); the app's
+E2E harness must set `SNAPBAK_POLISH` now.
 
-Every OpenAI call asks for priority processing (`service_tier: "priority"`) and
-sends a `prompt_cache_key` made from the system prompt's hash, so every request
-of one prompt version lands where its long fixed prefix is cached (founder, 13
-Oct 2026: faster at the same accuracy). gpt-5.6-luna answers with `service_tier:
-"priority"` and gpt-6-luna with `"fast"`. Groq gets neither. The priority price
-was not readable from OpenAI's pages, so `billed` in `config/pricing.py` counts
-an OpenAI call at twice the list price, an estimate on the safe side for the
-bench ledger and the replay.
+## The prompt cache
+
+Every OpenAI call sends a `prompt_cache_key` made from the hash of the system
+prompt's first 1,024 characters (`OPENING` in `ai/providers/openai.py`). Since
+15 Oct the system prompt is the core, the grammar module and the modules of the
+chunk's features (`api.md`), always in one order. The core alone is longer than
+the opening, so every feature set shares one key and lands where the shared
+prefix is cached. A key per whole prompt split the traffic into up to 16 keys,
+and R7 runs on the default tier came back 41 % cached; with the shared key on
+priority, 70 %. Groq gets no key.
+
+Every OpenAI call asks for priority processing (`service_tier: "priority"`;
+gpt-5.6-luna answers `"priority"` and gpt-6-luna `"fast"`), and `billed` in
+`config/pricing.py` counts it at twice the list price (`PRIORITY`), an estimate
+on the safe side. Priority went from 13 Oct, came off on 15 Oct (it cost twice
+as much and its runs then returned no cached tokens) and came back the same day
+after the R7 round (`bench.md`): the default tier was 25 % slower at p50 for the
+same model (`gpt-6-luna` without reasoning, 1,961 against 1,579 ms; p95 3,387
+against 2,480 ms), and with the shared key the priority runs were cached too.
+The bench ledger and the replay bill `billed()`.
 
 An Anthropic call marks two cache breakpoints, each an ephemeral
 `cache_control`: the system prompt, and the last worked example, the last
@@ -157,8 +183,13 @@ about as well as `gpt-6-luna` (81.5) at 8 to 25 times its price, and
 and `gpt-6.1-sol` (88.7, p95 2520 ms) have no row: the account ran out of
 credits during their 40 sample (440 and 123 provider errors).
 
-The defaults in `.env.example` are the founder's pair: small `gpt-5.6-luna`, big
-`gpt-6-luna`, fallback `gpt-5.6-luna` (founder, 11 Oct: a model other than the
+Since 15 Oct 2026 one model polishes every chunk (`escalation.md`), and the
+defaults keep the old pair's models until the bench picks the cheap one: polish
+`gpt-5.6-luna`, big (commands and corrections) `gpt-6-luna`, fallback
+`gpt-5.6-luna`. Everything below this paragraph measured the two tiers before
+15 Oct. The defaults in `.env.example` were the founder's pair: small
+`gpt-5.6-luna`, big `gpt-6-luna`, fallback `gpt-5.6-luna` (founder, 11 Oct: a
+model other than the
 big tier's, from the same family, needing no second key). Round b1 briefly made
 `gpt-6-luna` the small tier to keep the heavy month under $0.50; the founder
 reverted it (D8, 11 Oct: keep the same models, accuracy over cost and time), so
@@ -170,11 +201,12 @@ missed 4 it got (103 of 135 English rows against 95), at p50 2036 ms and p95
 5814 ms against 2114 and 8724 ms. Since 14 Oct both tiers reason at medium
 (`escalation.md`). Both tiers are near the best accuracy within budget; the
 trade is about twice the p95 of the `gpt-4.1` models. Every model below is in
-`SAMPLING`, `PRICES` and `CACHED`, so switching the pair takes only
-`SNAPBAK_SMALL` and `SNAPBAK_BIG` in `.env`, no code. A heavy month (`just
-replay`) on the 11 Oct prompt, at a 50 % and a 90 % cache share (corpus mix /
-the same month with every chunk on the big tier, measured before English only;
-Hindi and Hinglish were dropped on 14 Oct 2026, and `replay.md` has today's):
+`SAMPLING`, `PRICES` and `CACHED`, so switching the pair took only
+`SNAPBAK_SMALL` and `SNAPBAK_BIG` in `.env`, no code (now `SNAPBAK_POLISH`). A
+heavy month (`just replay`) on the 11 Oct prompt, at a 50 % and a 90 % cache
+share (corpus mix / the same month with every chunk on the big tier, measured
+before English only; Hindi and Hinglish were dropped on 14 Oct 2026, and
+`replay.md` has today's):
 
 | Small, big                     | Small items | p95 ms       | 50 % cached     | 90 % cached     |
 | ------------------------------ | ----------- | ------------ | --------------- | --------------- |
@@ -203,5 +235,4 @@ so the time is the model's own.
 
 The `priority` service tier (shown as "fast" for the `gpt-6` models) cut p50 by
 150 to 400 ms on the newer models and not at all on `gpt-4.1`. It costs twice
-the Standard price, and its calls came back with no cached tokens, so the
-default tier is used.
+the Standard price; every OpenAI call uses it (see The prompt cache).

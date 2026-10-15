@@ -2,17 +2,19 @@ import asyncio
 import json
 import math
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 import bench
 from snapbak_backend.ai.chain import Tiers
+from snapbak_backend.ai.prompts.polish import system
 from snapbak_backend.ai.providers.base import ProviderError, Turn, Usage
 from snapbak_backend.ai.providers.fake import Fake
 
 # gpt-6-luna lists $0.10 per million input tokens and an OpenAI call is billed at the priority estimate, twice
-# that (13 Oct), so each call below costs $0.20.
+# that (priority back since R7, 15 Oct), so each call below costs $0.20.
 MILLION = Usage(1_000_000, 0)
 
 
@@ -53,7 +55,7 @@ def entries(path: Path) -> list[dict]:
 
 def run_main(monkeypatch: pytest.MonkeyPatch, provider: Priced, count: int, ledger: Path, budget: float) -> int:
     monkeypatch.setattr(bench, "load", lambda: rows(count))
-    monkeypatch.setattr(bench, "make_provider", lambda spec, keys: provider)
+    monkeypatch.setattr(bench, "make_provider", lambda spec, keys, temperature=0.0: provider)
     monkeypatch.setattr(bench, "CONCURRENCY", 1)
     argv = ["bench.py", provider.engine, "--ledger", str(ledger), "--budget-usd", str(budget)]
     monkeypatch.setattr(sys, "argv", argv)
@@ -136,7 +138,7 @@ def test_a_call_that_failed_without_usage_is_charged_as_the_dearest_call_so_far(
 def test_an_item_whose_provider_failed_is_charged_as_one_call() -> None:
     budget = bench.Budget(40, 0)
     provider = bench.Metered(Priced(fail_after=1), budget)
-    tiers = Tiers(small=provider, big=provider, fallback=None)
+    tiers = Tiers(polish=provider, command=provider, fallback=None)
     gate = asyncio.Semaphore(1)
     first, second = rows(2)
     asyncio.run(bench.run(first, tiers, gate, budget))
@@ -145,14 +147,72 @@ def test_an_item_whose_provider_failed_is_charged_as_one_call() -> None:
     assert (budget.spent, budget.items) == (pytest.approx(0.4), 2)
 
 
-def test_the_real_escalation_runs_with_the_small_model_as_its_fallback_as_the_server_does() -> None:
-    # Round b5: the server's fallback is the small model (gpt-5.6-luna), which joins a slow big answer or retry; a
-    # bench with no fallback timed long retries out where the server would have answered.
+def test_a_spec_names_the_polish_model_and_the_one_that_corrects_it_backed_up_by_the_polish_model() -> None:
+    # Round b5: the server's fallback is the polish model, which joins a slow answer or retry; a bench with no
+    # fallback timed long retries out where the server would have answered. 15 Oct: "+none" runs with no retry.
     budget = bench.Budget(math.inf, 0.0)
-    tiers = bench.tiers_of("fake:echo+fake:slow", budget)
+    tiers = bench.tiers_of("fake:echo+fake:slow", budget, bench.Knobs())
     assert tiers is not None
-    assert tiers.fallback is not None
-    assert tiers.fallback.engine == tiers.small.engine == "fake:echo"
-    alone = bench.tiers_of("fake:echo", budget)
+    assert (tiers.polish.engine, tiers.fallback and tiers.fallback.engine) == ("fake:echo", "fake:echo")
+    assert tiers.correction is not None
+    assert tiers.correction.engine == "fake:slow"
+    alone = bench.tiers_of("fake:echo", budget, bench.Knobs())
     assert alone is not None
-    assert alone.fallback is None
+    assert alone.correction is alone.polish
+    unretried = bench.tiers_of("fake:echo+none", budget, bench.Knobs())
+    assert unretried is not None
+    assert unretried.correction is None
+
+
+def test_the_knobs_set_the_polish_temperature_effort_and_examples_as_the_server_environment_does(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    made: list[tuple[str, float]] = []
+
+    def make(spec: str, keys: dict, temperature: float = 0.0) -> Fake:
+        made.append((spec, temperature))
+        return Fake("echo")
+
+    monkeypatch.setattr(bench, "make_provider", make)
+    knobs = bench.Knobs(temperature=0.4, effort="none", examples="per_module")
+    tiers = bench.tiers_of("openai:gpt-4.1-nano+openai:gpt-6-luna", bench.Budget(math.inf, 0.0), knobs)
+    assert tiers is not None
+    assert made == [("openai:gpt-4.1-nano", 0.4), ("openai:gpt-6-luna", 0.0)]
+    assert (tiers.effort, tiers.examples) == ("none", "per_module")
+
+
+def test_the_features_file_flags_each_row_by_id_and_a_row_not_in_it_gets_every_module(tmp_path: Path) -> None:
+    path = tmp_path / "features.jsonl"
+    path.write_text('{"id": "a", "features": ["lists"]}\n{"id": "b", "features": []}\n', encoding="utf-8")
+    features = bench.read_features(path)
+    assert features == {"a": ["lists"], "b": []}
+    flagged, unlisted = rows(2)
+    flagged = replace(flagged, id="a")
+    assert bench.request_of(flagged, features.get(flagged.id)).features == ["lists"]
+    assert bench.request_of(unlisted, features.get(unlisted.id)).features is None
+
+
+def test_a_run_sends_each_row_with_its_features(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    sent: list[str] = []
+
+    class Seen(Priced):
+        async def complete(self, turns: list[Turn], max_tokens: int, timeout: float, reason: str = "") -> tuple:
+            sent.append(turns[0][1])
+            answer = await super().complete(turns, max_tokens, timeout, reason)
+            return answer
+
+    path = tmp_path / "features.jsonl"
+    path.write_text('{"id": "", "features": ["numbers"]}\n', encoding="utf-8")
+    monkeypatch.setattr(bench, "load", lambda: rows(1))
+    monkeypatch.setattr(bench, "make_provider", lambda spec, keys, temperature=0.0: Seen())
+    monkeypatch.setattr(sys, "argv", ["bench.py", "openai:gpt-6-luna", "--features", str(path), "--examples", "none"])
+    bench.main()
+    assert sent == [system(["grammar", "numbers"])]
+
+
+def test_a_run_reasons_at_the_servers_default_effort_unless_told(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # R7 (15 Oct): the server polishes without reasoning, so the bench does too by default.
+    run_main(monkeypatch, Priced(), 1, tmp_path / "spend.jsonl", 40)
+    assert "effort none," in capsys.readouterr().out

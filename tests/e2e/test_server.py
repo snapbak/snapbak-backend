@@ -29,7 +29,7 @@ def free_port() -> int:
 @pytest.fixture(scope="module")
 def server() -> Iterator[str]:
     port = free_port()
-    env = {**os.environ, "SNAPBAK_TOKEN": "dev", "SNAPBAK_SMALL": "fake:edit", "SNAPBAK_BIG": "fake:edit"}
+    env = {**os.environ, "SNAPBAK_TOKEN": "dev", "SNAPBAK_POLISH": "fake:edit", "SNAPBAK_BIG": "fake:edit"}
     env.pop("SNAPBAK_FALLBACK", None)
     command = [sys.executable, "-m", *SERVE[2:]]
     command[command.index("${PORT:-8787}")] = str(port)

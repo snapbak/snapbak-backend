@@ -1,11 +1,11 @@
-"""Asking a tier's providers in turn, then the fallback, before the deadline (docs/api.md)."""
+"""Asking a model, then the fallback, before the deadline (docs/api.md)."""
 
 import asyncio
 import time
 from dataclasses import dataclass
 
-from snapbak_backend.ai import routing
 from snapbak_backend.ai.providers.base import Provider, ProviderError, Turn, Usage
+from snapbak_backend.config.settings import ExamplesPolicy
 
 # The client stops waiting deadline_ms after it sends; the answer needs this long to travel back.
 MARGIN_MS = 250
@@ -17,13 +17,27 @@ HEDGE_S = 10.0
 
 @dataclass(frozen=True)
 class Tiers:
-    small: Provider
-    big: Provider
-    fallback: Provider | None
+    """The models a request may ask (15 Oct 2026, docs/escalation.md): one polish model for every chunk, reasoning at
+    `effort` when it reasons, with the `examples` policy's worked examples; the big model for commands; the model that
+    corrects a refused polish answer once (None: no retry); and the fallback that backs any of them up."""
 
-    def chain(self, tier: routing.Tier) -> list[Provider]:
-        first = self.small if tier == "small" else self.big
+    polish: Provider
+    command: Provider
+    fallback: Provider | None
+    correction: Provider | None = None
+    effort: str = "medium"
+    examples: ExamplesPolicy = "all"
+
+    def chain(self, first: Provider) -> list[Provider]:
         return [first] if self.fallback is None else [first, self.fallback]
+
+    def providers(self) -> list[Provider]:
+        """Every model the server asks, each once though it fills several roles: each connection is warmed at /healthz
+        and closed at shutdown."""
+        each = [self.polish, self.command, self.correction, self.fallback]
+        made = {id(provider): provider for provider in each if provider is not None}
+        unique = list(made.values())
+        return unique
 
 
 @dataclass

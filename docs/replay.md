@@ -1,10 +1,14 @@
 # Replay
 
-`just replay [SMALL BIG]` prices a heavy user's month: two hours of dictation
-through the escalation rules. It runs offline and is a report, not a gate: it
+`just replay [POLISH CORRECTION]` prices a heavy user's month: two hours of
+dictation on the one polish model, with a share corrected on the correction
+model (15 Oct 2026; until then `[SMALL BIG]` through the two-tier escalation).
+Every OpenAI call is billed at the priority estimate, twice the list price
+(`providers.md`). It runs
+offline and is a report, not a gate: it
 always exits 0 and prints the PRD's old US$0.50 target only for reference
 (founder decision D8, 11 Oct: the same models, accuracy over cost and time). The
-defaults are the founder's pair, `openai:gpt-5.6-luna openai:gpt-6-luna`.
+defaults are the server's, `openai:gpt-6-luna openai:gpt-6-luna`.
 
 ## How it works
 
@@ -15,23 +19,49 @@ defaults are the founder's pair, `openai:gpt-5.6-luna openai:gpt-6-luna`.
 2. Cut each utterance into 15-word chunks, about what the app's ChunkGate sends:
    at least 5 s of audio, then a pause. Each chunk carries the words before it
    as `prior`, capped at 300 words, as the app sends it.
-3. Pick each chunk's tier with `routing.tier`. Assume 5 % of answers on either
-   tier are refused and corrected on the big tier with reasoning, sending the
-   request, the refused answer and the reasons (about 50 tokens), until the
-   bench measures the real share.
-4. Estimate tokens as UTF-8 bytes over 4. A chunk on the big tier adds 46 output
-   tokens of reasoning, the larger of two bench means (`escalation.md`); every
-   pair is billed for them, though only OpenAI reasoning models spend them. That
-   counts the fixed prompt and examples (about 2,050 tokens) on every call.
-   Requests are measured as the server sends them, without empty fields.
+3. Polish every chunk on the polish model. Assume 5 % of answers are refused
+   and corrected on the correction model with reasoning, sending the request,
+   the refused answer and the reasons (about 50 tokens), until the bench
+   measures the real share.
+4. Estimate tokens as UTF-8 bytes over 4. A correction adds 46 output tokens of
+   reasoning, the larger of two bench means (`escalation.md`); every model is
+   billed for them, though only OpenAI reasoning models spend them. That counts
+   the fixed prompt with every module and all examples (10,213 tokens) on every
+   call, at the priority estimate. Requests are measured as the server sends
+   them, without empty fields.
 5. Bill `CACHE_HIT` (50 %) of the fixed prompt at the provider's cached price,
    the share the founder set on 10 Oct 2026. The bench measured 25 % for
    `gpt-6-luna` and `gpt-5.6-luna` on a cold start at 16 requests in flight, and
    99.6 to 99.9 % warm (the `gpt-4.1` models got 90 % cold).
 
 It prints one month: the English corpus as the app would send it. Reasoning
-tokens are billed only on the big tier, so the month understates the small
-tier's medium reasoning (`escalation.md`).
+tokens are billed only on corrections; the polish model reasons at none.
+
+## R7 one-model round, 15 Oct 2026
+
+With `gpt-6-luna` polishing every chunk at effort none and correcting, at the
+priority estimate, the month is 14.91 M input and 0.036 M output tokens over
+1,448 requests: $1.686 polish + $0.090 correction = $1.776, against $1.738 for
+`gpt-5.6-luna` at list price on the default tier (below). `gpt-6-luna` lists at
+half `gpt-5.6-luna`'s input price and priority doubles it, so the polish costs
+the same; the correction doubles. At the 70 % cached that the R7 priority runs
+measured (`bench.md`), the month is $1.217.
+
+The replay can't see the bench's −64 %: it sends every module on every call
+(the gate's cut is not in it) and bills no reasoning on the polish call, which
+the old setup's medium effort spent.
+
+## One model, 15 Oct 2026
+
+With `gpt-5.6-luna` polishing every chunk and `gpt-6-luna` correcting, at list
+price on the default tier, the month is 14.91 M input and 0.036 M output tokens
+over 1,448 requests: $1.693 polish + $0.045 correction = $1.738, against $3.391
+for the same models as the two-tier pair at the priority estimate the same day.
+Halving the price for the default tier accounts for $3.391 → $1.696; the rest
+($0.042) is the 5 % of chunks that held a cue or ran long, now on the polish
+model, which lists at twice `gpt-6-luna`'s price, and 12 more prompt tokens. The
+month still sends every module and all 92 examples: it can't tell a chunk's
+features offline, so the prompt the app's gate cuts is not in it yet.
 
 ## Filled v2 corpus, 14 Oct 2026
 

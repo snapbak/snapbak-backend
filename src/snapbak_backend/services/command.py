@@ -1,4 +1,4 @@
-"""Command: the selection rewritten by the big tier (docs/api.md)."""
+"""Command: the selection rewritten by the big model (docs/api.md)."""
 
 import json
 import time
@@ -13,7 +13,7 @@ async def command(request: CommandRequest, tiers: Tiers) -> tuple[CommandRespons
     deadline = deadline_of(started, request.deadline_ms)
     max_tokens = 2 * len(request.selection) + 200
     calls: list[Call] = []
-    output = await ask(tiers.chain("big"), command_turns(request), max_tokens, deadline, calls)
+    output = await ask(tiers.chain(tiers.command), command_turns(request), max_tokens, deadline, calls)
     try:
         text = json.loads(output)["text"]
     except (ValueError, KeyError, TypeError) as error:

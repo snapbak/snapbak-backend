@@ -1,34 +1,34 @@
+import json
+from importlib import resources
+
 import pytest
 
 from snapbak_backend.ai import routing
-from snapbak_backend.ai.routing import has_cue, tier
-
-LONG = " ".join(["word"] * 151)
-LIMIT = " ".join(["word"] * 150)
+from snapbak_backend.ai.routing import has_cue
 
 
 @pytest.mark.parametrize(
     ("text", "expected"),
     [
-        ("let's meet on friday no wait thursday", "big"),
-        ("Send this to Jam Co. No, send this to GMMCO.", "big"),
-        ("deploy on tuesday actually wednesday", "big"),
-        ("the copy should say built for teams scratch that designed for teams", "big"),
-        ("call Priya I mean Riya tomorrow", "big"),
-        ("book five seats make that six", "big"),
-        ("no no send it to Ravi", "big"),
-        ("no problem, I'll send it today", "small"),
-        ("there is no data in the sheet yet", "small"),
-        ("send this to jam co no send this to GMMCO", "small"),
-        ("meet friday no thursday", "small"),
-        ("ship the build to staging tonight", "small"),
-        ("await the build tonight", "small"),
-        (LONG, "big"),
-        (LIMIT, "small"),
+        ("let's meet on friday no wait thursday", True),
+        ("Send this to Jam Co. No, send this to GMMCO.", True),
+        ("deploy on tuesday actually wednesday", True),
+        ("the copy should say built for teams scratch that designed for teams", True),
+        ("call Priya I mean Riya tomorrow", True),
+        ("book five seats make that six", True),
+        ("no no send it to Ravi", True),
+        ("no problem, I'll send it today", False),
+        ("there is no data in the sheet yet", False),
+        ("send this to jam co no send this to GMMCO", False),
+        ("meet friday no thursday", False),
+        ("ship the build to staging tonight", False),
+        ("await the build tonight", False),
     ],
 )
-def test_tier_escalates_corrections_and_long_text(text: str, expected: str) -> None:
-    assert tier(text) == expected
+def test_a_correction_cue_is_found_and_a_plain_no_is_not(text: str, expected: bool) -> None:
+    # The cue folds the prior's last sentence into the chunk (transformers/polish.py); since 15 Oct it no longer
+    # picks a model.
+    assert has_cue(text) is expected
 
 
 @pytest.mark.parametrize(
@@ -56,26 +56,6 @@ def test_ordinary_words_are_not_cues(text: str) -> None:
     assert not has_cue(text)
 
 
-@pytest.mark.parametrize(
-    ("text", "effort"),
-    [
-        ("ship it on monday no wait tuesday", "low"),
-        ("ship it today", "minimal"),
-        (" ".join(["word"] * 151), "minimal"),
-    ],
-)
-def test_a_chunk_reasons_at_its_route_effort(monkeypatch: pytest.MonkeyPatch, text: str, effort: str) -> None:
-    # A chunk with a correction cue takes the cue route's effort, any other chunk the plain route's, on either tier.
-    monkeypatch.setitem(routing.EFFORTS, "cue", "low")
-    monkeypatch.setitem(routing.EFFORTS, "plain", "minimal")
-    assert routing.effort(text) == effort
-
-
-def test_every_route_reasons_at_medium() -> None:
-    # The 14 Oct 2026 English sweep: none and low fell outside medium's noise band (docs/escalation.md).
-    assert routing.EFFORTS == {"cue": "medium", "plain": "medium", "correction": "medium"}
-
-
 def test_a_long_chunk_splits_where_a_paragraph_is_said_between_long_paragraphs() -> None:
     # Founder, 13 Oct: each paragraph is polished at once, in parallel, so a long dictation takes its slowest part.
     first = " ".join(["first"] * 30)
@@ -87,7 +67,7 @@ def test_a_long_chunk_splits_where_a_paragraph_is_said_between_long_paragraphs()
     assert routing.paragraphs("ship it") == ["ship it"]
 
 
-# The cues people say to take words back, in natural English (14 Oct 2026): each sends the chunk to the big tier.
+# The cues people say to take words back, in natural English (14 Oct 2026).
 @pytest.mark.parametrize(
     "text",
     [
@@ -102,5 +82,14 @@ def test_a_long_chunk_splits_where_a_paragraph_is_said_between_long_paragraphs()
         "Book the room for Monday, sorry, Tuesday.",
     ],
 )
-def test_natural_correction_cues_go_to_the_big_tier(text: str) -> None:
-    assert tier(text) == "big"
+def test_natural_correction_cues_are_found(text: str) -> None:
+    assert has_cue(text)
+
+
+def test_the_cues_are_read_from_the_shared_cue_list_shipped_with_the_package() -> None:
+    # One list for the app and the server (15 Oct): the app embeds a byte-identical copy of this file.
+    shipped = resources.files("snapbak_backend.ai").joinpath("cues.json")
+    cues = json.loads(shipped.read_text(encoding="utf-8"))
+    assert cues == routing.CUES
+    assert len(cues) == 26
+    assert {"no,", "scratch that", "i mean", "no don't do that"} <= set(cues)

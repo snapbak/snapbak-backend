@@ -1,11 +1,15 @@
 """Polish quality, latency and cost per engine on the checked corpus sample (docs/bench.md).
 
 `uv run scripts/bench.py SPEC [SPEC ...] [--split dev|heldout] [--limit N | --per-slice N | --heldout N]
-[--failures PATH] [--ledger PATH --budget-usd USD]`. A SPEC is `provider:model` (both tiers that model) or
-`small+big` (the real escalation). Each corpus item goes through the server's own `polish()` with its tiers, and is
-scored against the gates overall, per length and per slice, then graded per area. Needs the providers'
-keys in the environment (`just bench` loads `.env`). With `--ledger`, each run appends what it spent to that JSONL
-file, and with `--budget-usd` it stops sending once the ledger's total and its own spend reach the budget.
+[--temperature T] [--effort E] [--examples all|per_module|none] [--features PATH] [--failures PATH]
+[--ledger PATH --budget-usd USD]`. A SPEC is the polish model, `provider:model`, which corrects its own refused
+answers, or `polish+correction`, where the correction is another `provider:model` or `none` (no retry). Each corpus
+item goes through the server's own `polish()`, with the polish model as the fallback as the server runs it, and is
+scored against the gates overall, per length and per slice, then graded per area. The knobs set what the server's
+environment sets (docs/bench.md); `--features` flags each row's prompt modules by id, and a row not in it gets them
+all. Needs the providers' keys in the environment (`just bench` loads `.env`). With `--ledger`, each run appends what
+it spent to that JSONL file, and with `--budget-usd` it stops sending once the ledger's total and its own spend reach
+the budget.
 """
 
 import argparse
@@ -21,7 +25,7 @@ import sys
 import time
 import unicodedata
 from collections import Counter
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from difflib import SequenceMatcher
 from functools import cache
 from pathlib import Path
@@ -30,11 +34,12 @@ from snapbak_backend.ai.chain import MARGIN_MS, Call, ProviderFailed, Tiers, ela
 from snapbak_backend.ai.guardrail.judge import Reject, check, in_address, judge
 from snapbak_backend.ai.guardrail.numbers import NUMBER_NAMES
 from snapbak_backend.ai.guardrail.shape import in_style
+from snapbak_backend.ai.prompts.polish import Feature
 from snapbak_backend.ai.providers.base import Provider, Turn, Usage
 from snapbak_backend.ai.providers.factory import make_provider
-from snapbak_backend.ai.routing import CUE, LETTER, effort
+from snapbak_backend.ai.routing import CUE, LETTER
 from snapbak_backend.config.pricing import PRICES, billed
-from snapbak_backend.config.settings import KEYS
+from snapbak_backend.config.settings import EFFORT, KEYS, POLICIES, ExamplesPolicy
 from snapbak_backend.schemas.polish import MAX_PRIOR_WORDS, PolishRequest
 from snapbak_backend.services.polish import polish
 from snapbak_backend.transformers.polish import fold, unfold
@@ -417,13 +422,17 @@ def known(item: Item) -> set[str]:
     return found
 
 
+# A time's "a.m." and "p.m." read as "am" and "pm", as `score` reads them.
+DOTTED_TIME = {"a.m": "am", "p.m": "pm"}
+
+
 def invented(item: Item, output: str) -> list[str]:
     """Output words in no expected answer that were never said, and words written more often than said and than any
     expected answer holds them (round b5: one word written twice): a digit counts as said when a number was."""
     numbered = bool(re.search(r"\d", item.said)) or not NUMBER_WORDS.isdisjoint(words_of(item.said))
     heard = known(item)
     folded = {canonical(word) for word in heard}
-    written = words_of(output)
+    written = [DOTTED_TIME.get(word, word) for word in words_of(output)]
     found = [
         word
         for word in written
@@ -602,7 +611,26 @@ def ledger_total(path: Path) -> float:
     return spent
 
 
-def request_of(item: Item) -> PolishRequest:
+@dataclass(frozen=True)
+class Knobs:
+    """What a run sets as the server's environment would (docs/bench.md): the polish model's temperature (models that
+    take one) and effort (models that reason), the examples policy, and each row's features by id."""
+
+    temperature: float = 0.0
+    effort: str = EFFORT
+    examples: ExamplesPolicy = "all"
+    features: dict[str, list[Feature]] = field(default_factory=dict)
+
+
+def read_features(path: Path) -> dict[str, list[Feature]]:
+    """Each row's features from a JSONL file of `{"id": ..., "features": [...]}` lines."""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    rows = [json.loads(line) for line in lines if line.strip()]
+    features = {row["id"]: row["features"] for row in rows}
+    return features
+
+
+def request_of(item: Item, features: list[Feature] | None = None) -> PolishRequest:
     fields = {
         "text": item.text,
         "prior": item.prior,
@@ -611,14 +639,21 @@ def request_of(item: Item) -> PolishRequest:
         "style": item.style,
         "continues": item.continues,
         "deadline_ms": DEADLINE_MS,
+        "features": features,
     }
     request = PolishRequest.model_validate(fields)
     return request
 
 
-async def run(item: Item, tiers: Tiers, gate: asyncio.Semaphore, budget: Budget | None = None) -> Result | None:
+async def run(
+    item: Item,
+    tiers: Tiers,
+    gate: asyncio.Semaphore,
+    budget: Budget | None = None,
+    features: list[Feature] | None = None,
+) -> Result | None:
     """The item's result, or None when the budget was reached before it was sent."""
-    request = request_of(item)
+    request = request_of(item, features)
     budget = budget or Budget(math.inf, 0.0)
     async with gate:
         if budget.reached():
@@ -929,15 +964,13 @@ class Timing:
 
 def route(result: Result) -> str:
     """How a result was answered: corrected (an answer after a refused one), paragraphs (one accepted answer per
-    paragraph said), else its tier, with the big tier split by whether it reasoned (docs/escalation.md)."""
+    paragraph said), else by the one polish model (docs/escalation.md)."""
     answered = [call for call in result.calls if call.verdict != "error"]
     if any(call.verdict != "ok" for call in answered[:-1]):
         return "corrected"
     if len(answered) > 1:
         return "paragraphs"
-    if result.tier == "small":
-        return "small"
-    return "big reasoned" if effort(result.item.text) else "big plain"
+    return "polish"
 
 
 def by_route(results: list[Result]) -> dict[str, Timing]:
@@ -999,7 +1032,7 @@ def report(spec: str, results: list[Result]) -> bool:
     late = sum(result.failed and result.ms >= DEADLINE_MS - MARGIN_MS for result in results)
     print(
         f"  latency ms: p50 {statistics.median(latencies):.0f}, p95 {p95}; timed out {100 * late / len(results):.1f} %;"
-        f" big tier {100 * big / len(results):.1f} %"
+        f" corrected {100 * big / len(results):.1f} %"
     )
     for name, timing in sorted(by_route(results).items()):
         print(
@@ -1010,44 +1043,57 @@ def report(spec: str, results: list[Result]) -> bool:
     usages = [call.usage for result in results for call in result.calls]
     cached = percent(sum(usage.cached for usage in usages), sum(usage.input for usage in usages)) or 0.0
     print(
-        f"  $ per 1,000 dictations: small {dollars['small']:.3f}, big {dollars['big']:.3f}; prompt cache {cached:.1f} %"
+        f"  $ per 1,000 dictations: polish {dollars['small']:.3f}, correction {dollars['big']:.3f};"
+        f" prompt cache {cached:.1f} %"
     )
     return not missed
 
 
-def tiers_of(spec: str, budget: Budget) -> Tiers | None:
-    """The spec's tiers, metered; the real escalation (`small+big`) has the small model as its fallback, as the
-    server's founder pair does (round b5). None, with the reason printed, when a provider can't be made."""
-    small, _, big = spec.partition("+")
+def tiers_of(spec: str, budget: Budget, knobs: Knobs) -> Tiers | None:
+    """The spec's models, metered: the polish model at the knobs' temperature, backing every call up as the server's
+    fallback does (round b5), and the correction model, itself unless named, or none. None, with the reason printed,
+    when a provider can't be made."""
+    polish, _, correction = spec.partition("+")
     keys = {provider: os.environ.get(name, "") for provider, name in KEYS.items()}
     try:
-        small_provider = Metered(make_provider(small, keys), budget)
-        big_provider = Metered(make_provider(big or small, keys), budget)
+        polisher = Metered(make_provider(polish, keys, knobs.temperature), budget)
+        if correction == "none":
+            corrects = None
+        elif correction:
+            corrects = Metered(make_provider(correction, keys), budget)
+        else:
+            corrects = polisher
     except ValueError as error:
         print(f"\n{spec}: cannot run: {error}")
         return None
-    fallback = small_provider if big else None
-    return Tiers(small=small_provider, big=big_provider, fallback=fallback)
+    tiers = Tiers(
+        polish=polisher,
+        command=polisher,
+        fallback=polisher,
+        correction=corrects,
+        effort=knobs.effort,
+        examples=knobs.examples,
+    )
+    return tiers
 
 
-async def bench(spec: str, items: list[Item], budget: Budget) -> list[Result] | None:
+async def bench(spec: str, items: list[Item], budget: Budget, knobs: Knobs) -> list[Result] | None:
     """The results of the items sent before the budget was reached."""
-    tiers = tiers_of(spec, budget)
+    tiers = tiers_of(spec, budget, knobs)
     if tiers is None:
         return None
+    models = tiers.providers()
     # An engine with no price would spend without counting against the budget.
-    unpriced = [
-        p.engine for p in (tiers.small, tiers.big) if p.engine not in PRICES and not p.engine.startswith("fake:")
-    ]
+    unpriced = [p.engine for p in models if p.engine not in PRICES and not p.engine.startswith("fake:")]
     if unpriced and budget.limit < math.inf:
         print(f"\n{spec}: cannot run: no price for {unpriced[0]} in config/pricing.py")
         return None
     gate = asyncio.Semaphore(CONCURRENCY)
     try:
-        results = await asyncio.gather(*(run(item, tiers, gate, budget) for item in items))
+        results = await asyncio.gather(*(run(item, tiers, gate, budget, knobs.features.get(item.id)) for item in items))
     finally:
-        await tiers.small.aclose()
-        await tiers.big.aclose()
+        for provider in models:
+            await provider.aclose()
     sent = [result for result in results if result is not None]
     return sent
 
@@ -1108,6 +1154,10 @@ def main() -> int:
     sampling.add_argument("--limit", type=int, help="the first N items of each slice")
     sampling.add_argument("--per-slice", type=int, help="a seeded sample of N items from each slice")
     sampling.add_argument("--heldout", type=int, help="N seeded items per slice outside the --per-slice 40 sample")
+    parser.add_argument("--temperature", type=float, default=0.0, help="the polish model's, where it takes one")
+    parser.add_argument("--effort", default=EFFORT, help="the polish model's reasoning effort, where it reasons")
+    parser.add_argument("--examples", choices=POLICIES, default="all", help="the examples policy")
+    parser.add_argument("--features", type=Path, help="a JSONL file of each row's features by id (else all)")
     parser.add_argument("--failures", type=Path, help="write each missed item as a JSON line here")
     parser.add_argument("--ledger", type=Path, help="append this run's spend to this JSONL ledger")
     parser.add_argument("--budget-usd", type=float, help="send nothing more once the ledger and this run reach it")
@@ -1121,6 +1171,12 @@ def main() -> int:
         items = per_slice(items, options.per_slice)
     if options.heldout is not None:
         items = heldout(items, options.heldout)
+    features = read_features(options.features) if options.features else {}
+    knobs = Knobs(options.temperature, options.effort, options.examples, features)
+    print(
+        f"knobs: temperature {knobs.temperature}, effort {knobs.effort}, examples {knobs.examples}, "
+        f"features {options.features or 'all modules'}"
+    )
     counts = {name: sum(item.slice == name for item in items) for name in sorted({item.slice for item in items})}
     print(f"{len(items)} items: " + ", ".join(f"{name} {count}" for name, count in counts.items()))
     before = ledger_total(options.ledger) if options.ledger else 0.0
@@ -1131,7 +1187,7 @@ def main() -> int:
     note = "crashed"
     try:
         for spec in options.specs:
-            results = asyncio.run(bench(spec, items, budget))
+            results = asyncio.run(bench(spec, items, budget, knobs))
             if results == []:
                 print(f"\n{spec}: nothing sent")
             outcomes.append(bool(results) and report(spec, results or []))

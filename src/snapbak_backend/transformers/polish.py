@@ -2,6 +2,7 @@
 
 import json
 import re
+from functools import cache
 
 from pydantic import BaseModel
 
@@ -26,9 +27,10 @@ from snapbak_backend.ai.guardrail.shape import (
     rejoined,
     unasked_marked,
 )
-from snapbak_backend.ai.prompts.examples import EXAMPLES
-from snapbak_backend.ai.prompts.polish import SYSTEM, correction, message
+from snapbak_backend.ai.prompts.examples import shown
+from snapbak_backend.ai.prompts.polish import Feature, correction, flags, message, system
 from snapbak_backend.ai.providers.base import Turn
+from snapbak_backend.config.settings import ExamplesPolicy
 from snapbak_backend.schemas.polish import PolishRequest
 
 # A full stop after a digit numbers a list item ("1. ") or ends a number, and starts no new sentence.
@@ -36,27 +38,37 @@ SENTENCE_END = re.compile(r"(?<!\d)[.?!]\s+|\n")
 
 
 MALFORMED = Reason(Reject.MALFORMED)
+# Fields the server reads and the model never sees: the features only pick the prompt's modules.
+UNSENT = {"deadline_ms", "features"}
 
 
 def last_turn(request: BaseModel) -> Turn:
-    fields = request.model_dump(exclude={"deadline_ms"})
+    fields = request.model_dump(exclude=UNSENT)
     return ("user", message(fields))
 
 
 def correction_turn(request: PolishRequest, reason: Reason) -> Turn:
     """The request asked again with why its answer was refused in a "checker" field of its own, so the note is
     never read as dictation to polish (round b6, D1)."""
-    fields = request.model_dump(exclude={"deadline_ms"})
+    fields = request.model_dump(exclude=UNSENT)
     fields["checker"] = correction(reason)
     return ("user", message(fields))
 
 
-def polish_turns(request: PolishRequest) -> list[Turn]:
-    turns: list[Turn] = [("system", SYSTEM)]
-    for said, cleaned in EXAMPLES:
-        turns += [("user", said), ("assistant", cleaned)]
-    turns.append(last_turn(request))
+def polish_turns(request: PolishRequest, examples: ExamplesPolicy = "all") -> list[Turn]:
+    """The rules for the request's features, the examples its policy picks, then the request."""
+    turns = [*fixed_turns(flags(request.features), examples), last_turn(request)]
     return turns
+
+
+@cache
+def fixed_turns(flagged: tuple[Feature, ...], examples: ExamplesPolicy) -> tuple[Turn, ...]:
+    """The turns before the request, the same for every request with these modules and this policy: built once each
+    (at most 17 module sets times 3 policies), since joining the 23 KB of rules on every request cost 3.7 us."""
+    turns: list[Turn] = [("system", system(flagged))]
+    for said, cleaned in shown(flagged, examples):
+        turns += [("user", said), ("assistant", cleaned)]
+    return tuple(turns)
 
 
 def read(request: PolishRequest, asked: PolishRequest, output: str) -> Polished:

@@ -11,7 +11,7 @@ from snapbak_backend.ai.providers.openai import OpenAICompatible
 from snapbak_backend.config.settings import KEYS
 
 # OpenAI models that reason run at their lowest effort; the newest refuse temperature 0 (docs/providers.md).
-# Any other model gets temperature 0.
+# Any other model gets temperature 0, or the polish temperature it is made with, and a fixed seed.
 TEMPERATURE_0: dict[str, Any] = {"temperature": 0}
 NO_REASONING: dict[str, Any] = {**TEMPERATURE_0, "reasoning_effort": "none"}
 SAMPLING: dict[str, dict[str, Any]] = {
@@ -33,20 +33,33 @@ SAMPLING: dict[str, dict[str, Any]] = {
 }
 
 
-REGISTRY: dict[str, Callable[[str, str], Provider]] = {
-    "groq": lambda model, key: OpenAICompatible(
-        f"groq:{model}", "https://api.groq.com/openai/v1", model, key, SAMPLING.get(model, TEMPERATURE_0)
+SEED = 7
+
+
+def sampled(model: str, temperature: float) -> dict[str, Any]:
+    """A model's sampling at this temperature, with a fixed seed, where it takes a temperature at all."""
+    sampling = SAMPLING.get(model, TEMPERATURE_0)
+    if "temperature" not in sampling:
+        return sampling
+    tempered = {**sampling, "temperature": temperature, "seed": SEED}
+    return tempered
+
+
+# Each provider from its model, key and temperature; only the OpenAI-style ones take the temperature.
+REGISTRY: dict[str, Callable[[str, str, float], Provider]] = {
+    "groq": lambda model, key, heat: OpenAICompatible(
+        f"groq:{model}", "https://api.groq.com/openai/v1", model, key, sampled(model, heat)
     ),
-    "openai": lambda model, key: OpenAICompatible(
-        f"openai:{model}", "https://api.openai.com/v1", model, key, SAMPLING.get(model, TEMPERATURE_0), fast=True
+    "openai": lambda model, key, heat: OpenAICompatible(
+        f"openai:{model}", "https://api.openai.com/v1", model, key, sampled(model, heat), fast=True
     ),
-    "anthropic": lambda model, key: Anthropic(f"anthropic:{model}", model, key),
-    "gemini": lambda model, key: Gemini(f"gemini:{model}", model, key),
-    "fake": lambda mode, _key: Fake(mode),
+    "anthropic": lambda model, key, _heat: Anthropic(f"anthropic:{model}", model, key),
+    "gemini": lambda model, key, _heat: Gemini(f"gemini:{model}", model, key),
+    "fake": lambda mode, _key, _heat: Fake(mode),
 }
 
 
-def make_provider(spec: str, keys: Mapping[str, str]) -> Provider:
+def make_provider(spec: str, keys: Mapping[str, str], temperature: float = 0.0) -> Provider:
     name, _, model = spec.partition(":")
     if not model:
         raise ValueError(f"Name an engine as provider:model, not '{spec}'.")
@@ -56,4 +69,5 @@ def make_provider(spec: str, keys: Mapping[str, str]) -> Provider:
     key = keys.get(name, "")
     if name in KEYS and not key:
         raise ValueError(f"Set {KEYS[name]} to use {spec}.")
-    return build(model, key)
+    provider = build(model, key, temperature)
+    return provider

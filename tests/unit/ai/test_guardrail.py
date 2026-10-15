@@ -2456,3 +2456,114 @@ def test_shaping_leaves_said_capitals_names_and_marks_alone(said: str, wrote: st
     from snapbak_backend.ai.guardrail.shape import shaped
 
     assert shaped(said, wrote) == wrote
+
+
+# 15 Oct 2026, the R7 misses of the shipped config's four stored runs that a rule mends after the guardrail accepts the
+# words: a web address the model capitalised (v2-addresses-en-00001, -00005), an address's name said with "dash"
+# (suite-growth-en-01219), a blank line after a name the speaker addressed (v2-punctuation-en-00189,
+# v2-numbers-en-00317), and a spoken paragraph the model moved to after the greeting (suite-growth-en-00383).
+@pytest.mark.parametrize(
+    ("said", "wrote", "shaped"),
+    [
+        ("Check yoko dot care", "Check Yoko.care.", "Check yoko.care."),
+        ("Prefer React dot dev", "Prefer React.dev.", "Prefer react.dev."),
+        (
+            "send the form to hr dash team at northwind dot io",
+            "Send the form to HR-team@northwind.io.",
+            "Send the form to hr-team@northwind.io.",
+        ),
+        (
+            "Omar the proposal includes onboarding training and reporting. i will send the final version after your "
+            "review",
+            "Omar,\n\nThe proposal includes onboarding, training and reporting. I will send the final version after "
+            "your review.",
+            "Omar, the proposal includes onboarding, training and reporting. I will send the final version after your "
+            "review.",
+        ),
+        (
+            "riya sorry for the delay here are the notes",
+            "Riya,\n\nSorry for the delay. Here are the notes.",
+            "Riya, sorry for the delay. Here are the notes.",
+        ),
+        (
+            "hi team here is the summary of the planning meeting new paragraph we agreed to launch the app on friday",
+            "Hi team,\n\nHere is the summary of the planning meeting. We agreed to launch the app on Friday.",
+            "Hi team,\n\nHere is the summary of the planning meeting.\n\nWe agreed to launch the app on Friday.",
+        ),
+    ],
+)
+def test_an_accepted_answer_gets_its_addresses_and_paragraphs_as_said(said: str, wrote: str, shaped: str) -> None:
+    judged = judge("", said, [], None, wrote)
+    assert judged.rejected is None
+    assert judged.text == shaped
+
+
+@pytest.mark.parametrize(
+    ("said", "wrote", "terms"),
+    [
+        # A term spells its address, and a file name keeps its capitals.
+        ("the portal is at snapbak dot app slash vendors", "The portal is at Snapbak.app/vendors.", ["Snapbak"]),
+        ("i checked session store dot ts", "I checked sessionStore.ts.", []),
+        # An address run on from a name the model capitalised keeps the name's capital (suite-growth-en-03217).
+        ("open green leaf dot in slash menu", "Open Green Leaf.in/menu.", []),
+        # A name the speaker addressed keeps its line before a name, and a greeting keeps its blank line.
+        ("hi sam the deck is ready thanks meera", "Hi Sam,\n\nThe deck is ready.\n\nThanks,\nMeera", []),
+        # A paragraph said after the greeting is where the speaker said it.
+        (
+            "dear mrs kapoor new paragraph thank you for the quote we start on monday",
+            "Dear Mrs. Kapoor,\n\nThank you for the quote. We start on Monday.",
+            [],
+        ),
+    ],
+)
+def test_shaping_leaves_term_addresses_greetings_and_said_paragraphs_alone(
+    said: str, wrote: str, terms: list[str]
+) -> None:
+    judged = judge("", said, terms, None, wrote)
+    assert judged.rejected is None
+    assert judged.text == wrote
+
+
+# 15 Oct 2026: a name written as it sounds where a term is spelled another way takes the term's spelling
+# (v2-backtracking-en-00038 "Riya" Rhea, suite-growth-en-01338 "Cafe Culture" Kafe Kulture), in the four stored R7
+# runs of the shipped config.
+@pytest.mark.parametrize(
+    ("said", "wrote", "terms", "shaped"),
+    [
+        (
+            "also please tell him Riya can walk the lead through it",
+            "Also, please tell him Riya can walk the lead through it.",
+            ["Rhea"],
+            "Also, please tell him Rhea can walk the lead through it.",
+        ),
+        (
+            "the cafe is called cafe culture",
+            "The cafe is called Cafe Culture.",
+            ["Kafe Kulture"],
+            "The cafe is called Kafe Kulture.",
+        ),
+    ],
+)
+def test_a_name_written_as_it_sounds_takes_the_terms_spelling(
+    said: str, wrote: str, terms: list[str], shaped: str
+) -> None:
+    judged = judge("", said, terms, None, wrote)
+    assert judged.rejected is None
+    assert judged.text == shaped
+
+
+@pytest.mark.parametrize(
+    ("said", "wrote", "terms"),
+    [
+        # Another name, a plain word and a name opening the sentence stay as written.
+        ("please ask Rao to call", "Please ask Rao to call.", ["Rhea"]),
+        ("we took a lift to the top", "We took a lift to the top.", ["Lyft"]),
+        ("aditi and i will cover the desk", "Aditi and I will cover the desk.", ["Aditee"]),
+        # A name that is a term itself stays, though another term sounds the same (backtracking-436, -372).
+        ("please ask lena to call", "Please ask Lena to call.", ["Lena", "Lina"]),
+        ("book the appraisal for sarah lim", "Book the appraisal for Sarah Lim.", ["Sarah Lim", "Sara Lim"]),
+    ],
+)
+def test_a_name_unlike_a_term_keeps_its_spelling(said: str, wrote: str, terms: list[str]) -> None:
+    judged = judge("", said, terms, None, wrote)
+    assert judged.text == wrote

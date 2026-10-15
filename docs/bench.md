@@ -1,9 +1,12 @@
 # Bench
 
 `just bench [SPEC ...]` runs the corpus sample through the server's own
-`polish()`, with the same escalation, guardrail and correction, and scores each
-engine against the gates. A SPEC is `provider:model` (that model on both tiers)
-or `small+big` (the real two-tier setup). `--limit N` takes the first N items of
+`polish()`, with the same prompt, guardrail and correction, and scores each
+engine against the gates. A SPEC is the polish model, `provider:model`, which
+then corrects its own refused answers, or `polish+correction`, where the
+correction is another `provider:model` or `none` for no retry (15 Oct 2026: one
+model polishes every chunk; before, a SPEC was `small+big`, the two tiers).
+`--limit N` takes the first N items of
 each slice for a quick look. `--per-slice N` takes the same seeded N items from
 each slice on every run, so engines and lanes compare like with like.
 `--per-slice 40` is the dev sample to tune on. `--heldout N` takes N seeded
@@ -23,6 +26,31 @@ when it is sent (accuracy over speed, founder, 11 Oct) (`LAST_MS` in the app's
 don't answer in time is scored as the text sent, as the app would type it, and
 the report prints that share as "timed out" next to p50 and p95.
 
+## Knobs, 15 Oct 2026
+
+Each knob sets what the server's environment sets (`providers.md`), so a run
+measures one server setup. The run prints its knobs before the results.
+
+| Flag                               | Server setting                | Default      | Does                                                                                                                       |
+| ---------------------------------- | ----------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| SPEC                               | `SNAPBAK_POLISH`              |              | the polish model                                                                                                           |
+| `+correction` in the SPEC          | `SNAPBAK_CORRECTION`          | the polish model | the model that corrects a refused answer once, at medium effort; `none` turns the retry off                                |
+| `--temperature T`                  | `SNAPBAK_POLISH_TEMPERATURE`  | 0            | the polish model's temperature, with seed 7, on models that take one (`providers.md`); others ignore it                    |
+| `--effort E`                       | `SNAPBAK_POLISH_EFFORT`       | `none`       | the polish model's `reasoning_effort` on models that reason; others ignore it                                              |
+| `--examples all\|per_module\|none` | `SNAPBAK_EXAMPLES_POLICY`     | `all`        | the worked examples before the request (`api.md`)                                                                          |
+| `--features PATH`                  | the request's `features`      | every module | a JSONL file of `{"id": ..., "features": [...]}` lines; each row gets its id's features, a row not in the file gets them all |
+
+The polish model is also the fallback that joins a slow answer or correction, as
+the server's `SNAPBAK_FALLBACK` is set in `.env.example`. A chunked twin keeps
+its row's id, so it gets the row's features. Every OpenAI call is billed at the
+priority estimate (`billed()`), as the server sends it on the priority tier.
+
+The report's routes are `polish` (the polish model answered), `paragraphs` (one
+answer per paragraph said) and `corrected` (an answer after a refused one); the
+latency line prints the corrected share and the money line `polish` and
+`correction` $ per 1,000 dictations. Before 15 Oct the routes were `small`,
+`big reasoned` and `big plain`.
+
 ## Spend ledger and budget
 
 `--ledger PATH` appends one JSON line per run to PATH (created if missing, never
@@ -35,18 +63,20 @@ once that reaches the budget it sends nothing more, scores only the items that
 finished, prints `budget reached: $X of $Y` and exits 1. Every run prints `$
 this run: X; ledger total: Y` at the end.
 
-Each provider call is charged as it ends, at `cost()` in `config/pricing.py` on
-its real usage: input, cached input and output tokens, where OpenAI's output
+Each provider call is charged as it ends, at `billed()` in `config/pricing.py`
+on its real usage: input, cached input and output tokens, where OpenAI's output
 count already holds the reasoning tokens. That covers the first call, the
-big-tier correction and any timed-out call. A call that fails or times out
-reports no usage, though the provider may have billed it, so it is charged as
-the dearest call of the run so far. A 429 or 5xx asked again inside one call is
-not charged: providers don't bill an answer they refused. The real escalation
-(`small+big`) runs with the small model as its fallback, as the server's founder
-pair does (round b5; it ran with none before, so a long correction timed out in
-the bench where the server's fallback would have answered); a one-model spec
-runs with none. With a budget set, an engine missing from `PRICES` (other than
-`fake:`) is refused, since it would spend without counting.
+correction and any timed-out call. A call that fails or times out reports no
+usage, though the provider may have billed it, so it is charged as the dearest
+call of the run so far. A 429 or 5xx asked again inside one call is not
+charged: providers don't bill an answer they refused. Every run has the polish
+model as its fallback, as the server does (round b5; a run with none timed a
+long correction out where the server's fallback would have answered; until 15
+Oct a one-model spec ran with none). With a budget set, an engine missing from
+`PRICES` (other than `fake:`) is refused, since it would spend without counting.
+An OpenAI call is charged at twice its list price, the priority estimate, as
+from 13 Oct; for part of 15 Oct, with priority off, it was charged at list
+price.
 
 The check runs before each item, and 16 items are in flight at once, so a run
 can overshoot the budget by at most the items already in flight when it is
@@ -373,6 +403,95 @@ that ended on the big tier, US$ per 1,000 dictations for each tier, priced from
 `PRICES` and `CACHED`, and the share of prompt tokens the provider served from
 its cache.
 
+## R7 one-model round, 15 Oct 2026
+
+The round that picked the one polish model (`escalation.md`). The full R7 set,
+687 English rows. The baseline is today's setup, the `fast-e5` and `fast-e4`
+recorded outputs replayed through today's server path at $0. Every candidate ran
+with the rules gate's per-row features (`--features`) and its corrections on
+`gpt-6-luna` at medium (the default big model). The gates are the overall
+column.
+
+| gate                   | today e5               | today e4 | winner run 1 (default tier) | winner run 2 (default) | winner priority |
+| ---------------------- | ---------------------- | -------- | --------------------------- | ---------------------- | --------------- |
+| backtracking           | 91.2                   | 91.2     | 91.2                        | 91.2                   | 93.4            |
+| punctuation            | 96.2                   | 95.2     | 96.6                        | 95.8                   | 95.9            |
+| grammar                | 92.3                   | 92.3     | 92.3                        | 92.3                   | 92.3            |
+| capitalization         | 99.6                   | 98.6     | 99.7                        | 99.5                   | 99.6            |
+| clean text unchanged   | 96.7                   | 97.8     | 97.8                        | 98.3                   | 97.8            |
+| dictionary terms kept  | 99.1                   | 100.0    | 98.2                        | 99.1                   | 97.4            |
+| list shape             | 100.0                  | 100.0    | 95.8                        | 100.0                  | 100.0           |
+| misheard words fixed   | 97.0                   | 93.9     | 97.0                        | 97.0                   | 97.0            |
+| sentence correctness   | 92.7                   | 92.4     | 92.4                        | 91.4                   | 91.8            |
+| dictionary strict      | 99.1                   | 100.0    | 97.4                        | 98.2                   | 97.4            |
+| spoken forms to terms  | 97.9                   | 100.0    | 95.7                        | 97.9                   | 93.6            |
+| no unheard content     | 2.3                    | 1.3      | 1.7                         | 0.6                    | 1.0             |
+| numbers right          | 82.2                   | 91.1     | 84.4                        | 88.9                   | 88.9            |
+| length parity          | 63.2                   | 57.9     | 73.7                        | 73.7                   | 68.4            |
+| paragraphs kept        | 93.5                   | 100.0    | 96.8                        | 100.0                  | 96.8            |
+| polish p50 / p95 ms    | 1382 / 2262 (priority) | –        | 1961 / 3387                 | 1986 / 4176            | 1579 / 2480     |
+| $ per 1,000 dictations | 1.99 (priority ×2)     | –        | 0.59                        | 0.61                   | 0.72            |
+| prompt cached          | 66 %                   | –        | 41 %                        | 41 %                   | 70 %            |
+
+The winner is `openai:gpt-6-luna` at reasoning effort none, the request's
+features, examples policy `all`, on OpenAI's priority tier. Exact rows (the
+answer equals a gold answer): today 600, the winner on priority 593, on the
+default tier 597 and 590.
+
+The other candidates ran the same setup, on the default tier unless noted
+(sentence correctness, p50 / p95 ms, $ per 1,000 dictations):
+
+- `gpt-4.1-nano` at temperature 0, 0.2 and 0.4: 72.8, 71.5 and 72.5;
+  backtracking 55 to 58; p95 5.1 to 5.8 s; $0.29 to $0.38. Fails.
+- `gpt-4.1-mini` at temperature 0: 82.4, backtracking 71.4; 1187 / 2484; $1.18.
+  Fails.
+- `gpt-5.4-nano` at effort none (it refuses minimal): 66.8; $0.50. Fails.
+- `gpt-5.4-mini` at effort none: 85.4, backtracking 84.6; 1407 / 2580; $1.37.
+  Fails.
+- `gpt-5.6-luna` at effort none, every module, priority: 90.2; 1448 / 2098;
+  $2.45. Fails, and costs more.
+- `gpt-6-luna` at none with `per_module` examples: default tier 91.1, 1771 /
+  3297, $0.12; priority 90.0, 1391 / 2252, $0.26. Exact rows 580 to 590 against
+  today's 600: about 1.5 points lower, outside the noise. Flagged modules
+  showing all their tagged examples: 90.0, 1363 / 2214, $0.31.
+- `gpt-6-luna` at none with every module and every example (one fixed prompt),
+  priority: 92.1, 1593 / 2408, $1.22.
+- Examples `none`: 86.5, $0.07. Fails. Examples after the shared rules, with the
+  modules in a second system turn: 90.0, $1.31. Worse.
+
+What the round showed:
+
+- No small model holds backtracking or the dictionary gates.
+- `gpt-6-luna` without reasoning keeps accuracy within today's run-to-run noise:
+  today's own two runs differ by up to 9 points on the 45-row gates.
+- The latency is the model's on its tier, not the prompt's size: with no
+  examples, 98.5 % cached, the default tier still took 1.76 s at p50.
+- Priority restores the speed, and with the shared cache key
+  (`providers.md`) its calls now hit the cache: 70 %.
+- Against the old runs from 14 Oct, the cost fell 64 % and the latency rose
+  14 % at p50 and 10 % at p95. Measured at the same time (below), the new
+  setup is the faster one.
+- For −87 % cost and about 1.5 points less accuracy, set
+  `SNAPBAK_EXAMPLES_POLICY=per_module`.
+
+### Same-time A/B, 15 Oct
+
+OpenAI's latency moves with the hour, so the old and new setups ran back to
+back on the same 150 R7 rows (seed 15), both on priority. "Old" is
+`gpt-5.6-luna` at medium reasoning with every module and example, the old small
+tier that answered most chunks.
+
+| Setup                                | p50 ms | p90 ms | p95 ms | Exact rows | $ / 1,000 |
+| ------------------------------------ | ------ | ------ | ------ | ---------- | --------- |
+| old: `gpt-5.6-luna`, medium          | 1920   | 2935   | 3464   | 136 / 150  | 2.65      |
+| new: `gpt-6-luna`, none              | 1550   | 2107   | 2292   | 130 / 150  | 0.28      |
+| new, every call sent twice at once   | 1467   | 1890   | 2160   | -          | 0.56      |
+
+The new setup is 19 % faster at p50 and 34 % at p95 at the same moment. Sending
+every call twice was not kept: 5 to 6 % for twice the price, where the app's
+polish-ahead in a pause saves more (`DICTATION-AI.md` in the app). Sending the
+second copy later gains nothing, since every call takes about 1.1 s at least.
+
 ## English only, 14 Oct 2026
 
 The English bench for this change: backtracking, its chunked twins, dictionary,
@@ -499,6 +618,37 @@ written as digits in one gold and as words in others, `app store`, and a gold
 that puts serial commas in one list and not the next). Digits for counts of 10
 and over, and for "nights" and "feet", were tried and rejected: each changes
 gold answers that keep the word.
+
+### R7 replay, shaping rules, 15 Oct
+
+The shipped config's four stored R7 runs (`gpt-6-luna`, effort none, all
+examples, the rules features: `wave2/luna-all-priority`, `wave1/luna-none`,
+`wave2/luna-all`, `wave2/luna-full-priority`, 687 rows each, 672 replayed) and
+the two old baselines (`fast-e5`, `fast-e4-merged`), replayed through the server
+path before and after the R7 shaping rules (`api.md`), at $0. Gates that moved
+(before → after); every other gate is equal:
+
+| gate                  | all-priority | none        | all         | full-priority | mean          | e5          | e4          |
+| --------------------- | ------------ | ----------- | ----------- | ------------- | ------------- | ----------- | ----------- |
+| sentence correctness  | 91.7 → 92.4  | 92.4 → 93.3 | 91.2 → 92.0 | 91.8 → 92.3   | 91.8 → 92.5   | 92.7 → 93.0 | 92.4 → 92.7 |
+| backtracking          | 92.1 → 93.4  | 90.8 → 92.1 | 89.5 → 90.8 | 89.5 → 90.8   | 90.5 → 91.8   | 91.2        | 91.2        |
+| dictionary terms kept | 97.3 → 99.1  | 98.2 → 100  | 99.1 → 100  | 96.4 → 98.2   | 97.8 → 99.3   | 99.1        | 100         |
+| dictionary strict     | 97.3 → 99.1  | 97.3 → 99.1 | 98.2 → 99.1 | 96.4 → 98.2   | 97.3 → 98.9   | 99.1        | 100         |
+| spoken forms to terms | 93.3 → 97.8  | 95.6 → 100  | 97.8 → 100  | 91.1 → 95.6   | 94.5 → 98.4   | 97.9        | 100         |
+| paragraphs kept       | 96.7 → 100   | 96.7 → 100  | 100         | 100           | 98.4 → 100    | 93.5        | 100         |
+| punctuation           | 95.1         | 96.6        | 95.0        | 94.9 → 95.0   | 95.40 → 95.43 | 96.2        | 95.2        |
+
+Misses fall 57 → 52, 52 → 46, 59 → 54, 55 → 52, 52 → 50 and 53 → 51; across
+all 39 stored runs 67 rows are newly exact and none got worse. Of the 82 rows
+the four runs still miss or missed, the rest need the model: a word choice or
+mark the speech doesn't settle (most), both versions kept around "let's change
+that" or a lone "no" (the guardrail accepts a full restatement by design), and
+three long rows whose paragraphs a replay answers out of order. Left as
+gold-inconsistent: "N people" (50 golds in words, 45 in digits:
+`suite-growth-en-01246`), a short fragment's last full stop
+(`v2-numbers-en-00029` has one, `dictionary-180` and `grammar-344` don't), and
+"p.m." (22 golds) against "pm", which the scorer reads as one but `invented()`
+counts as unheard.
 
 ## Results, 10 Oct 2026
 

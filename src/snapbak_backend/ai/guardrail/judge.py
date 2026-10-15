@@ -72,7 +72,7 @@ from snapbak_backend.ai.guardrail.numbers import (
     spoken_numbers,
 )
 from snapbak_backend.ai.guardrail.respell import as_heard, spoken, undangled
-from snapbak_backend.ai.guardrail.shape import NEVER_NAMES, shaped
+from snapbak_backend.ai.guardrail.shape import NEVER_NAMES, hosts_lowercase, names_as_terms, shaped
 from snapbak_backend.ai.guardrail.tokens import (
     Edit,
     align,
@@ -2590,14 +2590,22 @@ def twins_as_said(said: str, text: str, terms: list[str]) -> str:
     return text
 
 
+# Each count up to ten as a digit typed alone and as its word, compiled once: `digits_as_said` runs on every answer.
+SMALL_COUNTS = [
+    (re.compile(rf"(?<![\w.,:$₹/-]){digit}(?![\w.,:%/-])"), re.compile(rf"\b{word}\b", re.IGNORECASE), digit)
+    for word, digit in SMALL_VALUES.items()
+]
+ANY_DIGIT = re.compile(r"\d")
+
+
 def digits_as_said(said: str, text: str) -> str:
     """A count up to ten the speaker's text already held as a digit, and never as its word, goes back to the digit
     where the model wrote the word ("5 countries" five countries), as rule 4 asks (14 Oct 2026)."""
-    heard = said.lower()
-    for word, digit in SMALL_VALUES.items():
-        typed = re.search(rf"(?<![\w.,:$₹/-]){digit}(?![\w.,:%/-])", said) is not None
-        if typed and re.search(rf"\b{word}\b", heard) is None:
-            text = re.sub(rf"\b{word}\b", digit, text, flags=re.IGNORECASE)
+    if ANY_DIGIT.search(said) is None:
+        return text
+    for typed, said_word, digit in SMALL_COUNTS:
+        if typed.search(said) is not None and said_word.search(said) is None:
+            text = said_word.sub(digit, text)
     return text
 
 
@@ -2606,7 +2614,9 @@ def as_said(said: str, text: str, terms: list[str]) -> str:
     joined = joins_as_said(said, digits_kept, terms)
     tidied = tidy(joined, terms)
     twins = twins_as_said(said, tidied, terms) if terms else tidied
-    return twins
+    hosts = hosts_lowercase(twins, terms)
+    named = names_as_terms(hosts, terms) if terms else hosts
+    return named
 
 
 def join(*parts: str) -> str:

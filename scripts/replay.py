@@ -1,6 +1,6 @@
-"""A heavy user's month through the escalation, priced and reported (docs/replay.md).
+"""A heavy user's month on the one polish model, priced and reported (docs/replay.md).
 
-`uv run scripts/replay.py [SMALL BIG]` (default openai:gpt-5.6-luna openai:gpt-6-luna). Two hours of dictation
+`uv run scripts/replay.py [POLISH CORRECTION]` (default openai:gpt-6-luna openai:gpt-6-luna). Two hours of dictation
 are drawn from the corpus utterances (fixed seed), each cut into chunks the way the app's ChunkGate cuts speech,
 and each chunk is sent with the words before it as `prior`, like the app. Tokens are estimated from UTF-8 bytes
 (4 per token). Runs offline: no keys needed.
@@ -14,8 +14,8 @@ from bench import load
 from snapbak_backend.ai.guardrail.judge import Reason, Reject
 from snapbak_backend.ai.prompts.examples import EXAMPLES
 from snapbak_backend.ai.prompts.polish import SYSTEM, correction, message
-from snapbak_backend.ai.routing import tier
 from snapbak_backend.config.pricing import billed
+from snapbak_backend.config.settings import POLISH
 from snapbak_backend.schemas.polish import MAX_PRIOR_WORDS
 
 # The PRD's cost target, shown for reference: the founder put accuracy over cost and time (11 Oct).
@@ -24,14 +24,14 @@ SECONDS = 2 * 3600
 WORDS_PER_SECOND = 2.5
 CHUNK_WORDS = 15
 MESSAGE_OVERHEAD = 4
-# Answers the guardrail refuses, on either tier, which the big tier corrects once with reasoning (D1): it reads the
-# request again, the refused answer and the reasons. Replace with the bench's measured share.
+# Answers the guardrail refuses, which the correction model corrects once with reasoning (D1): it reads the request
+# again, the refused answer and the reasons. Replace with the bench's measured share.
 RETRY_SHARE = 0.05
 # Share of the fixed prompt served from the provider's prompt cache, as the founder set it (10 Oct): the bench
 # measured 25 % on a cold start at 16 requests in flight and 99.8 % warm.
 CACHE_HIT = 0.5
-# Reasoning tokens a big-tier chunk adds to its answer, the larger of two bench means on `gpt-6-luna`: 46 more
-# output tokens on correction chunks at low effort than at none, and 20.5 reasoning tokens a big-tier call
+# Reasoning tokens a correction adds to its answer, the larger of two bench means on `gpt-6-luna`: 46 more output
+# tokens on correction chunks at low effort than at none, and 20.5 reasoning tokens a big-tier call
 # (docs/escalation.md).
 REASONED_TOKENS = 46
 
@@ -64,9 +64,9 @@ def utterances() -> list[str]:
     return [item.text for item in load() if not item.prior and item.slice != "suite-growth"]
 
 
-def month(pool: list[str], small: str, big: str) -> dict[str, float]:
+def month(pool: list[str], polish: str, correction: str) -> dict[str, float]:
     rng = random.Random(7)
-    totals = {"requests": 0, "big": 0, "input": 0, "output": 0, "small $": 0.0, "big $": 0.0}
+    totals = {"requests": 0, "input": 0, "output": 0, "polish $": 0.0, "correction $": 0.0}
     cached_tokens = round(CACHE_HIT * STATIC)
     words = 0
     while words < SECONDS * WORDS_PER_SECOND:
@@ -76,35 +76,30 @@ def month(pool: list[str], small: str, big: str) -> dict[str, float]:
             request = {"text": text, "prior": prior, "terms": [], "app": "", "style": "chat"}
             input_tokens = STATIC + estimate(message(request))
             answer = estimate(json.dumps({"revision": None, "text": text}, ensure_ascii=False))
-            chosen = tier(text)
-            output_tokens = answer + (REASONED_TOKENS if chosen == "big" else 0)
             totals["requests"] += 1
             totals["input"] += input_tokens
-            totals["output"] += output_tokens
+            totals["output"] += answer
             corrected = input_tokens + answer + CORRECTION_TOKENS
-            totals["big $"] += RETRY_SHARE * billed(big, corrected, answer + REASONED_TOKENS, cached_tokens)
-            if chosen == "big":
-                totals["big"] += 1
-                totals["big $"] += billed(big, input_tokens, output_tokens, cached_tokens)
-                continue
-            totals["small $"] += billed(small, input_tokens, output_tokens, cached_tokens)
+            retried = billed(correction, corrected, answer + REASONED_TOKENS, cached_tokens)
+            totals["correction $"] += RETRY_SHARE * retried
+            totals["polish $"] += billed(polish, input_tokens, answer, cached_tokens)
     return totals
 
 
 def main() -> int:
-    small, big = sys.argv[1:3] if len(sys.argv) >= 3 else ("openai:gpt-5.6-luna", "openai:gpt-6-luna")
+    polish, correction = sys.argv[1:3] if len(sys.argv) >= 3 else (POLISH, "openai:gpt-6-luna")
     pool = utterances()
     print(
-        f"A heavy month: {SECONDS // 3600} h of dictation, small {small}, big {big}, retry share {RETRY_SHARE:.0%}, "
-        f"prompt cache {CACHE_HIT:.0%}"
+        f"A heavy month: {SECONDS // 3600} h of dictation, polish {polish}, correction {correction}, "
+        f"retry share {RETRY_SHARE:.0%}, prompt cache {CACHE_HIT:.0%}"
     )
-    totals = month(pool, small, big)
-    dollars = totals["small $"] + totals["big $"]
+    totals = month(pool, polish, correction)
+    dollars = totals["polish $"] + totals["correction $"]
     passes = dollars <= TARGET
     print(
-        f"  corpus: {totals['requests']:.0f} requests, {100 * totals['big'] / totals['requests']:.1f} % big, "
+        f"  corpus: {totals['requests']:.0f} requests, "
         f"{totals['input'] / 1e6:.2f} M in + {totals['output'] / 1e6:.3f} M out tokens, "
-        f"${totals['small $']:.3f} small + ${totals['big $']:.3f} big = ${dollars:.3f} "
+        f"${totals['polish $']:.3f} polish + ${totals['correction $']:.3f} correction = ${dollars:.3f} "
         f"{'within' if passes else 'OVER'} ${TARGET:.2f}"
     )
     return 0

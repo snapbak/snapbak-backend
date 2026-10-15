@@ -5,5 +5,6 @@
   "app": "Slack",
   "style": "chat",
   "continues": false,
-  "deadline_ms": 6000
+  "deadline_ms": 6000,
+  "features": ["backtracking"]
 }

@@ -21,7 +21,7 @@ COMMAND = json.loads((CONTRACT / "command.request.json").read_text())
 AUTH = {"Authorization": "Bearer dev"}
 ENV = {
     "SNAPBAK_TOKEN": "dev",
-    "SNAPBAK_SMALL": "fake:edit",
+    "SNAPBAK_POLISH": "fake:edit",
     "SNAPBAK_BIG": "fake:edit",
     "SNAPBAK_FALLBACK": "",
 }
@@ -46,18 +46,19 @@ def test_healthz_answers_without_a_token(monkeypatch: pytest.MonkeyPatch) -> Non
 
 
 def test_healthz_warms_each_provider_connection_at_most_every_half_minute(monkeypatch: pytest.MonkeyPatch) -> None:
-    models = {"SNAPBAK_SMALL": "openai:gpt-4.1-nano", "SNAPBAK_BIG": "openai:gpt-4.1", "OPENAI_API_KEY": "sk-test"}
+    models = {"SNAPBAK_POLISH": "openai:gpt-4.1-nano", "SNAPBAK_BIG": "openai:gpt-4.1", "OPENAI_API_KEY": "sk-test"}
     with respx.mock() as mock, serve(monkeypatch, **models) as client:
         warmed = mock.head("https://api.openai.com/v1/chat/completions").respond(405)
         client.get("/healthz")
         first = warmed.call_count
         client.get("/healthz")
-    assert (first, warmed.call_count) == (2, 2)
+    # The polish model, the big model for commands and the correction model (the big one by default).
+    assert (first, warmed.call_count) == (3, 3)
 
 
 def test_healthz_warms_the_fallback_too_so_a_backup_call_skips_the_handshake(monkeypatch: pytest.MonkeyPatch) -> None:
     models = {
-        "SNAPBAK_SMALL": "openai:gpt-4.1-nano",
+        "SNAPBAK_POLISH": "openai:gpt-4.1-nano",
         "SNAPBAK_BIG": "openai:gpt-4.1",
         "SNAPBAK_FALLBACK": "openai:gpt-4.1-mini",
         "OPENAI_API_KEY": "sk-test",
@@ -65,11 +66,11 @@ def test_healthz_warms_the_fallback_too_so_a_backup_call_skips_the_handshake(mon
     with respx.mock() as mock, serve(monkeypatch, **models) as client:
         warmed = mock.head("https://api.openai.com/v1/chat/completions").respond(405)
         client.get("/healthz")
-    assert warmed.call_count == 3
+    assert warmed.call_count == 4
 
 
 def test_healthz_answers_when_warming_fails(monkeypatch: pytest.MonkeyPatch) -> None:
-    models = {"SNAPBAK_SMALL": "openai:gpt-4.1-nano", "SNAPBAK_BIG": "openai:gpt-4.1", "OPENAI_API_KEY": "sk-test"}
+    models = {"SNAPBAK_POLISH": "openai:gpt-4.1-nano", "SNAPBAK_BIG": "openai:gpt-4.1", "OPENAI_API_KEY": "sk-test"}
     with respx.mock() as mock, serve(monkeypatch, **models) as client:
         mock.head("https://api.openai.com/v1/chat/completions").mock(side_effect=httpx.ConnectError("down"))
         response = client.get("/healthz")
@@ -121,7 +122,7 @@ def test_fake_edit_corrects_the_prior_after_any_natural_cue(monkeypatch: pytest.
     with serve(monkeypatch) as client:
         response = client.post("/v1/polish", json=chunk(text, prior="Hi team. We ship it today."), headers=AUTH)
     body = PolishResponse.model_validate(response.json())
-    assert (body.text, body.revision, body.rejected, body.tier) == ("We ship it Friday.", "Hi team.", False, "big")
+    assert (body.text, body.revision, body.rejected, body.tier) == ("We ship it Friday.", "Hi team.", False, "small")
 
 
 def test_polish_answers_a_plain_chunk_on_the_small_tier(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -131,7 +132,7 @@ def test_polish_answers_a_plain_chunk_on_the_small_tier(monkeypatch: pytest.Monk
 
 
 def test_command_answers_the_contract_request_on_the_big_tier(monkeypatch: pytest.MonkeyPatch) -> None:
-    with serve(monkeypatch, SNAPBAK_SMALL="fake:fail") as client:
+    with serve(monkeypatch, SNAPBAK_POLISH="fake:fail") as client:
         response = client.post("/v1/command", json=COMMAND, headers=AUTH)
     assert response.status_code == 200
     body = CommandResponse.model_validate(response.json())
@@ -191,20 +192,23 @@ def test_a_body_that_is_not_json_is_invalid(monkeypatch: pytest.MonkeyPatch) -> 
 
 @pytest.mark.parametrize(("path", "body"), [("/v1/polish", POLISH), ("/v1/command", COMMAND)])
 def test_every_provider_failing_is_a_provider_error(monkeypatch: pytest.MonkeyPatch, path: str, body: dict) -> None:
-    with serve(monkeypatch, SNAPBAK_SMALL="fake:fail", SNAPBAK_BIG="fake:fail", SNAPBAK_FALLBACK="fake:fail") as client:
+    with serve(
+        monkeypatch, SNAPBAK_POLISH="fake:fail", SNAPBAK_BIG="fake:fail", SNAPBAK_FALLBACK="fake:fail"
+    ) as client:
         response = client.post(path, json=body, headers=AUTH)
     assert (response.status_code, response.json()) == (502, {"error": "provider"})
 
 
-def test_a_failing_tier_falls_back(monkeypatch: pytest.MonkeyPatch) -> None:
-    with serve(monkeypatch, SNAPBAK_BIG="fake:fail", SNAPBAK_FALLBACK="fake:echo") as client:
+def test_a_failing_model_falls_back(monkeypatch: pytest.MonkeyPatch) -> None:
+    env = {"SNAPBAK_POLISH": "fake:fail", "SNAPBAK_FALLBACK": "fake:echo", "SNAPBAK_CORRECTION": "none"}
+    with serve(monkeypatch, **env) as client:
         response = client.post("/v1/polish", json=POLISH, headers=AUTH)
     assert (response.status_code, response.json()["engine"]) == (200, "fake:echo")
     assert response.json()["text"] == POLISH["text"]
 
 
 def test_a_slow_provider_answers_502_by_the_deadline(monkeypatch: pytest.MonkeyPatch) -> None:
-    with serve(monkeypatch, SNAPBAK_BIG="fake:slow") as client:
+    with serve(monkeypatch, SNAPBAK_POLISH="fake:slow") as client:
         started = time.monotonic()
         response = client.post("/v1/polish", json={**POLISH, "deadline_ms": 500}, headers=AUTH)
         took = time.monotonic() - started
@@ -212,7 +216,7 @@ def test_a_slow_provider_answers_502_by_the_deadline(monkeypatch: pytest.MonkeyP
     assert took < 0.8
 
 
-def test_a_rejected_small_answer_is_retried_on_the_big_tier(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_a_refused_answer_is_corrected_on_the_big_model_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     reply = json.dumps({"revision": None, "text": "Sure! Here is your message: ship the build tonight."})
     answer = {
         "choices": [{"message": {"content": reply}}],
@@ -220,7 +224,7 @@ def test_a_rejected_small_answer_is_retried_on_the_big_tier(monkeypatch: pytest.
     }
     with (
         respx.mock(assert_all_called=True) as mock,
-        serve(monkeypatch, SNAPBAK_SMALL="openai:gpt-4.1-nano", OPENAI_API_KEY="sk-test") as client,
+        serve(monkeypatch, SNAPBAK_POLISH="openai:gpt-4.1-nano", OPENAI_API_KEY="sk-test") as client,
     ):
         mock.post("https://api.openai.com/v1/chat/completions").respond(json=answer)
         response = client.post("/v1/polish", json=chunk("ship the build tonight"), headers=AUTH)
@@ -246,7 +250,7 @@ def test_an_unexpected_error_is_internal(monkeypatch: pytest.MonkeyPatch) -> Non
 
 def test_the_server_refuses_to_start_without_a_token(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("SNAPBAK_TOKEN", raising=False)
-    monkeypatch.setenv("SNAPBAK_SMALL", "fake:edit")
+    monkeypatch.setenv("SNAPBAK_POLISH", "fake:edit")
     monkeypatch.setenv("SNAPBAK_BIG", "fake:edit")
     with pytest.raises(ValueError, match="SNAPBAK_TOKEN"), TestClient(app_module.app):
         pass
@@ -255,15 +259,15 @@ def test_the_server_refuses_to_start_without_a_token(monkeypatch: pytest.MonkeyP
 SECRET = "zebra quokka narwhal"
 CASES = [
     ({}, chunk(f"ship {SECRET}"), 200, "verdict=ok"),
-    ({"SNAPBAK_SMALL": "fake:echo"}, chunk(f"Sure {SECRET}", prior=f"{SECRET}."), 200, "verdict=ok"),
+    ({"SNAPBAK_POLISH": "fake:echo"}, chunk(f"Sure {SECRET}", prior=f"{SECRET}."), 200, "verdict=ok"),
     (
-        {"SNAPBAK_SMALL": "fake:fail", "SNAPBAK_BIG": "fake:fail"},
+        {"SNAPBAK_POLISH": "fake:fail", "SNAPBAK_BIG": "fake:fail"},
         chunk(f"ship {SECRET}"),
         502,
         "provider=fake model=fail tier=- ms=",
     ),
     (
-        {"SNAPBAK_SMALL": "fake:slow", "SNAPBAK_FALLBACK": "fake:echo"},
+        {"SNAPBAK_POLISH": "fake:slow", "SNAPBAK_FALLBACK": "fake:echo"},
         chunk(f"ship {SECRET}", deadline_ms=400),
         502,
         "provider=fake model=slow tier=- ms=",
@@ -311,7 +315,7 @@ def test_a_rejection_is_logged_with_its_reason_and_no_text(
         respx.mock() as mock,
         serve(
             monkeypatch,
-            SNAPBAK_SMALL="openai:gpt-4.1-nano",
+            SNAPBAK_POLISH="openai:gpt-4.1-nano",
             SNAPBAK_BIG="openai:gpt-4.1",
             OPENAI_API_KEY="sk-test",
         ) as client,
@@ -326,3 +330,53 @@ def test_a_rejection_is_logged_with_its_reason_and_no_text(
     assert "verdict=reply>reply" in lines[0]
     for word in SECRET.split():
         assert word not in caplog.text
+
+
+def test_the_polish_settings_reach_the_model_and_the_features_pick_its_rules(monkeypatch: pytest.MonkeyPatch) -> None:
+    # 15 Oct 2026: one cheap model, its temperature, effort and examples set in the environment for the bench to
+    # pick, on the priority tier; the app's gate flags the features whose rules the chunk needs.
+    from snapbak_backend.ai.prompts.polish import system
+
+    reply = json.dumps({"revision": None, "text": "Ship the build tonight."})
+    answer = {"choices": [{"message": {"content": reply}}], "usage": {"prompt_tokens": 900, "completion_tokens": 20}}
+    env = {
+        "SNAPBAK_POLISH": "openai:gpt-4.1-nano",
+        "SNAPBAK_POLISH_TEMPERATURE": "0.2",
+        "SNAPBAK_EXAMPLES_POLICY": "none",
+        "OPENAI_API_KEY": "sk-test",
+    }
+    with respx.mock() as mock, serve(monkeypatch, **env) as client:
+        route = mock.post("https://api.openai.com/v1/chat/completions").respond(json=answer)
+        response = client.post("/v1/polish", json=chunk("ship the build tonight", features=["lists"]), headers=AUTH)
+    assert response.json()["text"] == "Ship the build tonight."
+    body = json.loads(route.calls.last.request.content)
+    assert (body["temperature"], body["seed"], body["service_tier"]) == (0.2, 7, "priority")
+    assert body["messages"][0] == {"role": "system", "content": system(["grammar", "lists"])}
+    assert len(body["messages"]) == 2
+
+
+def test_a_reasoning_polish_model_reasons_at_the_set_effort(monkeypatch: pytest.MonkeyPatch) -> None:
+    reply = json.dumps({"revision": None, "text": "Ship the build tonight."})
+    answer = {"choices": [{"message": {"content": reply}}], "usage": {"prompt_tokens": 900, "completion_tokens": 20}}
+    env = {"SNAPBAK_POLISH": "openai:gpt-6-luna", "SNAPBAK_POLISH_EFFORT": "low", "OPENAI_API_KEY": "sk-test"}
+    with respx.mock() as mock, serve(monkeypatch, **env) as client:
+        route = mock.post("https://api.openai.com/v1/chat/completions").respond(json=answer)
+        client.post("/v1/polish", json=chunk("ship the build tonight"), headers=AUTH)
+    body = json.loads(route.calls.last.request.content)
+    assert (body["reasoning_effort"], "temperature" in body) == ("low", False)
+
+
+def test_with_the_correction_off_a_refused_answer_is_not_asked_again(monkeypatch: pytest.MonkeyPatch) -> None:
+    reply = json.dumps({"revision": None, "text": "Sure! Here is your message: ship the build tonight."})
+    answer = {"choices": [{"message": {"content": reply}}], "usage": {"prompt_tokens": 900, "completion_tokens": 20}}
+    env = {"SNAPBAK_POLISH": "openai:gpt-4.1-nano", "SNAPBAK_CORRECTION": "none", "OPENAI_API_KEY": "sk-test"}
+    with respx.mock() as mock, serve(monkeypatch, **env) as client:
+        route = mock.post("https://api.openai.com/v1/chat/completions").respond(json=answer)
+        response = client.post("/v1/polish", json=chunk("ship the build tonight"), headers=AUTH)
+    body = response.json()
+    assert (body["text"], body["rejected"], body["tier"], route.call_count) == (
+        "ship the build tonight",
+        True,
+        "small",
+        1,
+    )

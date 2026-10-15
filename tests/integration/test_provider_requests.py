@@ -23,8 +23,9 @@ def sent(route: respx.Route) -> dict:
     return json.loads(request.content)
 
 
-# OpenAI is asked for priority processing and a cache key from the fixed prompt, so the long prompt is served from
-# its cache and the answer comes back sooner (founder, 13 Oct: faster at the same accuracy). Groq gets neither.
+# OpenAI is asked for priority processing and a cache key from the fixed prompt's opening, so the long prompt is
+# served from its cache and the answer comes back sooner: the R7 round (15 Oct) measured the default tier 25 % slower
+# at p50 for the same model. Groq gets neither.
 OPENAI_SPEED = {"service_tier": "priority", "prompt_cache_key": "snapbak-c53b0f3aaea46bbe"}
 
 
@@ -53,6 +54,7 @@ async def test_openai_style_providers_post_the_turns_as_a_chat(spec: str, url: s
     assert sent(route) == {
         "model": spec.split(":", 1)[1],
         "temperature": 0,
+        "seed": 7,
         "max_completion_tokens": 64,
         "response_format": {"type": "json_object"},
         "messages": [{"role": role, "content": content} for role, content in TURNS],
@@ -78,11 +80,28 @@ async def test_the_openai_cache_key_follows_the_fixed_prompt_not_the_dictation()
 
 
 @pytest.mark.anyio
+async def test_every_module_set_of_the_polish_prompt_shares_one_cache_key() -> None:
+    from snapbak_backend.ai.prompts.command import COMMAND_SYSTEM as COMMAND
+    from snapbak_backend.ai.prompts.polish import MODULES, system
+
+    provider = make_provider("openai:gpt-6-luna", KEYS)
+    reply = {"choices": [{"message": {"content": REPLY}}], "usage": {"prompt_tokens": 120, "completion_tokens": 9}}
+    keys = []
+    with respx.mock() as mock:
+        route = mock.post("https://api.openai.com/v1/chat/completions").respond(json=reply)
+        for rules in (system(["grammar"]), system(["grammar", "lists"]), system(MODULES), COMMAND):
+            await provider.complete([("system", rules), *TURNS[1:]], 64, 2.0)
+            keys.append(sent(route)["prompt_cache_key"])
+    assert keys[0] == keys[1] == keys[2] != keys[3]
+    await provider.aclose()
+
+
+@pytest.mark.anyio
 @pytest.mark.parametrize(
     ("model", "sampling"),
     [
-        ("gpt-4.1-mini", {"temperature": 0}),
-        ("gpt-5.4-nano", {"temperature": 0, "reasoning_effort": "none"}),
+        ("gpt-4.1-mini", {"temperature": 0, "seed": 7}),
+        ("gpt-5.4-nano", {"temperature": 0, "seed": 7, "reasoning_effort": "none"}),
         ("gpt-6-luna", {"reasoning_effort": "none"}),
         ("gpt-5-nano", {"reasoning_effort": "minimal"}),
         ("gpt-6.1-sol", {"reasoning_effort": "low"}),
@@ -98,8 +117,39 @@ async def test_openai_models_get_their_lowest_reasoning_effort_and_temperature_0
         )
         await provider.complete(TURNS, 64, 2.0)
     body = sent(route)
-    assert {name: body[name] for name in ("temperature", "reasoning_effort") if name in body} == sampling
+    assert {name: body[name] for name in ("temperature", "seed", "reasoning_effort") if name in body} == sampling
     await provider.aclose()
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("model", "sampling"),
+    [
+        ("groq:llama-3.3-70b-versatile", {"temperature": 0.4, "seed": 7}),
+        ("openai:gpt-4.1-nano", {"temperature": 0.4, "seed": 7}),
+        ("openai:gpt-5.4-nano", {"temperature": 0.4, "seed": 7, "reasoning_effort": "none"}),
+        # A model that refuses temperature gets none, whatever the setting.
+        ("openai:gpt-6-luna", {"reasoning_effort": "none"}),
+    ],
+)
+async def test_the_polish_temperature_and_a_fixed_seed_go_to_models_that_take_a_temperature(
+    model: str, sampling: dict
+) -> None:
+    # 15 Oct: the bench sweeps temperature 0, 0.2 and 0.4 on the models that take one (SNAPBAK_POLISH_TEMPERATURE).
+    provider = make_provider(model, KEYS, temperature=0.4)
+    with respx.mock(assert_all_called=True) as mock:
+        route = mock.post(url=httpx.URL(sent_to(model))).respond(
+            json={"choices": [{"message": {"content": REPLY}}], "usage": {"prompt_tokens": 1, "completion_tokens": 1}}
+        )
+        await provider.complete(TURNS, 64, 2.0)
+    body = sent(route)
+    assert {name: body[name] for name in ("temperature", "seed", "reasoning_effort") if name in body} == sampling
+    await provider.aclose()
+
+
+def sent_to(spec: str) -> str:
+    base = "https://api.groq.com/openai/v1" if spec.startswith("groq:") else "https://api.openai.com/v1"
+    return f"{base}/chat/completions"
 
 
 @pytest.mark.anyio

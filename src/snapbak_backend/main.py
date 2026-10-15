@@ -20,17 +20,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     config = load(os.environ)
     fallback = make_provider(config.fallback, config.keys) if config.fallback else None
+    correction = make_provider(config.correction, config.keys) if config.correction else None
     tiers = Tiers(
-        small=make_provider(config.small, config.keys),
-        big=make_provider(config.big, config.keys),
+        polish=make_provider(config.polish, config.keys, config.temperature),
+        command=make_provider(config.big, config.keys),
         fallback=fallback,
+        correction=correction,
+        effort=config.effort,
+        examples=config.examples,
     )
     app.state.token = config.token
     app.state.tiers = tiers
     yield
-    for provider in (tiers.small, tiers.big, tiers.fallback):
-        if provider is not None:
-            await provider.aclose()
+    for provider in tiers.providers():
+        await provider.aclose()
 
 
 app = FastAPI(

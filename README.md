@@ -20,7 +20,7 @@ just serve                   # http://127.0.0.1:8787
 For the app's end-to-end tests, run it with the fake model:
 
 ```sh
-SNAPBAK_SMALL=fake:edit SNAPBAK_BIG=fake:edit SNAPBAK_TOKEN=dev just serve
+SNAPBAK_POLISH=fake:edit SNAPBAK_BIG=fake:edit SNAPBAK_TOKEN=dev just serve
 ```
 
 ```sh
@@ -32,18 +32,22 @@ curl -s localhost:8787/v1/polish -H 'Authorization: Bearer dev' \
 ## How it works
 
 1. `POST /v1/polish` checks the token and the request limits.
-2. The escalation rules pick a tier: the small model, or the big one for
-   corrections and long chunks.
-3. The model gets a fixed system prompt, worked examples and the request as
-   JSON, and answers `{"revision", "text"}`.
+2. One polish model answers every chunk: `gpt-6-luna` without reasoning, on
+   OpenAI's priority tier, the R7 round's pick (15 Oct 2026, `docs/bench.md`).
+   Commands go to the big model.
+3. The model gets a system prompt of a core and the rule modules of the
+   request's `features` (every module when it sends none), the worked examples
+   the examples policy picks, and the request as JSON, and answers
+   `{"revision", "text"}`.
 4. The guardrail checks the answer (a stutter like "it's it's" may lose a copy,
    and a word the recognizer misheard may become the word that sounds like it):
    no unheard words or numbers, no lost or invented dictionary term, no rewrite
    of over 30 %, no dropped sentence, no flipped negation or tense, no dropped
    qualifier, no reply, no question left out of order. An
    answer refused only for a mark or a list's shape is mended without a model
-   when it can be. A refused answer, small or big, is corrected once by the big
-   model with reasoning if at least 1.5 s is left: it gets its answer back and
+   when it can be. A refused answer is corrected once by the correction model
+   (the big one by default, or none) with reasoning if at least 1.5 s is left:
+   it gets its answer back and
    the request again, with the rule and the words the guardrail named in a
    `checker` field. If the correction is refused too, the request text comes
    back unchanged with `rejected: true`.
@@ -61,7 +65,7 @@ curl -s localhost:8787/v1/polish -H 'Authorization: Bearer dev' \
 | Path            | Holds                                                                                                                                  |
 | --------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `config/`       | `settings.py` reads the environment; `pricing.py` holds the price table                                                                |
-| `ai/`           | the model layer: `prompts/`, `providers/`, `routing.py` (which tier), `chain.py` (a tier, then the fallback, in time) and `guardrail/` |
+| `ai/`           | the model layer: `prompts/`, `providers/`, `routing.py` (correction cues from `cues.json`, paragraphs), `chain.py` (a model, then the fallback, in time) and `guardrail/` |
 | `schemas/`      | the request and response models                                                                                                        |
 | `transformers/` | a request as model turns, and the model's JSON back as an answer                                                                       |
 | `services/`     | the polish and command flows, and the counts-only log line                                                                             |

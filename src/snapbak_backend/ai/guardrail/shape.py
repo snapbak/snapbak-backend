@@ -170,12 +170,15 @@ def rejoined(text: str, output: str) -> str:
 PARAGRAPH_SAID = tuple(words("new paragraph"))
 CONTEXT_WORDS = 3
 TOKEN = re.compile(r"\S+")
-SENTENCE_GAP = re.compile(r"(?<=[.?!])[ \t]*\n?[ \t]*(?=\S)")
+# The gap after a sentence, with any line breaks already there, so a place the model broke stays as it is.
+SENTENCE_GAP = re.compile(r"(?<=[.?!])[ \t]*\n*[ \t]*(?=\S)")
+SAID_PARAGRAPH = re.compile(r"\bnew paragraph\b", re.IGNORECASE)
 
 
-def paragraphed(said: str, text: str) -> str | None:
+def paragraphed(said: str, text: str, strict: bool = False) -> str | None:
     """The answer with a blank line after the sentence each spoken "new paragraph" followed, where the model ran the
-    two paragraphs on; None when a place can't be found."""
+    two paragraphs on; None when a place can't be found, or, `strict`, when the words before it don't end a
+    sentence."""
     raw = said.split()
     heard = [words(token) for token in raw]
     spans = [(found.start(), found.end(), words(found.group())) for found in TOKEN.finditer(text)]
@@ -195,7 +198,7 @@ def paragraphed(said: str, text: str) -> str | None:
         if at is None:
             return None
         gap = SENTENCE_GAP.search(text, spans[owner[at - 1]][0])
-        if gap is None:
+        if gap is None or (strict and gap.start() != spans[owner[at - 1]][1]):
             return None
         places.append(gap.start())
     if not places:
@@ -245,13 +248,16 @@ def breaks_kept(said: str, text: str) -> str:
 
 
 BLANK = re.compile(r"\n\n+")
+ADDRESSED = re.compile(r"\A([^\n,.!?:]{1,30}, )([A-Z]\w*)")
+# Words that open a sentence and are never a name.
+NO_NAMES = NEVER_NAMES | word_set("sorry please thanks thank just also so okay ok well here hope")
 SPOKEN_BREAK = re.compile(r"\n|new paragraph", re.IGNORECASE)
 SIGN_OFF_WORDS = 3
 
 
 def unparagraphed(said: str, text: str) -> str:
-    """The answer without a blank line the speaker never asked for: one sets off an email's greeting (its line ends
-    with a comma) or its sign-off (a short line), and before a list item it is one line break."""
+    """The answer without a blank line the speaker never asked for: one sets off an email's greeting or its sign-off
+    (a short line), and before a list item it is one line break."""
     if "\n\n" not in text or SPOKEN_BREAK.search(said):
         return text
 
@@ -260,12 +266,19 @@ def unparagraphed(said: str, text: str) -> str:
         after = text[found.end() :].split("\n", 1)[0]
         if LIST_LINE.match(after):
             return "\n"
-        if before.endswith(",") or len(after.split()) <= SIGN_OFF_WORDS:
+        greeted = before.endswith(",") and GREETING.match(before) is not None
+        if greeted or len(after.split()) <= SIGN_OFF_WORDS:
             return found.group()
         return " "
 
     run_on = BLANK.sub(gap, text)
-    return run_on
+    # A name the speaker addressed runs on into the sentence after it, which keeps no capital a name never has
+    # ("Omar, the proposal").
+    addressed_first = ADDRESSED.sub(
+        lambda found: found.group(1) + found.group(2).lower() if found.group(2).lower() in NO_NAMES else found.group(),
+        run_on,
+    )
+    return addressed_first
 
 
 # Two end marks stacked on one sentence ("Friday?."): the question or exclamation mark stays (round b3).
@@ -351,10 +364,86 @@ def addressed(said: str, text: str) -> str:
 
     unnamed = NAMED_ADDRESS.sub(unnamed_once, joined)
     spoken = f" {' '.join(said.split())} "
-    lowered = WRITTEN_NAME.sub(
-        lambda found: found.group().lower() if f" {found.group().lower()} at " in spoken else found.group(), unnamed
-    )
+
+    def as_spoken(found: re.Match[str]) -> str:
+        name = found.group().lower()
+        said_name = name.translate(NAME_MARKS_SAID)
+        return name if f" {name} at " in spoken or f" {said_name} at " in spoken else found.group()
+
+    lowered = WRITTEN_NAME.sub(as_spoken, unnamed)
     return lowered
+
+
+# An address's name said with its marks as words ("hr dash team").
+NAME_MARKS_SAID = str.maketrans({"-": " dash ", ".": " dot ", "_": " underscore "})
+# A web address the model capitalised like a name ("Yoko.care"): every address in the corpus is in lowercase but for a
+# term's own spelling ("Snapbak.app") and a file's ("sessionStore.ts").
+TITLED_HOST = re.compile(r"(?<![\w@./+-])[A-Z][a-z0-9-]*(?:\.[a-z0-9-]+)*\.[a-z]{2,}(?![\w@-])")
+# An address has a dot right before a lowercase letter; a sentence's full stop has a space.
+DOTTED = re.compile(r"\.[a-z]")
+PREVIOUS_WORD = re.compile(r"(\S+) +$")
+
+
+def hosts_lowercase(text: str, terms: list[str]) -> str:
+    """Each web address written with a name's capital in lowercase, but at a sentence's start or where a term spells
+    it."""
+    if DOTTED.search(text) is None:
+        return text
+
+    def lowered(found: re.Match[str]) -> str:
+        host = found.group()
+        named = any(term.lower() in host.lower() for term in terms)
+        # A host run on from a name the model capitalised ("Green Leaf.in") is part of that name.
+        previous = PREVIOUS_WORD.search(text, 0, found.start())
+        runs_on = False
+        if previous is not None:
+            runs_on = previous.group(1)[:1].isupper() and not opens_sentence(text, previous.start())
+        return host if opens_sentence(text, found.start()) or named or runs_on else host.lower()
+
+    lowercase = TITLED_HOST.sub(lowered, text)
+    return lowercase
+
+
+def opens_sentence(text: str, at: int) -> bool:
+    before = text[:at].rstrip()
+    return not before or before[-1] in ".?!\n"
+
+
+# A name's sound: a vowel by its class, a silent "h", one letter for "c" and "k", and a doubled sound once ("Riya" and
+# "Rhea" are ria, "Aditi" and "Aditee" aditi), round R7.
+SOUNDS = str.maketrans({"c": "k", "q": "k", "z": "s", "e": "i", "y": "i", "o": "u", "h": None})
+TITLED_WORD = r"[A-Z][a-z]+"
+TITLED_WORDS = re.compile(rf"(?<![\w-]){TITLED_WORD}(?![\w-])")
+
+
+def sound(word: str) -> str:
+    letters = word.lower().replace("ph", "f").translate(SOUNDS)
+    once = "".join(letter for index, letter in enumerate(letters) if index == 0 or letter != letters[index - 1])
+    return once
+
+
+def names_as_terms(text: str, terms: list[str]) -> str:
+    """Each name written mid-sentence as it sounds where a term of the same sound is spelled another way, in the
+    term's spelling ("tell him Riya" Rhea). A plain word, in lowercase, and a sentence's first word stay."""
+    missing = [term for term in terms if term not in text and all(word.isalpha() for word in term.split())]
+    if not missing:
+        return text
+    spelled_terms = {term.lower() for term in terms}
+    written_sounds = {sound(word) for word in TITLED_WORDS.findall(text)}
+    for term in missing:
+        term_words = term.split()
+        heard = [sound(word) for word in term_words]
+        if heard[0] not in written_sounds:
+            continue
+        run = re.compile(rf"(?<![\w-]){' '.join([TITLED_WORD] * len(term_words))}(?![\w-])")
+
+        def spelled(found: re.Match[str], term: str = term, heard: list[str] = heard, text: str = text) -> str:
+            written = found.group()
+            alike = [sound(word) for word in written.split()] == heard and written.lower() not in spelled_terms
+            return term if alike and not opens_sentence(text, found.start()) else written
+
+        text = run.sub(spelled, text)
+    return text
 
 
 # A size after a number is written in capitals ("2 mb" 2 MB).
@@ -394,8 +483,24 @@ def colons_as_said(said: str, text: str) -> str:
     return mended
 
 
+def greeting_took_a_paragraph(said: str, text: str) -> bool:
+    """Whether a blank line the model put after a greeting the speaker ran on made up the count of paragraphs said
+    later ("hi team here is the summary new paragraph we agreed": Hi team, blank line, Here is the summary. We
+    agreed)."""
+    greeted = text.count(",\n\n")
+    first = SAID_PARAGRAPH.search(said) if greeted else None
+    if first is None:
+        return False
+    greeting = text.split(",\n\n", 1)[0]
+    said_later = len(said[: first.start()].split()) > len(greeting.split())
+    short = text.count("\n\n") - greeted < len(SAID_PARAGRAPH.findall(said))
+    return said_later and short
+
+
 def shaped(said: str, text: str) -> str:
     text = breaks_kept(said, addressed(said, text))
+    if greeting_took_a_paragraph(said, text):
+        text = paragraphed(said, text, strict=True) or text
     text = SIZE_UNIT.sub(lambda found: found.group().upper(), measured_in_digits(text))
     paragraphs = unparagraphed(said, text)
     text = unstacked(paragraphs)

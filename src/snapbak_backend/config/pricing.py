@@ -63,7 +63,7 @@ def cost(engine: str, input_tokens: int, output_tokens: int, cached_tokens: int 
     return dollars
 
 
-# OpenAI calls ask for priority processing (founder, 13 Oct). Its price was not readable from OpenAI's pages, so a
+# OpenAI calls ask for priority processing (R7, 15 Oct 2026). Its price was not readable from OpenAI's pages, so a
 # priority call is billed at twice the Standard price: an estimate on the safe side for the bench ledger and the replay.
 PRIORITY = 2.0
 

@@ -5,10 +5,14 @@ from typing import Any
 
 from snapbak_backend.ai.providers.base import Http, Turn, Usage
 
+# The characters of the system prompt the cache key follows: within the polish prompt's core (2,006).
+OPENING = 1024
+
 
 class OpenAICompatible(Http):
-    """`fast` (OpenAI only, founder 13 Oct) asks for priority processing and keys the prompt cache on the fixed prompt,
-    so every request of one prompt version lands where its long prefix is cached."""
+    """`fast` (OpenAI only) asks for priority processing and keys the prompt cache on the system prompt's opening, so
+    every polish request lands where its shared prefix is cached. R7 (15 Oct 2026) measured the default tier 25 % slower
+    at p50 for the same model; priority with the shared key served 70 % of the prompt from the cache."""
 
     def __init__(
         self, engine: str, base: str, model: str, key: str, sampling: dict[str, Any], fast: bool = False
@@ -32,8 +36,11 @@ class OpenAICompatible(Http):
         }
         if self.fast:
             fixed = next((content for role, content in turns if role == "system"), "")
+            # Keyed on the opening every polish prompt shares (its core), not the whole prompt: one key per module
+            # set split the traffic so thin that 41 % of the prompt was cached (15 Oct, docs/providers.md).
+            opening = fixed[:OPENING]
             body["service_tier"] = "priority"
-            body["prompt_cache_key"] = "snapbak-" + hashlib.sha256(fixed.encode()).hexdigest()[:16]
+            body["prompt_cache_key"] = "snapbak-" + hashlib.sha256(opening.encode()).hexdigest()[:16]
         answer = await self.ask(body, timeout, self.parse)
         return answer
 

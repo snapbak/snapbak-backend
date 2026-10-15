@@ -163,7 +163,7 @@ def test_money_prices_each_tier_per_thousand_dictations() -> None:
     small = Call("openai:gpt-4.1-nano", Usage(1000, 20), "ok")
     retried = [Call("openai:gpt-4.1-nano", Usage(1000, 20), "unheard"), Call("openai:gpt-4.1", Usage(1000, 20), "ok")]
     dollars = bench.money([result(entry, "", "small", [small]), result(entry, "", "big", retried)])
-    # OpenAI calls are billed at the priority estimate, twice the list price (13 Oct).
+    # OpenAI calls are billed at the priority estimate, twice the list price (back since R7, 15 Oct).
     assert dollars == pytest.approx({"small": 0.216, "big": 2.16})
 
 
@@ -178,6 +178,7 @@ def test_money_prices_cached_prompt_tokens_at_the_cached_price() -> None:
     entry = item("grammar", "tense", "she go home", "She goes home.")
     cached = Call("openai:gpt-4.1-nano", Usage(1000, 20, 1000), "ok")
     dollars = bench.money([result(entry, "", "small", [cached])])
+    # At the priority estimate, twice the list price.
     assert dollars == pytest.approx({"small": 0.066, "big": 0.0})
 
 
@@ -197,7 +198,7 @@ class Scripted:
 def test_a_full_retraction_of_the_prior_is_scored_without_it() -> None:
     entry = item("backtracking-chunked", "cue no", "No, send it to Ravi.", "Send it to Ravi.", "Send the deck to Sam.")
     provider = Scripted({"revision": "", "text": "Send it to Ravi."})
-    tiers = Tiers(small=provider, big=provider, fallback=None)
+    tiers = Tiers(polish=provider, command=provider, fallback=None)
     outcome = asyncio.run(bench.run(entry, tiers, asyncio.Semaphore(1)))
     assert outcome is not None
     assert outcome.text == "Send it to Ravi."
@@ -540,7 +541,7 @@ def test_an_answer_after_the_deadline_is_scored_as_the_text_sent_and_counted_as_
     monkeypatch.setattr(bench, "DEADLINE_MS", 600)
     entry = item("grammar", "tense", "she go home", "She goes home.")
     provider = Late({"revision": None, "text": "She goes home."})
-    tiers = Tiers(small=provider, big=provider, fallback=None)
+    tiers = Tiers(polish=provider, command=provider, fallback=None)
     late = asyncio.run(bench.run(entry, tiers, asyncio.Semaphore(1)))
     assert late is not None
     assert late.failed
@@ -1355,6 +1356,13 @@ def test_round_b5_a_word_written_more_often_than_said_or_expected_is_invented() 
     assert bench.invented(entry, "Will he come? What did he get?") == []
 
 
+def test_a_time_written_p_m_is_not_an_unheard_word_where_pm_was_said() -> None:
+    # 15 Oct replay: score() reads "p.m." as "pm", but invented() flagged "p.m" (v2-backtracking-en-00197).
+    entry = item("v2-numbers", "time", "call me at five pm", "Call me at 5 pm.")
+    assert bench.invented(entry, "Call me at 5 p.m.") == []
+    assert bench.invented(entry, "Call me at 5 a.m.") == ["am"]
+
+
 @pytest.mark.parametrize(
     ("output", "expected"),
     [
@@ -1458,12 +1466,11 @@ def test_a_result_is_timed_under_the_route_that_answered_it() -> None:
     refused = Call("openai:big", Usage(100, 10), "unheard")
     english = item("formatting", "run-on", "hey sam can you ship it", "Hey Sam, can you ship it?")
     cue = item("backtracking", "cue", "send it friday no wait monday", "Send it Monday.")
-    assert bench.route(result(english, "x", "small", [ok])) == "small"
-    # English reasons at medium on the big tier too (founder, 14 Oct).
-    assert bench.route(result(english, "x", "big", [ok])) == "big reasoned"
-    assert bench.route(result(cue, "x", "big", [ok])) == "big reasoned"
+    # One polish model answers every chunk, a cue too (15 Oct 2026).
+    assert bench.route(result(english, "x", "small", [ok])) == "polish"
+    assert bench.route(result(cue, "x", "small", [ok])) == "polish"
     assert bench.route(result(cue, "x", "big", [refused, ok])) == "corrected"
-    assert bench.route(result(cue, "x", "big", [Call("openai:big", Usage(0, 0), "error"), ok])) == "big reasoned"
+    assert bench.route(result(cue, "x", "small", [Call("openai:small", Usage(0, 0), "error"), ok])) == "polish"
     # A chunk split where "new paragraph" was said answers once per paragraph, all accepted: no correction.
     assert bench.route(result(cue, "x", "big", [ok, ok])) == "paragraphs"
     assert bench.route(result(cue, "x", "big", [ok, refused, ok])) == "corrected"
@@ -1476,4 +1483,17 @@ def test_each_route_reports_its_latency_and_the_tokens_its_calls_wrote() -> None
         for ms in (100, 200, 300, 400)
     ]
     failed = bench.Result(english, "x", False, "-", 9000, [], True)
-    assert bench.by_route([*timed, failed]) == {"small": bench.Timing(4, 250, 300, 20.0, 5.0)}
+    assert bench.by_route([*timed, failed]) == {"polish": bench.Timing(4, 250, 300, 20.0, 5.0)}
+
+
+def test_report_names_the_share_and_cost_of_corrections_now_that_one_model_polishes(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    entry = item("grammar", "tense", "she go home", "She goes home.")
+    answered = [Call("openai:gpt-4.1-nano", Usage(1000, 20), "ok")]
+    refused = Call("openai:gpt-4.1-nano", Usage(1000, 20), "unheard", json.dumps({"revision": None, "text": "x"}))
+    retried = [refused, Call("openai:gpt-6-luna", Usage(1000, 20), "ok")]
+    bench.report("fake", [result(entry, "She goes home.", "small", answered), result(entry, "x", "big", retried)])
+    out = capsys.readouterr().out
+    assert "corrected 50.0 %" in out
+    assert "$ per 1,000 dictations: polish 0.216, correction 0.110" in out

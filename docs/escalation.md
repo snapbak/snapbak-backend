@@ -1,7 +1,45 @@
 # Escalation
 
-A chunk goes to the small model unless it is hard. `tier(text)` in
-`src/snapbak_backend/ai/routing.py` is a pure function:
+## One model, 15 Oct 2026
+
+One model polishes every chunk; nothing escalates. The founder (15 Oct 2026)
+wants polish faster and cheaper at the same accuracy: one cheap OpenAI model, a
+prompt cut to the modules the app's gate flags (`api.md`), and the bench to pick
+the model and its settings. The R7 round picked `gpt-6-luna` without reasoning,
+every worked example, on the priority tier (`bench.md`).
+
+| Call                                    | Model                                                              | Effort                                  |
+| --------------------------------------- | ------------------------------------------------------------------ | --------------------------------------- |
+| every polish chunk, a cue or a long one | `SNAPBAK_POLISH` (default `gpt-6-luna`)                            | `SNAPBAK_POLISH_EFFORT` (default none)  |
+| the correction of a refused answer      | `SNAPBAK_CORRECTION` (default `SNAPBAK_BIG`), or none              | medium                                  |
+| a command (`/v1/command`)               | `SNAPBAK_BIG` (`gpt-6-luna`)                                       | none sent                               |
+| the hedge and failure fallback          | `SNAPBAK_FALLBACK` (the polish model in `.env.example`)            | none sent                               |
+
+An effort reaches only models that reason; a model that doesn't ignores it
+(`providers.md`). A correction keeps medium: the 14 Oct sweep below kept every
+route there. With `SNAPBAK_CORRECTION=none` a refused answer goes in as said
+after one call. The response's `tier` stays in the contract: `small` when the
+polish model answered, `big` when a correction did. OpenAI calls go on the
+priority tier (`providers.md`).
+
+The correction cues below no longer pick a model: a cue still folds the prior's
+last sentence into the chunk (`api.md`) and guides the guardrail. The shared
+cue list is `ai/cues.json`.
+
+Measured before the change, on the two tiers below: small p50 1.43 s and p95
+1.94 s, big 2.25 s and 4.99 s, corrected 8.2 s and 12.0 s, and $0.28 to $0.41
+for a heavy month at the priority price. The R7 round measured the one model
+(`bench.md`): p50 1,579 ms and p95 2,480 ms at $0.72 per 1,000 dictations,
+against 1,382 and 2,262 ms at $1.99 for the setup it replaced.
+
+Everything after this section describes and measured the two tiers in place
+until 15 Oct 2026, with gpt-5.6-luna small and gpt-6-luna big: those numbers
+are from before.
+
+## Two tiers, until 15 Oct 2026
+
+A chunk went to the small model unless it was hard. `tier(text)` in
+`src/snapbak_backend/ai/routing.py` was a pure function:
 
 | Chunk                     | Tier  |
 | ------------------------- | ----- |
@@ -59,9 +97,10 @@ about a point overall.
 
 ## Reasoning
 
-Every polish chunk is answered with reasoning at its route's effort,
-`routing.EFFORTS = {"cue": "medium", "plain": "medium", "correction":
-"medium"}`: `effort(text)` is the cue route's effort when the chunk holds a
+Until 15 Oct every polish chunk was answered with reasoning at its route's
+effort, `routing.EFFORTS = {"cue": "medium", "plain": "medium", "correction":
+"medium"}` (since then one `SNAPBAK_POLISH_EFFORT`, and a correction at
+medium): `effort(text)` was the cue route's effort when the chunk held a
 correction cue, else the plain route's, on either tier (founder, 14 Oct: English
 always thinks at medium). The correction of a refused answer asks for the
 correction route's effort. A command sends no effort (not measured: there is no
@@ -101,7 +140,7 @@ ran out at its cap, so it has no warm-cache $). The correction route has too few
 rows a run to judge. Every route stays at medium, so `HEDGE_S` and
 `REASONING_TOKENS` stay as they are, and the early backup for an answer that
 does not reason (`FAST_HEDGE_S`) went: no route answers without reasoning. A
-unit test pins `routing.EFFORTS` to these values.
+unit test pinned `routing.EFFORTS` to these values until 15 Oct.
 
 ### Reasoning on the big tier, 10 Oct 2026
 
@@ -227,7 +266,7 @@ about 0.6 ms a chunk.
 A reasoned answer is about 50 tokens; the rest is the model thinking. A
 correction (2.8 % of rows, most of them `unheard`) is where answers take 10 s.
 
-Each route's effort is in `routing.EFFORTS`, so one can be benched alone. Low
+Each route's effort was in `routing.EFFORTS`, so one could be benched alone. Low
 effort, two runs each on the rows it changes, against the same rows' baseline:
 
 | Route       | p50 ms      | p95 ms      | Gates that fell                               |
@@ -250,8 +289,9 @@ chunks cut during a slow answer queue up (`DICTATION-AI.md` in the app repo).
 
 ## Retry
 
-When the guardrail refuses an answer, small or big tier, the big tier corrects
-it once if at least 1,500 ms of the deadline are left (gpt-6-luna, p50 1.49 s on
+When the guardrail refuses an answer, the correction model (the big one by
+default, since 15 Oct `SNAPBAK_CORRECTION`, or none) corrects it once if at
+least 1,500 ms of the deadline are left (gpt-6-luna, p50 1.49 s on
 30 corpus items without reasoning, 11 Oct 2026): it gets the refused answer and
 the rule and words the guardrail named, with reasoning (`api.md`, Correction;
 founder, 11 Oct: a blind retry often repeated the same mistake). A failed or
@@ -261,6 +301,12 @@ a long dictation's correction answers before the deadline instead of timing out.
 
 ## Fallback
 
-When a tier errors or times out, `SNAPBAK_FALLBACK` is tried once with the time
-that is left. The answer then names the fallback engine with the tier that was
-asked for.
+When a model errors or times out, `SNAPBAK_FALLBACK` is tried once with the time
+that is left, and it joins a call still asking after `HEDGE_S` (10 s). Sending
+every polish call to the fallback at once was measured and not kept: on 150 R7
+rows (15 Oct) it took gpt-6-luna at effort none from p50 1550 / p95 2292 ms to
+1467 / 2160 ms for twice the polish price, and the app's polish-ahead in a pause
+buys more for less (DICTATION-AI.md in the app). A copy sent later gained
+nothing in a simulation on the measured times, since every call takes about
+1.1 s at least. The answer then names the engine that answered with the tier
+that was asked for.
