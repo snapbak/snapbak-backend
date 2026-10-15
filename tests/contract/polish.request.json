@@ -4,7 +4,6 @@
   "terms": ["GMMCO", "Priya"],
   "app": "Slack",
   "style": "chat",
-  "language": "en",
   "continues": false,
   "deadline_ms": 6000
 }

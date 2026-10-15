@@ -4,27 +4,24 @@
 
 from snapbak_backend.ai.guardrail.grammar import FORMAT_WORDS, FUNCTION_WORDS, PAST
 from snapbak_backend.ai.guardrail.numbers import VALUES, is_number
-from snapbak_backend.ai.guardrail.tokens import word_set, words
+from snapbak_backend.ai.guardrail.tokens import word_set
 from snapbak_backend.ai.routing import CUES
 
 NEGATORS = word_set(
     "not never no cannot dont doesnt didnt isnt arent wasnt werent hasnt havent hadnt cant couldnt wont wouldnt "
-    "shouldnt nahi nahin na mat नहीं न मत"
+    "shouldnt"
 )
 
 
 CUE_PHRASES = {tuple(cue.replace(",", "").split()) for cue in CUES}
-# The words of the cues, but for everyday words a cue phrase holds ("mera matlab", "galti se bola", "let me"), whose
-# loss is a loss like any word's.
-EVERYDAY = word_set(
-    "me let meant se bola mera galti से बोल बोला दिया मेरा गलती make it my bad ignore cancel strike correction "
-    "ho gayi हो गई change"
-)
+# The words of the cues, but for everyday words a cue phrase holds ("let me", "my bad"), whose loss is a loss like any
+# word's.
+EVERYDAY = word_set("me let meant make it my bad ignore cancel strike correction change delete don't do this")
 CUE_WORDS = {word for cue in CUE_PHRASES for word in cue} - EVERYDAY
 # "not friday" after a correction names the version taken back.
-DESCRIBING = word_set("not nahi नहीं")
-# A "no" or "nahi" alone, which may itself be a cue ("latest nahi purana").
-LONE_NEGATORS = word_set("no nahi nahin नहीं")
+DESCRIBING = word_set("not")
+# A "no" alone, which may itself be a cue ("latest no oldest").
+LONE_NEGATORS = word_set("no")
 # Cues that are also everyday words ("wait for", "sorry about"), and the ones that are cues only before a comma.
 WEAK_CUES = {
     tuple(cue.split())
@@ -35,39 +32,24 @@ WEAK_CUES = {
         "actually",
         "make that",
         "change that",
-        "matlab",
-        "मतलब",
-        "balki",
-        "बल्कि",
-        "सॉरी",
-        "एक्चुअली",
-        "वेट",
         "i meant",
-        "ruko",
-        "रुको",
-        "galti se",
-        "गलती से",
         "make it",
         "correction",
         "strike that",
         "my bad",
         "ignore that",
         "cancel that",
-        "galti ho gayi",
-        "गलती हो गई",
+        "delete that",
     )
 }
 # A weak cue right before one of these is an everyday phrase ("wait for it", "sorry about that").
 BINDERS = word_set("for about until till than")
 COMMA_CUES = {tuple(cue.removesuffix(",").split()) for cue in CUES if cue.endswith(",")}
-# A doubled "no" ("nahi nahi", "नहीं नहीं") is a correction cue, never a negation.
+# A doubled "no" ("no no") is a correction cue, never a negation.
 REPEATS = {cue for cue in CUE_PHRASES if len(cue) == 2 and cue[0] == cue[1]}
-# Words a lone "no" or "nahi" may put one of in another's place ("tum friday nahi sunday aao").
-DAYS = word_set(
-    "monday tuesday wednesday thursday friday saturday sunday today tonight tomorrow yesterday aaj kal parso parson "
-    "आज कल परसों सोमवार मंगलवार बुधवार गुरुवार शुक्रवार शनिवार रविवार मंडे ट्यूजडे वेडनेसडे थर्सडे फ्राइडे सैटरडे संडे"
-)
-# Words of one kind a lone "no" or "nahi" may put one of in another's place ("use red no blue", "mom no dad").
+# Words a lone "no" may put one of in another's place ("come friday no sunday").
+DAYS = word_set("monday tuesday wednesday thursday friday saturday sunday today tonight tomorrow yesterday")
+# Words of one kind a lone "no" may put one of in another's place ("use red no blue", "mom no dad", "him no her").
 KINDS = [
     word_set(group)
     for group in (
@@ -77,20 +59,21 @@ KINDS = [
         "high low medium",
         "mom dad mum mother father mummy papa sister brother",
         "small large big medium",
+        "i we you he she they",
+        "me us you him her them",
+        "my our your his her their",
     )
 ]
 # After a lone "no" these make a negation phrase, never a correction ("no one objected", "no problem").
 NEGATION_PHRASES = word_set("one longer idea problem way matter doubt worries worry body")
 # A lone "no" before one of these starts a replacement, never a negation ("keep it with me no in your bag").
 PREPOSITIONS = word_set("in on at for with from by")
-# "matlab rehne do" ("I mean, leave it") takes back the instruction before it.
-WITHDRAWALS = {tuple(words(phrase)) for phrase in ("matlab rehne do", "मतलब रहने दो")}
 
 
 def negated_again(said: list[str], span: list[str], cue_start: int, cue_end: int, end: int) -> bool:
     """A negation in the replacement after a cue: "don't" or "not" before a word not taken back ("no wait don't
-    send it"), or a lone "no" or "nahi" right after it whose words go on to restate the taken ones ("no allergies
-    actually no known allergies"), not one after an alternative ("latest nahi purana")."""
+    send it"), or a lone "no" right after it whose words go on to restate the taken ones ("no allergies actually no
+    known allergies"), not one after an alternative ("latest no oldest")."""
     after_cue = span[cue_end:]
     said_before = set(said[: end - len(span) + cue_start])
     # "not friday" after "make it thursday" names the version taken back; it negates nothing kept.
@@ -112,8 +95,8 @@ def negated_again(said: list[str], span: list[str], cue_start: int, cue_end: int
 
 
 def lone_cue(said: list[str], marks: list[bool], span: list[str], at: int, end: int) -> bool:
-    """A lone "no" right after a cue that goes on with it: a mark after it ("actually नहीं, निहारिका को") or the taken
-    words said again from their start after it."""
+    """A lone "no" right after a cue that goes on with it: a mark after it ("actually no, Nora") or the taken words
+    said again from their start after it."""
     marked = at + 1 < len(said) and marks[at + 1]
     return marked or restarts(said, span, at - (end - len(span)) + 1, end)
 
@@ -126,8 +109,8 @@ def restarts(said: list[str], span: list[str], at: int, end: int) -> bool:
 
 
 def taking_cue(span: list[str]) -> tuple[int, int] | None:
-    """The cue that takes words back in a removed run: the last, unless that is a lone "no" or "nahi" right after
-    another cue, which then opens the replacement ("no allergies actually no known allergies")."""
+    """The cue that takes words back in a removed run: the last, unless that is a lone "no" right after another
+    cue, which then opens the replacement ("no allergies actually no known allergies")."""
     cue = last_cue(span)
     if cue is not None and tuple(span[cue[0] : cue[1]]) in WEAK_CUES:
         # Two cues in a row are one ("no wait make it thursday").
@@ -144,7 +127,7 @@ def taking_cue(span: list[str]) -> tuple[int, int] | None:
 
 def last_cue(span: list[str]) -> tuple[int, int] | None:
     """Where the last correction cue in `span` starts and ends, if it holds one: the longest of those ending last
-    ("nahi nahi", not its second "nahi")."""
+    ("no no", not its second "no")."""
     found = [
         (i, i + len(cue))
         for i, word in enumerate(span)
@@ -163,7 +146,7 @@ for _cue in CUE_PHRASES:
 RESTATED_WITHIN = 3
 # The letters a name put right keeps ("maria" mariam, "jose" joseph).
 RESPELLED = 4
-# A cue that puts one word right takes back a few words at most ("finance ko bhejo nahi legal ko").
+# A cue that puts one word right takes back a few words at most ("send it to finance no to legal").
 SHORT_TAKEN = 3
 # Prefixes that make a word's opposite ("happy no unhappy").
 OPPOSITES = ("un", "in", "im", "ir", "il", "dis", "non")
@@ -175,8 +158,8 @@ def reads_as_cue(
     """Whether the cue at `said[cue_start:cue_end]` takes back `said[start:cue_start]`, though nothing kept is left
     in its place: a strong cue does, and a weak one after a clause mark unless an everyday phrase goes on ("Wait for
     it."), inside a sentence, or when the words after it restate a word it takes back or open the same way ("mark
-    said sorry matt said", "the daughter actually the son"). Inside a sentence a lone "no" or "nahi" is a negation
-    ("main friday nahi aaunga") unless what follows it opens like the words it takes back ("ship it to staging no to
+    said sorry matt said", "the daughter actually the son"). Inside a sentence a lone "no" is a negation ("there is
+    no data") unless what follows it opens like the words it takes back ("ship it to staging no to
     production") or with a preposition, or the word after it is of a kind it takes back: a day or a number ("book 3
     tickets no 4")."""
     after = said[cue_end:]
@@ -186,8 +169,8 @@ def reads_as_cue(
     bound = bool(after) and after[0] in BINDERS and not marks[cue_end]
     taken = said[start:cue_start]
     # A restatement follows the cue closely; a word said again much later is just said again. So does a word put
-    # right ("maria sorry mariam"), and a word with the same small word after it as one taken ("finance ko bhejo
-    # nahi legal ko").
+    # right ("maria sorry mariam"), and a word with the same small word after it as one taken ("finance on monday no
+    # legal on monday").
     soon = after[: len(taken) + RESTATED_WITHIN]
     restated = {word for word in taken if word not in FUNCTION_WORDS} & set(soon) or after[:1] == taken[:1]
     short = len(taken) <= SHORT_TAKEN
@@ -200,14 +183,14 @@ def reads_as_cue(
         short and len(after) > 1 and after[1] in FUNCTION_WORDS and after[1] in taken[1:] and after[0] not in taken
     )
     opens_clause = marks[cue_start] and not bound
-    withdrawn = tuple(said[cue_start : cue_end + 2]) in WITHDRAWALS
-    cue = strong(said, marks, cue_start, cue_end) or opens_clause or withdrawn
+    cue = strong(said, marks, cue_start, cue_end) or opens_clause
     opens_alike = start > 0 and after[:1] == said[start - 1 : start]
     replaces = opens_alike or (bool(after) and after[0] in PREPOSITIONS)
-    # A name for another follows only the English "no" ("amy no emily"); "pata nahi shaan" is a negation.
+    # A name for another follows only a lone "no" ("amy no emily").
     names_for = named if said[cue_start:cue_end] == ["no"] else frozenset()
     alike = any(same_kind([word, *after[:1]], names_for) for word in taken)
-    # A number or a day for another is a correction also at the start ("छह नहीं सात फेरे"), when it takes back only that.
+    # A number or a day for another is a correction also at the start ("six no seven chairs"), when it takes back only
+    # that.
     lone = sum(word not in FUNCTION_WORDS for word in taken) == 1
     plain = used_plainly(said, marks, start, cue_start, cue_end)
     inside = not plain and ((not marks[start] and (not negator or replaces or alike)) or (lone and alike))
@@ -225,10 +208,12 @@ def reads_as_cue(
 
 def used_plainly(said: list[str], marks: list[bool], start: int, cue_start: int, cue_end: int) -> bool:
     """A weak cue inside a sentence used as an everyday word: a verb, a joining word or "to" goes on after it, a
-    reporting verb comes before it, or it binds the word after ("the brake warning actually stayed off", "is fine
-    sorry but", "sorry to hear", "amit ne kaha sorry", "we cannot wait for"), unless another version of the words
-    before follows it ("risks sorry for blockers", "tuesday actually wednesday")."""
-    if tuple(said[cue_start:cue_end]) not in WEAK_CUES:
+    reporting verb comes before it, it binds the word after, or, with nothing else taken, its "that" points at the
+    word after ("the brake warning actually stayed off", "is fine sorry but", "sorry to hear", "amit said sorry", "we
+    cannot wait for", "delete that file"), unless another version of the words before follows it ("risks sorry for
+    blockers", "tuesday actually wednesday")."""
+    cue = tuple(said[cue_start:cue_end])
+    if cue not in WEAK_CUES:
         return False
     after = said[cue_end:]
     taken = said[start:cue_start]
@@ -237,15 +222,21 @@ def used_plainly(said: list[str], marks: list[bool], start: int, cue_start: int,
     goes_on = bool(after) and (after[0] in EVERYDAY_AFTER or (past_form(after[0]) and not any(map(past_form, taken))))
     reported = bool(taken) and taken[-1] in REPORTING
     bound = bool(after) and after[0] in BINDERS and not marks[cue_end]
+    # A "that" pointing at the word after takes back nothing when nothing was said before it in the run.
+    pointing = (
+        not taken and cue[-1] in POINTING and bool(after) and not marks[cue_end] and after[0] not in FUNCTION_WORDS
+    )
     soon = after[: len(taken) + RESTATED_WITHIN]
     restated = {word for word in taken if word not in FUNCTION_WORDS} & set(soon) or after[:1] == taken[:1]
     opens_alike = start > 0 and after[:1] == said[start - 1 : start]
-    return goes_on or reported or (bound and not restated and not opens_alike)
+    return goes_on or reported or ((bound or pointing) and not restated and not opens_alike)
 
 
 # Words that go on with a sentence after a weak cue used plainly, and verbs that report what was said before one.
 EVERYDAY_AFTER = word_set("but and so because or yet to that if when though although")
-REPORTING = word_set("said told asked kaha bola poocha likha कहा बोला पूछा लिखा")
+REPORTING = word_set("said told asked")
+# The last word of a cue that may point at the word after it ("delete that file", "cancel that order").
+POINTING = word_set("that this")
 
 
 def past_form(word: str) -> bool:
@@ -267,8 +258,8 @@ def same_kind(pair: list[str], named: frozenset[str] = frozenset()) -> bool:
 
 
 def strong(said: list[str], marks: list[bool], cue_start: int, cue_end: int) -> bool:
-    """A cue that is never an everyday word: not a weak one, and "no" or "nahi" only with a comma or a negation after
-    it ("no don't send it")."""
+    """A cue that is never an everyday word: not a weak one, and "no" only with a comma or a negation after it ("no
+    don't send it")."""
     cue = tuple(said[cue_start:cue_end])
     after = cue_end < len(said) and (marks[cue_end] or negations(said[cue_end : cue_end + 1]) > 0)
     return cue not in WEAK_CUES and (cue not in COMMA_CUES or after)
@@ -359,7 +350,7 @@ def retracts(
     # scratch that give it to her before lunch" Give the medicine to Grandma before lunch), round b4.
     if any(word not in STAND_INS for word in replacement):
         lost = [word for word in lost if word not in STAND_INS]
-    # A negation said again in the replacement must be written ("note nahi kiya matlab ... note nahi kiya").
+    # A negation said again in the replacement must be written ("didn't note it i mean ... didn't note it").
     if negations(lost):
         return None
     takes = (in_place and len(lost) <= 1) or (followed and not lost)
@@ -367,7 +358,7 @@ def retracts(
 
 
 # Third-person words that stand for a noun said before them; never "me" or "you", who are other people.
-STAND_INS = word_set("he she it they him her them his its their उसे उसको उन्हें उनको use usko unhe unko")
+STAND_INS = word_set("he she it they him her them his its their")
 
 # Small words a replacement may open with like the version it takes back ("on prod no on staging").
 LEAD_WORDS = word_set("on in at to for with from by the a an")
@@ -375,7 +366,7 @@ LEAD_WORDS = word_set("on in at to for with from by the a an")
 
 def version_start(taken: list[str], replacement: list[str], after: list[str]) -> int:
     """Where the version a replacement puts right starts among the taken words: at the last word of its kind ("eight
-    feet rather twelve feet", "kal upgrade karenge matlab parso") or its opening small word ("happen on prod no on
+    feet rather twelve feet", "upgrade it tomorrow i mean friday") or its opening small word ("happen on prod no on
     staging"); else all of them."""
     kinds = [i for i, word in enumerate(taken) if replacement and same_kind([word, replacement[0]])]
     if kinds:
@@ -415,21 +406,11 @@ def as_digits(word: str, written_digits: str) -> bool:
     return written_digits.startswith(leading)
 
 
-TAGS = word_set("na ना")
-TAG_AFTER = word_set("hai hain ho tha thi है हैं हो था थी")
-
-
-def tagged(word: str) -> bool:
-    return word in TAG_AFTER or word.endswith(("ga", "gi", "ge", "गा", "गी", "गे"))
-
-
 def negations(said: list[str]) -> int:
     joined = " ".join(said)
     if NEGATORS.isdisjoint(said) and "'" not in joined and "-" not in joined:
         return 0
     pieces = [piece for word in said for piece in word.replace("'", "").split("-")]
-    # A "na" after a verb is a question tag, never a negation ("tum aa rahe ho na", "आओगे ना").
-    pieces = [piece for i, piece in enumerate(pieces) if not (piece in TAGS and i and tagged(pieces[i - 1]))]
     found = sum(piece in NEGATORS for piece in pieces)
     if found < 2:
         return found

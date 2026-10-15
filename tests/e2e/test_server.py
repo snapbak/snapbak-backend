@@ -74,13 +74,6 @@ def test_command_over_http(server: str) -> None:
     assert (response.status_code, response.json()["text"]) == (200, "HEY CAN U SEND THE DECK BY EOD")
 
 
-def test_hinglish_and_hindi_over_http(server: str) -> None:
-    for text, language in [("kal milte hain", "hinglish"), ("कल मिलते हैं", "hi")]:
-        request = {**POLISH, "text": text, "prior": "", "language": language}
-        response = httpx.post(f"{server}/v1/polish", json=request, headers=AUTH)
-        assert (response.json()["text"], response.json()["tier"]) == (f"{text}!", "big")
-
-
 def test_wrong_token_over_http(server: str) -> None:
     response = httpx.post(f"{server}/v1/polish", json=POLISH, headers={"Authorization": "Bearer nope"})
     assert (response.status_code, response.json()) == (401, {"error": "unauthorized"})

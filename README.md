@@ -6,8 +6,7 @@ lists, numbers, small grammar fixes, and corrections such as "no wait, make it
 Thursday". It also rewrites a selection when the user speaks a command. It
 stores nothing and logs no text.
 
-English, Hinglish (Hindi in Roman script) and Hindi (Devanagari) are polished in
-the language and script they were spoken in, never translated.
+Snapbak is English only (14 Oct 2026); text is never translated.
 
 ## Run it
 
@@ -34,14 +33,14 @@ curl -s localhost:8787/v1/polish -H 'Authorization: Bearer dev' \
 
 1. `POST /v1/polish` checks the token and the request limits.
 2. The escalation rules pick a tier: the small model, or the big one for
-   corrections, Hinglish, Hindi and long chunks.
+   corrections and long chunks.
 3. The model gets a fixed system prompt, worked examples and the request as
    JSON, and answers `{"revision", "text"}`.
 4. The guardrail checks the answer (a stutter like "it's it's" may lose a copy,
    and a word the recognizer misheard may become the word that sounds like it):
    no unheard words or numbers, no lost or invented dictionary term, no rewrite
-   of over 30 %, no dropped sentence, no flipped negation, tense or speaker
-   gender, no dropped qualifier, no reply, no question left out of order. An
+   of over 30 %, no dropped sentence, no flipped negation or tense, no dropped
+   qualifier, no reply, no question left out of order. An
    answer refused only for a mark or a list's shape is mended without a model
    when it can be. A refused answer, small or big, is corrected once by the big
    model with reasoning if at least 1.5 s is left: it gets its answer back and

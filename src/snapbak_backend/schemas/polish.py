@@ -19,7 +19,6 @@ class PolishRequest(BaseModel):
     terms: list[Term] = Field(max_length=200)
     app: str = Field(max_length=100)
     style: Style
-    language: str
     # The first chunk goes in mid-sentence: the text before the cursor ends with no sentence mark.
     continues: bool = False
     # The app waits up to 20 s for the AI: accuracy over speed (D2, 11 Oct).

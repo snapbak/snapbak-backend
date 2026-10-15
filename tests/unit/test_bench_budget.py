@@ -41,10 +41,7 @@ class Priced:
 
 
 def rows(count: int) -> list[bench.Item]:
-    made = [
-        bench.Item("grammar", "tense", "She goes home.", "", [], "en", "other", ["She goes home."])
-        for _ in range(count)
-    ]
+    made = [bench.Item("grammar", "tense", "She goes home.", "", [], "other", ["She goes home."]) for _ in range(count)]
     return made
 
 

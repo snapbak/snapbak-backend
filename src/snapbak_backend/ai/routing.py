@@ -18,33 +18,10 @@ CUES = [
     "rather",
     "sorry",
     "change that",
-    "nahi nahi",
-    "nahin nahin",
-    "nahi,",
-    "nahin,",
-    "matlab",
-    "balki",
-    "नहीं नहीं",
-    "नहीं,",
-    "मतलब",
-    "बल्कि",
-    "सॉरी",
-    "आई मीन",
-    "एक्चुअली",
-    "वेट",
     "i meant",
     "oops",
     "nope",
     "let me rephrase",
-    "mera matlab",
-    "ruko",
-    "galti se bola",
-    "galti se",
-    "मेरा मतलब",
-    "रुको",
-    "गलती से बोल दिया",
-    "गलती से बोला",
-    "गलती से",
     "make it",
     "correction",
     "strike that",
@@ -52,13 +29,13 @@ CUES = [
     "ignore that",
     "cancel that",
     "no sorry",
-    "galti ho gayi",
-    "गलती हो गई",
+    "delete that",
+    "no don't do this",
+    "no don't do that",
 ]
-BIG_LANGUAGES = {"hinglish", "hi"}
 MAX_SMALL_WORDS = 150
 
-LETTER = r"\wऀ-ॿ"
+LETTER = r"\w"
 _alternatives = "|".join(re.escape(cue).replace(r"\ ", r"\s+") for cue in CUES)
 CUE = re.compile(rf"(?<![{LETTER}])(?:{_alternatives})(?![{LETTER}])")
 
@@ -68,28 +45,25 @@ def has_cue(text: str) -> bool:
     return found is not None
 
 
-def tier(text: str, language: str) -> Tier:
-    hard = has_cue(text) or language in BIG_LANGUAGES or len(text.split()) > MAX_SMALL_WORDS
+def tier(text: str) -> Tier:
+    hard = has_cue(text) or len(text.split()) > MAX_SMALL_WORDS
     return "big" if hard else "small"
 
 
-# The reasoning effort each route asks for: a chunk with a correction cue, Hindi, Hinglish, and the correction of a
-# refused answer. Round b3 measured medium's gain on Hindi, Hinglish and cues (150 against 131 of 216 rows).
-EFFORTS = {"cue": "medium", "hinglish": "medium", "hi": "medium", "correction": "medium"}
-STRENGTH = ["", "minimal", "low", "medium", "high"]
+# The reasoning effort each route asks for: a chunk with a correction cue, any other chunk, on either tier, and the
+# correction of a refused answer. The 14 Oct 2026 English sweep kept every route at medium: none and low fell outside
+# medium's noise band, and the models refuse "minimal" (docs/escalation.md).
+EFFORTS = {"cue": "medium", "plain": "medium", "correction": "medium"}
 
 
-def effort(text: str, language: str) -> str:
-    """The effort a big-tier answer reasons at, "" for none: the higher of its routes' (a cue, Hindi or Hinglish); an
-    English chunk that is big only for its length answers without it (founder, 13 Oct: faster)."""
-    routes = [EFFORTS["cue"] if has_cue(text) else "", EFFORTS.get(language, "") if language in BIG_LANGUAGES else ""]
-    return max(routes, key=STRENGTH.index)
+def effort(text: str) -> str:
+    """The effort an answer reasons at: its route's."""
+    route = "cue" if has_cue(text) else "plain"
+    return EFFORTS[route]
 
 
 # A paragraph said between two long paragraphs splits a chunk; each part is polished at once (founder, 13 Oct).
-PARAGRAPH = re.compile(
-    r"(?<![\wऀ-ॿ])(?:new paragraph|naya paragraph|naya para|नया पैराग्राफ|नया पैरा)(?![\wऀ-ॿ])", re.IGNORECASE
-)
+PARAGRAPH = re.compile(r"(?<!\w)new paragraph(?!\w)", re.IGNORECASE)
 MIN_PARAGRAPH_WORDS = 30
 
 

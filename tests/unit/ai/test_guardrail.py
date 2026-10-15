@@ -19,18 +19,10 @@ ACCEPTED = [
         "Ishaan, do one thing. Get in touch with Aran directly for this, and whatever he says, then call Archana.",
     ),
     ("we have 2 options", "We have two options."),
-    ("1 kaam karo, report bhejo", "Ek kaam karo, report bhejo."),
-    ("mere paas 3 ideas hain", "Mere paas teen ideas hain."),
-    ("1 काम करो, रिपोर्ट भेजो", "एक काम करो, रिपोर्ट भेजो।"),
-    ("हमारे पास 2 रास्ते हैं", "हमारे पास दो रास्ते हैं।"),
     # A stutter: a word said twice in a row may lose one copy (founder, 11 Oct).
     ("It's it's finished finished.", "It's finished."),
     ("we we shipped shipped it", "We shipped it."),
     ("the the build is green", "The build is green."),
-    ("kal kal meeting hai", "Kal meeting hai."),
-    ("report bhej bhej diya", "Report bhej diya."),
-    ("मैंने मैंने रिपोर्ट भेज दी", "मैंने रिपोर्ट भेज दी।"),
-    ("हम कल कल मिलेंगे", "हम कल मिलेंगे।"),
     (
         "hey team i pushed the fix for the login issue can someone test it",
         "Hey team, I pushed the fix for the login issue. Can someone test it?",
@@ -55,35 +47,20 @@ ACCEPTED = [
     ("she don't know that the files was moved", "She doesn't know that the files were moved."),
     ("they wasn't ready", "They weren't ready."),
     ("I has already send the document", "I had already sent the document."),
-    ("usne report bheja tha", "Usne report bheji thi."),
-    ("वह रिपोर्ट भेजता था", "वह रिपोर्ट भेजती थी।"),
     ("ship it please", "Ship it."),
     ("sure i can take the review", "Sure, I can take the review."),
     ("deploy on tuesday actually wednesday", "Deploy on Wednesday."),
     ("we celebrate at our place wait at grandmas place", "We celebrate at Grandma's place."),
     ("Send this to Jam Co. No, send this to GMMCO.", "Send this to GMMCO."),
     ("send this to jam co no send this to GMMCO", "Send this to GMMCO."),
-    (
-        "kal client ko call karna hai aur report bhejni hai",
-        "Kal client ko call karna hai aur report bhejni hai.",
-    ),
-    ("kal milte hain nahi nahi parso milte hain", "Parso milte hain."),
-    ("teen baje meeting hai", "3 baje meeting hai."),
-    ("कल रिपोर्ट भेजनी है", "कल रिपोर्ट भेजनी है।"),
-    ("कल मिलते हैं नहीं नहीं परसों मिलते हैं", "परसों मिलते हैं।"),
-    ("मुझे कल तीन बजे कॉल करना", "मुझे कल 3 बजे कॉल करना है।"),
     ("kevin seen the error", "Kevin saw the error."),
     ("i already send it and they pay it", "I already sent it and they paid it."),
     ("my notes goes missing", "My notes go missing."),
     ("we has a idea", "We have an idea."),
     ("he were late, they was early", "He was late, they were early."),
-    ("pehla budget doosra hiring", "1. Budget\n2. Hiring"),
-    ("do cheezein pehla budget doosra hiring", "Do cheezein:\n1. Budget\n2. Hiring"),
-    ("पहला बजट दूसरा भर्ती", "1. बजट\n2. भर्ती"),
     ("firstly the budget secondly the hiring", "1. The budget\n2. The hiring"),
     ("order pizza for lunch. actually let's get sushi", "Let's get sushi."),
     ("Book the flight to Delhi tomorrow. Scratch that, call Priya.", "Call Priya."),
-    ("Kal Delhi ki flight book karo. Nahi nahi, Priya ko call karo.", "Priya ko call karo."),
     ("We should send this to the frontend team. No, don't send it yet.", "Don't send it yet."),
     ("please ship the build to staging today thanks", "Ship the build to staging today."),
     ("the api path is slash v one slash notes slash note id", "The API path is /v1/notes/:noteId"),
@@ -104,167 +81,60 @@ ACCEPTED = [
     ("he has did it", "He has done it."),
     ("the mouses are broken", "The mice are broken."),
     ("i stop the build yesterday", "I stopped the build yesterday."),
-    ("वह गया था", "वह गई थी।"),
-    ("वह लड़की आया था", "वह लड़की आई थी।"),
-    ("लड़कियां आया", "लड़कियां आईं।"),
     ("ok. fifty five dollars", "Ok. $55."),
     ("fifty five dollars", "$55."),
-    ("बुलेट तौलिया बुलेट चार्जर", "- तौलिया\n- चार्जर"),
-    ("report bhejo nahin, deck bhejo", "Deck bhejo."),
     ("call at ten after three", "Call at 3:10."),
     ("dial 555-0147 now", "Dial 555-0147 now."),
-    ("मीटिंग सोमवार को है बल्कि मंगलवार को है", "मीटिंग मंगलवार को है।"),
-    ("meeting monday ko hai balki tuesday ko hai", "Meeting Tuesday ko hai."),
-    ("जयराम का पेमेंट रन रविवार को नहीं बल्कि शनिवार रात आठ बजे होगा", "जयराम का पेमेंट रन शनिवार रात 8 बजे होगा।"),
-    ("बैठक के बाद रोहित से बात करना, बल्कि रौनक से बात करना", "बैठक के बाद रौनक से बात करना।"),
-    ("कृपया GST फाइलिंग दस तारीख को, sorry ग्यारह तारीख को फाइनल करना", "कृपया GST फाइलिंग 11 तारीख को फाइनल करना।"),
-    ("ek tab night me dena scratch that do tab night me dena", "2 tab night me dena."),
-    ("मीटिंग बारह बजे है", "मीटिंग 12 बजे है।"),
-    ("baarah mahine ka runway", "12 mahine ka runway."),
-    ("runway barah mahine ka hai", "Runway 12 mahine ka hai."),
-    ("pachees hazaar rupaye", "₹25,000."),
-    ("dus baje", "10 baje."),
-    ("बारह महीने का रनवे", "12 महीने का रनवे।"),
-    ("पांच बजे कॉल है और छब्बीस मिनट बाद अपडेट", "5 बजे कॉल है और 26 मिनट बाद अपडेट।"),
-    ("हमारा रनवे बारह महीने का है लेकिन कैश बर्न तेज है", "हमारा रनवे 12 महीने का है लेकिन कैश बर्न तेज है।"),
-    ("तीस प्रतिशत यूजर्स ने फीचर इस्तेमाल किया", "30% यूजर्स ने फीचर इस्तेमाल किया।"),
-    ("कुल बिल एक लाख बीस हजार आएगा", "कुल बिल ₹1,20,000 आएगा।"),
-    ("पांच हज़ार रुपये भेज दो", "5,000 रुपये भेज दो।"),
-    ("saat baje paanch log aayenge", "7 baje 5 log aayenge."),
-    ("रिफंड के लिए बिल्स एट प्रोकोल डॉट इन पर इनवॉइस भेजें", "रिफंड के लिए bills@procol.in पर इनवॉइस भेजें।"),
-    ("डॉक्युमेंट अपलोड करो drive डॉट google डॉट com स्लैश ops", "डॉक्युमेंट अपलोड करो drive.google.com/ops।"),
-    ("पेमेंट पेज पर जाइए डब्ल्यू डब्ल्यू डब्ल्यू डॉट पेमेंट डॉट कॉम स्लैश इनवॉइस", "पेमेंट पेज पर जाइए www.payment.com/invoice।"),
-    ("लिंक एच टी टी पी एस कोलन स्लैश स्लैश हेल्प डॉट इन स्लैश एच ई एल पी है", "लिंक https://help.in/help है।"),
-    ("रिव्यू साढ़े दस बजे होगा", "रिव्यू 10:30 बजे होगा।"),
     ("pick up the kids by half past three", "Pick up the kids by 3:30."),
     (
         "agenda bullet one simplify onboarding bullet two keep dark mode",
         "Agenda:\n- Simplify onboarding\n- Keep dark mode",
     ),
-    ("राम का किताब मेज पर है", "राम की किताब मेज पर है।"),
-    ("ravi ki ghar kal jaana hai", "Ravi ke ghar kal jaana hai."),
     ("kevin seen error in log", "Kevin saw the error in the log."),
-    ("Neha aur Aman present tha", "Neha aur Aman present the."),
-    ("server restart hui", "Server restart hua."),
-    ("main jaata hai", "Main jaata hoon."),
-    ("hum kal jayega", "Hum kal jayenge."),
-    ("ट्रेनिंग स्लाइड्स तैयार हो गया", "ट्रेनिंग स्लाइड्स तैयार हो गईं।"),
-    ("पेमेंट्स क्लियर हो गया था", "पेमेंट्स क्लियर हो गई थीं।"),
-    ("दो वर्शन आज डेमो होगा", "दो वर्शन आज डेमो होंगे।"),
-    ("वो लोग आ रहा है", "वो लोग आ रहे हैं।"),
-    ("सौरभ ने अमाउंट चेक करती है और अप्रूवल भेजती है", "सौरभ ने अमाउंट चेक किया और अप्रूवल भेजा।"),
     ("Ship it today team. Also loop in Priya on the budget doc. Scratch that.", "Ship it today team."),
     ("i drafted the update for finance actually for operations", "I drafted the update for operations."),
-    ("मेल राहुल को भेजो सॉरी रोहित को", "मेल रोहित को भेजो।"),
-    ("मेल राहुल को भेजो, आई मीन रोहित को", "मेल रोहित को भेजो।"),
-    ("रिपोर्ट सोमवार को भेजो एक्चुअली मंगलवार को", "रिपोर्ट मंगलवार को भेजो।"),
     ("ill send it", "I'll send it."),
     ("i will sent it", "I will send it."),
-    ("main kal report bhejega", "Main kal report bhejunga."),
-    ("main kal kaam karega", "Main kal kaam karunga."),
-    ("main kal aayega", "Main kal aaunga."),
-    ("hum kal payment dega", "Hum kal payment denge."),
-    ("main file lega", "Main file lunga."),
-    ("मैं कल रिपोर्ट भेजेगा", "मैं कल रिपोर्ट भेजूंगा।"),
-    ("मैं कल काम करेगा", "मैं कल काम करूंगा।"),
-    ("मैं कल आएगा", "मैं कल आऊंगा।"),
-    ("हम कल पेमेंट देगा", "हम कल पेमेंट देंगे।"),
-    ("मैं फाइल लेगा", "मैं फाइल लूंगा।"),
     ("she eated lunch", "She ate lunch."),
     ("he drinked the water", "He drank the water."),
     ("i sleeped late", "I slept late."),
-    ("उसने चाय बनाया", "उसने चाय बनाई।"),
-    ("उसने रोटी बनाया", "उसने रोटी बनाई।"),
-    ("मैंने उसे बताई", "मैंने उसे बताया।"),
     ("first call sam and second email ana", "1. Call Sam\n2. Email Ana"),
     ("first call sam second email ana", "1. Call Sam\n2. Email Ana"),
     ("first the api second the api docs", "1. The API\n2. The API docs"),
     ("first add the airfare second add the hotel", "1. Add the airfare\n2. Add the hotel"),
     ("first set the cap to five second expand to ten percent", "1. Set the cap to 5\n2. Expand to 10%"),
-    ("pehle report bhejo doosre report check karo", "1. Report bhejo\n2. Report check karo"),
     ("the first build failed the second build passed", "The first build failed, the second build passed."),
-    ("pehla call sam ko doosra call ana ko", "Pehla call Sam ko, doosra call Ana ko."),
     (
         "the plan has two steps one call the vendor two update the sheet",
         "The plan has two steps:\n1. Call the vendor\n2. Update the sheet",
     ),
-    ("हमारा रनवे बारह महीने का है", "हमारा रनवे 12 महीने का है।"),
-    ("बीटा यूजर्स पंद्रह सौ हैं और रिटेंशन सत्तर प्रतिशत है", "बीटा यूजर्स 1,500 हैं और रिटेंशन 70% है।"),
-    ("खर्चा पच्चीस हजार रुपये है और टैक्स अलग", "खर्चा ₹25,000 है और टैक्स अलग।"),
-    ("बर्न रेट तीस हजार डॉलर है", "बर्न रेट $30,000 है।"),
-    ("फिर बारह पंद्रह पर रिकवरी आई", "फिर 12:15 पर रिकवरी आई।"),
-    ("कल फाइनेन्स टीम से बात हुई", "कल फाइनेंस टीम से बात हुई।"),
-    ("यहाँ काम ज़्यादा है", "यहां काम ज्यादा है।"),
-    ("सब हँसने लगे", "सब हंसने लगे।"),
-    ("हेल्प डॉट इन खोलो", "help.in खोलो।"),
-    ("मैं कल रिपोर्ट भेजता है", "मैं कल रिपोर्ट भेजता हूं।"),
-    ("पेमेंट्स क्लियर हो गया था", "पेमेंट्स क्लियर हो गईं थीं।"),
-    ("पोर्टल खोलिए डब्ल्यू डब्ल्यू डब्ल्यू डॉट हेल्प डॉट इन स्लैश रिफंड", "पोर्टल खोलिए www.help.in/refund।"),
-    (
-        "लिंक एच टी टी पी एस कोलन स्लैश स्लैश सर्विस डॉट कंपनी डॉट इन स्लैश एच ई एल पी है",
-        "लिंक https://service.company.in/help है।",
-    ),
-    ("फाइल drive डॉट google डॉट com स्लैश folders स्लैश ops पर है", "फाइल drive.google.com/folders/ops पर है।"),
-    ("उसे दो और फाइल चाहिए थी", "उसे दो और फाइलें चाहिए थीं।"),
-    ("हमने टैक्स फाइल करता था", "हमने टैक्स फाइल किया था।"),
-    ("प्लानिंग अगले हफ्ते शुरू होंगे", "प्लानिंग अगले हफ्ते शुरू होगी।"),
-    ("मैंने रिटर्न भरती थी", "मैंने रिटर्न भरा था।"),
-    ("स्लाइड्स तैयार हो गया और उसने देख लिया", "स्लाइड्स तैयार हो गईं और उसने देख लीं।"),
-    ("server restart hui to service wapas aa gaya", "Server restart hua to service wapas aa gayi."),
-    ("main status update karta hai", "Main status update karta hoon."),
-    ("quality team ne material inspect karti hai", "Quality team ne material inspect kiya."),
-    ("पेमेंट रन रविवार को नहीं बल्कि शनिवार रात आठ बजे होगा", "पेमेंट रन शनिवार रात 8 बजे होगा।"),
     (
         "send the reminder to emily at northstar dot io, no, emily at northstar dot com, actually sales at northstar "
         "dot com",
         "Send the reminder to sales@northstar.com.",
     ),
-    ("nahi nahi tum next friday nahi sunday aao", "Tum next Sunday aao."),
-    ("नहीं नहीं तुम अगले फ्राइडे नहीं संडे आओ", "तुम अगले संडे आओ।"),
-    ("tum friday nahi sunday aao", "Tum Sunday aao."),
-    ("main kal nahi parso aaunga", "Main parso aaunga."),
-    ("मैं कल नहीं परसों आऊंगा", "मैं परसों आऊंगा।"),
     ("meet at five no six", "Meet at 6."),
     ("ship the hotfix to staging no to production", "Ship the hotfix to production."),
     ("put the notes in drive no in notion", "Put the notes in Notion."),
     ("i have 2 no 3 kids", "I have 3 kids."),
-    ("mujhe 2 nahi 3 tickets chahiye", "Mujhe 3 tickets chahiye."),
-    ("मुझे दो नहीं तीन टिकट चाहिए", "मुझे तीन टिकट चाहिए।"),
     ("book 3 tickets no 4", "Book 4 tickets."),
-    ("mujhe 3 tickets nahi 4 chahiye", "Mujhe 4 tickets chahiye."),
-    ("मुझे तीन टिकट नहीं चार चाहिए", "मुझे चार टिकट चाहिए।"),
     ("keep it with me no in your bag", "Keep it in your bag."),
     ("leave the keys with ravi no at the desk", "Leave the keys at the desk."),
     ("no no we meet friday", "We meet Friday."),
-    ("pod delete karo matlab rehne do", "Rehne do."),
-    ("पॉड डिलीट करो मतलब रहने दो", "रहने दो।"),
-    ("file delete mat karo matlab rehne do", "Rehne do."),
     ("send the report to ravi no don't do this", "Don't do this."),
     ("send the report to ravi no don't send it yet", "Don't send it yet."),
-    ("report ravi ko bhejo nahi mat bhejo", "Mat bhejo."),
-    ("रिपोर्ट रवि को भेजो नहीं मत भेजो", "मत भेजो।"),
     ("ship it today, no, tomorrow", "Ship it tomorrow."),
     ("don't send it, no wait, send it", "Send it."),
     ("do not merge the pr scratch that merge the pr", "Merge the PR."),
     ("don't cancel the meeting i mean cancel the meeting", "Cancel the meeting."),
-    ("mat bhejo, nahi nahi, bhejo", "Bhejo."),
-    ("मत भेजो नहीं नहीं भेजो", "भेजो।"),
     ("the copy should say no busywork rather no distractions", "The copy should say no distractions."),
-    ("kal sirf report bhejo nahi nahi parso", "Parso sirf report bhejo."),
-    ("आज नहीं नहीं कल भेजो", "कल भेजो।"),
-    ("मैंने उसे बताई", "मैंने उसे बताया।"),
-    ("main kal report bhejega", "Main kal report bhejunga."),
     ("we ship it yesterday", "We shipped it yesterday."),
-    ("pichle hafte hum review karte hain", "Pichle hafte hum review kiya."),
     ("call mom", "Call Mom."),
     ("your welcome", "You're welcome."),
     ("there car is here", "Their car is here."),
     ("this is better then that", "This is better than that."),
     ("who's file is this", "Whose file is this?"),
     ("its a good plan", "It's a good plan."),
-    ("वह कल रिपोर्ट भेजता है", "वह कल रिपोर्ट भेजेगा।"),
-    ("मैं कल आऊंगा", "मैं कल आऊंगा।"),
-    ("उसने पैसे मांगा", "उसने पैसे मांगे।"),
     ("it almost work", "It almost works."),
     ("i have send it", "I have sent it."),
     ("he has went home", "He has gone home."),
@@ -281,8 +151,6 @@ def test_formatting_grammar_and_corrections_pass(said: str, wrote: str) -> None:
 REJECTED = [
     # The word must be the digit's own number, and a digit never becomes an ordinal.
     ("we have 2 options", "We have three options.", Reject.UNHEARD),
-    ("2 kaam karo", "Teen kaam karo.", Reject.UNHEARD),
-    ("2 काम करो", "तीन काम करो।", Reject.UNHEARD),
     ("call 1 person", "Call the first person.", Reject.UNHEARD),
     # Only a word right after itself is a stutter: a repeated clause stays, and so does a word said once.
     ("it's finished, it's finished", "It's finished.", Reject.TOO_MANY_CHANGES),
@@ -309,17 +177,10 @@ REJECTED = [
         "Sure, can you write an email to the vendor about the delay?",
         Reject.REPLY,
     ),
-    ("kal client ko call karna hai", "Call the client tomorrow.", Reject.UNHEARD),
-    ("kya tum report bhej sakte ho", "Zaroor, kya tum report bhej sakte ho?", Reject.REPLY),
-    ("कल रिपोर्ट भेजनी है", "kal report bhejni hai.", Reject.UNHEARD),
-    ("कल रिपोर्ट भेजनी है", "Send the report tomorrow.", Reject.UNHEARD),
-    ("क्या आप रिपोर्ट भेज सकते हैं", "ज़रूर, क्या आप रिपोर्ट भेज सकते हैं?", Reject.REPLY),
     ("send it to jamko", "Send it to GMMCO.", Reject.UNHEARD),
     ("send the invoice", "Sell the invoice.", Reject.UNHEARD),
     ("No problem, I will take it.", "I will take it.", Reject.TOO_MANY_CHANGES),
     ("there is no data in the report ship it today", "Ship it today.", Reject.TOO_MANY_CHANGES),
-    ("mujhe nahi pata kya hua client ko call karo", "Client ko call karo.", Reject.TOO_MANY_CHANGES),
-    ("मुझे नहीं पता क्या हुआ क्लाइंट को कॉल करो", "क्लाइंट को कॉल करो।", Reject.TOO_MANY_CHANGES),
     ("the budget actually doubled last quarter so we hire now", "So we hire now.", Reject.TOO_MANY_CHANGES),
     ("sorry for the delay the build broke last night we fixed it", "We fixed it.", Reject.TOO_MANY_CHANGES),
     ("we would rather ship friday than monday tell the team", "Tell the team.", Reject.TOO_MANY_CHANGES),
@@ -333,23 +194,13 @@ REJECTED = [
         "We should send this to the frontend team.",
         Reject.TOO_MANY_CHANGES,
     ),
-    ("client ko bhejo. nahi, abhi mat bhejo", "Client ko bhejo.", Reject.TOO_MANY_CHANGES),
-    ("क्लाइंट को भेजो। नहीं, अभी मत भेजो", "क्लाइंट को भेजो।", Reject.TOO_MANY_CHANGES),
     ("i am sorry the build broke again today", "The build broke again today.", Reject.TOO_MANY_CHANGES),
     ("i was wait listed for the conference", "Listed for the conference.", Reject.TOO_MANY_CHANGES),
-    ("hai matlab report kal bhejni hai", "Report kal bhejni hai.", Reject.TOO_MANY_CHANGES),
-    ("है मतलब रिपोर्ट कल भेजनी है", "रिपोर्ट कल भेजनी है।", Reject.TOO_MANY_CHANGES),
     ("we have no money left for the trip", "We have left for the trip.", Reject.NEGATION),
     ("i know the answer", "I don't know the answer.", Reject.NEGATION),
     ("i can go tomorrow", "I cannot go tomorrow.", Reject.NEGATION),
     ("i do not agree with the plan", "I do agree with the plan.", Reject.NEGATION),
     ("we will never ship this", "We will ship this.", Reject.NEGATION),
-    ("main kal nahi aaunga", "Main kal aaunga.", Reject.NEGATION),
-    ("मैं कल नहीं आऊंगा", "मैं कल आऊंगा।", Reject.NEGATION),
-    ("kal meeting hai", "Kal meeting is.", Reject.UNHEARD),
-    ("kal meeting hai", "Kal meeting है।", Reject.UNHEARD),
-    ("यह काम का है", "यह काम of है।", Reject.UNHEARD),
-    ("the file is ready", "The file hai ready.", Reject.UNHEARD),
     ("the meeting is at five", "The meeting is at 6.", Reject.UNHEARD),
     ("pay him fifty dollars", "Pay him $500.", Reject.UNHEARD),
     ("tell the team to wait for the review", "The review.", Reject.TOO_MANY_CHANGES),
@@ -358,8 +209,6 @@ REJECTED = [
     ("priya was actually promoted last week", "Promoted last week.", Reject.TOO_MANY_CHANGES),
     ("i would rather go home now and rest", "Go home now and rest.", Reject.TOO_MANY_CHANGES),
     ("make that call to the bank before noon", "Call to the bank before noon.", Reject.TOO_MANY_CHANGES),
-    ("is shabd ka matlab kya hai", "Kya hai?", Reject.TOO_MANY_CHANGES),
-    ("इस शब्द का मतलब क्या है", "क्या है?", Reject.TOO_MANY_CHANGES),
     ("ship it", "Ship it to the and it or this with that for it in the.", Reject.TOO_MANY_CHANGES),
     ("call priya", "Call Priya and it.", Reject.TOO_MANY_CHANGES),
     ("invite alice and bob", "Invite Alice or Bob.", Reject.TOO_MANY_CHANGES),
@@ -372,7 +221,6 @@ REJECTED = [
     ("sign the contract now", "Sign the contrast now.", Reject.UNHEARD),
     ("send the mail to priya", "Send the main to Priya.", Reject.UNHEARD),
     ("the debit was approved", "The debt was approved.", Reject.UNHEARD),
-    ("मैं बल्कि घर जाऊंगा आज", "घर जाऊंगा आज।", Reject.TOO_MANY_CHANGES),
     ("send a file to sam", "Send that file to Sam.", Reject.TOO_MANY_CHANGES),
     (
         "send the deck to sam and the notes to ravi scratch that the notes to priya",
@@ -382,18 +230,9 @@ REJECTED = [
     ("we need five servers by friday", "We need servers by Friday.", Reject.TOO_MANY_CHANGES),
     ("call me at three", "Call me.", Reject.TOO_MANY_CHANGES),
     ("ship the second build to sam today", "Ship the build to Sam today.", Reject.TOO_MANY_CHANGES),
-    ("pehla draft accha tha", "Draft accha tha.", Reject.TOO_MANY_CHANGES),
-    ("तीन लोग आएंगे", "लोग आएंगे।", Reject.TOO_MANY_CHANGES),
-    ("पांच लोग आएंगे", "6 लोग आएंगे।", Reject.UNHEARD),
     ("ship it", "The ship is to the it a.", Reject.TOO_MANY_CHANGES),
     ("ship it now", "Ship the it to a now is.", Reject.TOO_MANY_CHANGES),
-    ("kal meeting hai", "Kal ka meeting ki hai ke tha.", Reject.TOO_MANY_CHANGES),
-    ("कल मीटिंग है", "कल का मीटिंग की है के था।", Reject.TOO_MANY_CHANGES),
     ("we are ready they are done it is live", "We were ready, they were done, it was live.", Reject.TOO_MANY_CHANGES),
-    ("प्रोकोल डॉट इन पर रिपोर्ट भेजनी है", "procol.in par report bhejni hai.", Reject.UNHEARD),
-    ("मेल प्रिया एट procol डॉट इन", "Mail priya@procol.in.", Reject.UNHEARD),
-    ("बिल्स एट प्रोकोल डॉट इन पर भेजें", "sales@procol.in पर भेजें।", Reject.UNHEARD),
-    ("के लिए हेल्प डॉट इन खोलें", "k liye help.in खोलें।", Reject.UNHEARD),
     ("Ravi will send the deck. Wait for it.", "For it.", Reject.TOO_MANY_CHANGES),
     ("Thanks for the update. Sorry for the delay on my side.", "For the delay on my side.", Reject.TOO_MANY_CHANGES),
     ("Send it to Sam. Sorry about that.", "About that.", Reject.TOO_MANY_CHANGES),
@@ -405,30 +244,12 @@ REJECTED = [
         Reject.TOO_MANY_CHANGES,
     ),
     ("ship it today team also loop in priya on the budget doc scratch that", "", Reject.TOO_MANY_CHANGES),
-    ("राहुल ने सॉरी बोला मीटिंग के लिए", "मीटिंग के लिए।", Reject.TOO_MANY_CHANGES),
     ("i was first in line and second in the race", "I was:\n1. In line\n2. In the race", Reject.TOO_MANY_CHANGES),
     ("first of the month and second of the month", "1. Of the month\n2. Of the month", Reject.TOO_MANY_CHANGES),
     ("we shipped one or two fixes", "We shipped:\n1. Or\n2. Fixes", Reject.TOO_MANY_CHANGES),
-    ("humne ek ya do fix bheje", "Humne:\n1. Ya\n2. Fix bheje", Reject.TOO_MANY_CHANGES),
-    ("हमने एक या दो फिक्स भेजे", "हमने:\n1. या\n2. फिक्स भेजे", Reject.TOO_MANY_CHANGES),
     ("we need one to two days", "We need:\n1. To\n2. Days", Reject.TOO_MANY_CHANGES),
-    ("humein ek se do din chahiye", "Humein:\n1. Se\n2. Din chahiye", Reject.TOO_MANY_CHANGES),
-    ("हमें एक से दो दिन चाहिए", "हमें:\n1. से\n2. दिन चाहिए", Reject.TOO_MANY_CHANGES),
     ("the first build failed the second build passed", "1. Build failed\n2. Build passed", Reject.TOO_MANY_CHANGES),
-    (
-        "mera pehla draft weak tha mera doosra draft strong tha",
-        "1. Draft weak tha\n2. Draft strong tha",
-        Reject.TOO_MANY_CHANGES,
-    ),
-    ("मेरा पहला ड्राफ्ट कमज़ोर था मेरा दूसरा ड्राफ्ट अच्छा था", "1. ड्राफ्ट कमज़ोर था\n2. ड्राफ्ट अच्छा था", Reject.TOO_MANY_CHANGES),
-    ("main pehla aaya aur woh doosra", "Main:\n1. Aaya aur woh\n2.", Reject.TOO_MANY_CHANGES),
     ("i bought two apples one red and two green", "I bought two apples:\n1. Red\n2. Green", Reject.TOO_MANY_CHANGES),
-    (
-        "mere paas do kutte hain ek kala aur do safed",
-        "Mere paas do kutte hain:\n1. Kala\n2. Safed",
-        Reject.TOO_MANY_CHANGES,
-    ),
-    ("मेरे पास दो कुत्ते हैं एक काला और दो सफेद", "मेरे पास दो कुत्ते हैं:\n1. काला\n2. सफेद", Reject.TOO_MANY_CHANGES),
     ("i will send it", "I sent it.", Reject.TENSE),
     ("i will go there", "I go there.", Reject.TENSE),
     (
@@ -436,27 +257,9 @@ REJECTED = [
         "I sent the report and I paid the vendor and I called the client.",
         Reject.TENSE,
     ),
-    ("main kal report bhejega", "Main kal report bheja.", Reject.UNHEARD),
-    ("उसने चाय बनाई", "उसने चाय पाई।", Reject.UNHEARD),
-    ("हमारा रनवे बारह महीने का है", "हमारा रनवे 13 महीने का है।", Reject.UNHEARD),
-    ("रिव्यू साढ़े दस बजे होगा", "रिव्यू 11:30 बजे होगा।", Reject.UNHEARD),
-    ("कुल बिल एक लाख बीस हजार आएगा", "कुल बिल ₹1,25,000 आएगा।", Reject.UNHEARD),
-    ("बिल्स एट प्रोकोल डॉट इन पर भेजें", "bills@paypal.in पर भेजें।", Reject.UNHEARD),
-    ("पोर्टल खोलिए डब्ल्यू डब्ल्यू डब्ल्यू डॉट हेल्प डॉट इन", "पोर्टल खोलिए www.help.in/admin।", Reject.UNHEARD),
-    ("फाइल drive डॉट google डॉट com स्लैश ops पर है", "फाइल drive.google.com/slash ops पर है।", Reject.UNHEARD),
-    ("रिपोर्ट कल भेजो", "Report kal bhejo.", Reject.UNHEARD),
-    ("रिपोर्ट कल भेजो", "रिपोर्ट कल free भेजो।", Reject.UNHEARD),
-    ("हमने टैक्स फाइल करता था", "हमने टैक्स फाइल रखा था।", Reject.UNHEARD),
-    ("Neha aur Aman present tha", "Neha aur Aman absent the.", Reject.UNHEARD),
-    ("पेमेंट रविवार को नहीं होगा", "पेमेंट रविवार को होगा।", Reject.NEGATION),
-    ("हम बल्कि कल रिपोर्ट भेजेंगे और डेक भी", "कल रिपोर्ट भेजेंगे।", Reject.TOO_MANY_CHANGES),
-    ("न सिर्फ़ रिपोर्ट बल्कि डेक भी भेजो", "डेक भी भेजो।", Reject.TOO_MANY_CHANGES),
     ("give one pill at night then give two pills at night", "Give two pills at night.", Reject.TOO_MANY_CHANGES),
-    ("main friday nahi aaunga", "Main friday aaunga.", Reject.NEGATION),
     ("send it no wait send it", "Don't send it.", Reject.NEGATION),
     ("i have 2 no kids", "I have 2 kids.", Reject.NEGATION),
-    ("मैं दो दिन नहीं आऊंगा", "मैं आऊंगा।", Reject.TOO_MANY_CHANGES),
-    ("main 2 din nahi aaunga", "Main aaunga.", Reject.TOO_MANY_CHANGES),
     ("don't send it, no wait, send it", "Don't send it.", Reject.TOO_MANY_CHANGES),
     ("don't send it", "Send it.", Reject.NEGATION),
     (
@@ -464,18 +267,7 @@ REJECTED = [
         "The copy should say distractions.",
         Reject.TOO_MANY_CHANGES,
     ),
-    ("file delete mat karo", "File delete karo.", Reject.NEGATION),
-    ("मैं फ्राइडे नहीं आऊंगा", "मैं फ्राइडे आऊंगा।", Reject.NEGATION),
-    ("फाइल डिलीट मत करो", "फाइल डिलीट करो।", Reject.NEGATION),
-    ("nahi nahi main friday nahi aaunga", "Main friday aaunga.", Reject.NEGATION),
-    ("main friday nahi aaunga", "Main aaunga.", Reject.TOO_MANY_CHANGES),
-    ("payment abhi nahi hoga", "Payment hoga.", Reject.TOO_MANY_CHANGES),
-    ("abhi rollback nahi chahiye", "Abhi chahiye.", Reject.TOO_MANY_CHANGES),
-    ("पेमेंट रविवार को नहीं होगा", "पेमेंट होगा।", Reject.TOO_MANY_CHANGES),
-    ("मैं कल नहीं आऊंगा", "मैं आऊंगा।", Reject.TOO_MANY_CHANGES),
     ("tell the vendor no pickup after six pm", "Tell the pickup after 6 pm.", Reject.NEGATION),
-    ("file delete mat karo matlab rehne do", "File delete karo.", Reject.TOO_MANY_CHANGES),
-    ("pod delete karo matlab report bhejo", "Report bhejo.", Reject.TOO_MANY_CHANGES),
     ("send the report to ravi", "", Reject.DROPPED_SENTENCE),
     ("there is no data in the report don't ship it", "Don't ship it.", Reject.TOO_MANY_CHANGES),
     ("call priya today", "Call Priya.", Reject.QUALIFIER),
@@ -484,21 +276,9 @@ REJECTED = [
     ("delete all files", "Delete files.", Reject.QUALIFIER),
     ("the bug is probably fixed", "The bug is fixed.", Reject.QUALIFIER),
     ("we must ship before friday", "We ship before Friday.", Reject.QUALIFIER),
-    ("kal sirf report bhejo", "Kal report bhejo.", Reject.QUALIFIER),
-    ("shayad kal meeting hai", "Kal meeting hai.", Reject.QUALIFIER),
-    ("कल सिर्फ रिपोर्ट भेजो", "कल रिपोर्ट भेजो।", Reject.QUALIFIER),
-    ("शायद कल मीटिंग है", "कल मीटिंग है।", Reject.QUALIFIER),
-    ("main kal aaunga", "Main kal aaungi.", Reject.GENDER),
-    ("main ghar ja raha hoon", "Main ghar ja rahi hoon.", Reject.GENDER),
-    ("मैं कल आऊंगा", "मैं कल आऊंगी।", Reject.GENDER),
-    ("मैं घर जा रहा हूं", "मैं घर जा रही हूं।", Reject.GENDER),
-    ("हम घर जा रहे हैं", "हम घर जा रही हैं।", Reject.GENDER),
     ("we almost lost the client", "We lost the client.", Reject.QUALIFIER),
     ("we rarely ship on friday", "We ship on Friday.", Reject.QUALIFIER),
     ("it is definitely ready", "It is ready.", Reject.QUALIFIER),
-    ("build lagbhag ready hai", "Build ready hai.", Reject.QUALIFIER),
-    ("बिल्ड लगभग तैयार है", "बिल्ड तैयार है।", Reject.QUALIFIER),
-    ("बिल्ड अक्सर फेल होता है", "बिल्ड फेल होता है।", Reject.QUALIFIER),
     ("we shipped it", "We ship it.", Reject.TENSE),
     ("i have sent the file to priya", "I send the file to Priya.", Reject.TENSE),
     ("we have finished the review", "We finish the review.", Reject.TENSE),
@@ -507,12 +287,6 @@ REJECTED = [
     ("we ship the build", "We shipped the build.", Reject.TENSE),
     ("he is coming", "He was coming.", Reject.TENSE),
     ("i send it tomorrow", "I sent it tomorrow.", Reject.TENSE),
-    ("मैं घर जाता हूं", "मैं घर जाता था।", Reject.TENSE),
-    ("वह कल रिपोर्ट भेजेगा", "वह कल रिपोर्ट भेजा।", Reject.TENSE),
-    ("मैं कल रिपोर्ट भेजूंगा", "मैं कल रिपोर्ट भेजता हूं।", Reject.TENSE),
-    ("वो काम करेगा", "वो काम करता है।", Reject.TENSE),
-    ("kal meeting hai", "Kal meeting thi.", Reject.TENSE),
-    ("कल मीटिंग है", "कल मीटिंग थी।", Reject.TENSE),
     ("your file is ready", "Their file is ready.", Reject.UNHEARD),
     ("send report", "I send the report.", Reject.TOO_MANY_CHANGES),
     ("pay it", "Pay for it.", Reject.TOO_MANY_CHANGES),
@@ -525,15 +299,14 @@ def test_unheard_words_rewrites_dropped_sentences_and_replies_fail(said: str, wr
 
 
 def test_decomposed_and_precomposed_unicode_are_the_same_word() -> None:
-    said = unicodedata.normalize("NFD", "ज़रूरी काम है")
-    wrote = "\u095bरूरी काम है।"
-    assert said[0] != wrote[0]
+    said = unicodedata.normalize("NFD", "the café is open")
+    wrote = "The caf\u00e9 is open."
+    assert "\u0301" in said and "\u0301" not in wrote
     assert check(said, wrote, []) is None
 
 
-@pytest.mark.parametrize("span", [["aaj", "nahi", "nahi"], ["आज", "नहीं", "नहीं"], ["today", "no", "no"]])
-def test_the_last_cue_is_the_longest_one_ending_last(span: list[str]) -> None:
-    assert last_cue(span) == (1, 3)
+def test_the_last_cue_is_the_longest_one_ending_last() -> None:
+    assert last_cue(["today", "no", "no"]) == (1, 3)
 
 
 def test_a_lone_cue_cannot_erase_the_prior() -> None:
@@ -567,11 +340,11 @@ def test_the_guardrail_accepts_the_corpus_gold_answers(path: Path) -> None:
     assert len(rejected) * 100 <= len(rows), rejected
 
 
-LONE_NEGATORS = {"no", "nahi", "nahin", "नहीं"}
+LONE_NEGATORS = {"no"}
 
 
 def without_a_negation(text: str) -> str | None:
-    """The text with its first lone "no", "nahi" or "नहीं" and the word before it dropped, as a model that misread
+    """The text with its first lone "no" and the word before it dropped, as a model that misread
     a negation as a correction would write it; `None` when it has none."""
     found = text.split(" ")
     for i in range(1, len(found) - 1):
@@ -605,13 +378,13 @@ def test_tidy_puts_term_spelling_back_and_trims_line_ends() -> None:
 
 
 def test_tidy_keeps_a_sentence_start_capital_on_a_lowercase_term() -> None:
-    text = "Main kal office aaunga. Bahut kaam Hai na? hai.\n1. Bahut"
-    tidied = tidy(text, ["main", "kal", "aaunga", "bahut", "hai"])
-    assert tidied == "Main kal office aaunga. Bahut kaam hai na? hai.\n1. Bahut"
+    text = "Npm is fast. Yarn works, Pnpm too? pnpm.\n1. Yarn"
+    tidied = tidy(text, ["npm", "yarn", "pnpm"])
+    assert tidied == "Npm is fast. Yarn works, pnpm too? pnpm.\n1. Yarn"
 
 
 def test_tidy_lowercases_a_lowercase_term_inside_a_sentence() -> None:
-    assert tidy("Use NPM and Bahut more.", ["npm", "bahut"]) == "Use npm and bahut more."
+    assert tidy("Use NPM and Yarn more.", ["npm", "yarn"]) == "Use npm and yarn more."
 
 
 def test_tidy_leaves_a_term_inside_another_word_alone() -> None:
@@ -647,12 +420,6 @@ def test_a_revision_without_prior_text_or_equal_to_it_is_dropped() -> None:
     assert judge(PRIOR, "and bring snacks", [], PRIOR, "And bring snacks.").revision is None
 
 
-def test_hinglish_revision_reaching_into_prior() -> None:
-    judged = judge("Kal meeting rakhte hain.", "nahi nahi parso rakhte hain", [], "Parso meeting rakhte hain.", "")
-    assert judged.rejected is None
-    assert judged.revision == "Parso meeting rakhte hain."
-
-
 def test_a_first_chunk_answered_only_as_a_revision_is_judged_as_its_text() -> None:
     judged = judge("", "she go home", [], "She goes home.", "")
     assert judged == Polished(text="She goes home.", revision=None, rejected=None)
@@ -661,7 +428,9 @@ def test_a_first_chunk_answered_only_as_a_revision_is_judged_as_its_text() -> No
 
 
 def test_a_negation_dropped_across_chunks_is_rejected() -> None:
-    judged = judge("Main Friday nahi aaunga.", "aur report bhejo", [], "Main aaunga.", "Aur report bhejo.")
+    judged = judge(
+        "I will not come on Friday.", "and send the report", [], "I will come on Friday.", "And send the report."
+    )
     assert judged.rejected == Reject.NEGATION
 
 
@@ -670,18 +439,10 @@ def test_a_negative_instruction_taken_back_across_chunks_is_kept() -> None:
     assert judged == Polished(text="", revision="Send it.", rejected=None)
 
 
-def test_hindi_revision_reaching_into_prior() -> None:
-    judged = judge("कल मीटिंग रखते हैं।", "नहीं नहीं परसों", [], "परसों मीटिंग रखते हैं।", "")
-    assert judged.rejected is None
-    assert judged.revision == "परसों मीटिंग रखते हैं।"
-
-
 @pytest.mark.parametrize(
     ("said", "wrote"),
     [
-        ("kal meeting hai", "Kal meeting thi."),
         ("the tests are passing", "The tests were passing."),
-        ("कल मीटिंग है", "कल मीटिंग थी।"),
     ],
 )
 def test_a_tense_swap_costs_one_change(said: str, wrote: str) -> None:
@@ -697,8 +458,6 @@ def test_a_tense_swap_costs_one_change(said: str, wrote: str) -> None:
     ("said", "wrote", "polished"),
     [
         ("i will try again on hotel wifi", "I will try again on hotel Wi-Fi.", "I will try again on hotel wifi."),
-        ("oncall ko ping karo", "On-call ko ping karo.", "Oncall ko ping karo."),
-        ("oncall टीम को बताओ", "On-call टीम को बताओ।", "Oncall टीम को बताओ।"),
     ],
 )
 def test_a_word_said_whole_loses_the_hyphen_the_model_put_in(said: str, wrote: str, polished: str) -> None:
@@ -706,11 +465,28 @@ def test_a_word_said_whole_loses_the_hyphen_the_model_put_in(said: str, wrote: s
 
 
 @pytest.mark.parametrize(
+    ("said", "wrote", "polished"),
+    [
+        # 14 Oct 2026 (English only): "5 countries" came back "five countries" in two runs of two.
+        (
+            "For the beta, we support 5 countries and 2 languages.",
+            "For the beta, we support five countries and two languages.",
+            "For the beta, we support 5 countries and 2 languages.",
+        ),
+        ("2 tickets are confirmed", "Two tickets are confirmed.", "2 tickets are confirmed."),
+        # A number said as a word stays a word, and so does one the speaker said both ways.
+        ("we support five countries", "We support five countries.", "We support five countries."),
+        ("send 1 copy to no one else", "Send one copy to no one else.", "Send one copy to no one else."),
+    ],
+)
+def test_a_digit_already_written_stays_a_digit(said: str, wrote: str, polished: str) -> None:
+    assert judge("", said, [], None, wrote) == Polished(text=polished, revision=None, rejected=None)
+
+
+@pytest.mark.parametrize(
     ("said", "wrote", "terms"),
     [
         ("send a follow up email", "Send a follow-up email.", []),
-        ("kal check in karna hai", "Kal check-in karna hai.", []),
-        ("follow up कॉल करो", "Follow-up कॉल करो।", []),
         ("page the oncall", "Page the on-call.", ["on-call"]),
     ],
 )
@@ -739,10 +515,6 @@ JOINS = [
         None,
     ),
     ("We shipped it.", "and then we celebrated", "Then we celebrated.", None),
-    ("pehle report bhejo", "phir priya ko call karo", "Priya ko call karo.", Reject.DROPPED_JOIN),
-    ("pehle report bhejo", "phir priya ko call karo", "phir Priya ko call karo.", None),
-    ("रिपोर्ट भेजो", "फिर प्रिया को फोन करो", "प्रिया को फोन करो।", Reject.DROPPED_JOIN),
-    ("रिपोर्ट भेजो", "और प्रिया को फोन करो", "और प्रिया को फोन करो।", None),
 ]
 
 
@@ -757,12 +529,6 @@ def test_a_piece_that_continues_a_sentence_keeps_its_joining_word(
     ("prior", "text", "output", "expected"),
     [
         ("2. visually appealing", "and How is it going", "And how is it going?", "and how is it going?"),
-        (
-            "2. Kitna accha dikhta hai",
-            "Aur Data kaise dikhata hai?",
-            "Aur data kaise dikhata hai?",
-            "aur data kaise dikhata hai?",
-        ),
         ("We shipped it.", "and then we left", "And then we left.", "And then we left."),
     ],
 )
@@ -773,7 +539,7 @@ def test_a_joining_word_that_goes_on_with_a_sentence_comes_back_lowercase(
 
 
 # A word the recognizer misheard may become the word that sounds the same and was meant (STT policy, 11 Oct): one
-# said word for one written, two for one ("a head" ahead) or one for two ("bhejdiya" bhej diya), same script.
+# said word for one written, two for one ("a head" ahead) or one for two ("alot" a lot).
 MISHEARD = [
     ("we need to taste the build before friday", "We need to test the build before Friday.", []),
     ("it was a waist of time", "It was a waste of time.", []),
@@ -791,13 +557,6 @@ MISHEARD = [
     ("it past review", "It passed review.", []),
     ("witch date works", "Which date works?", []),
     ("the service can cash the results", "The service can cache the results.", []),
-    ("main usko kal karunga", "Main usko call karunga.", []),
-    ("sub log dashboard dekh rahe the", "Sab log dashboard dekh rahe the.", []),
-    ("registry may fresh petition aayi", "Registry me fresh petition aayi.", []),
-    ("claim approval aagaya", "Claim approval aa gaya.", []),
-    ("ऑफिस मैं मीटिंग है", "ऑफिस में मीटिंग है।", []),
-    ("उसने कहा की वो आएगा", "उसने कहा कि वो आएगा।", []),
-    ("मुझे इसकी चिता है", "मुझे इसकी चिंता है।", []),
     ("we pay invoices through zero", "We pay invoices through Xero.", ["Xero"]),
     ("book a ride on lift tonight", "Book a ride on Lyft tonight.", ["Lyft"]),
     ("the lift is broken again", "The lift is broken again.", ["Lyft"]),
@@ -818,7 +577,6 @@ MISHEARD_REFUSED = [
     ("tell sean the plan", "Tell Shaun the plan.", [], Reject.UNHEARD),
     ("Lakshmi will join the call", "Laxmi will join the call.", ["Lakshmi"], Reject.UNHEARD),
     ("we use Xero for invoices", "We use zero for invoices.", ["Xero"], Reject.UNHEARD),
-    ("main kal aaunga", "Main kal aaungi.", [], Reject.GENDER),
     ("i will send it", "I sent it.", [], Reject.TENSE),
     ("book a ride on lift tonight", "Book a ride on Lyft tonight.", [], Reject.UNHEARD),
     ("send it", "Send it to Procol.", ["Procol"], Reject.UNHEARD),
@@ -841,14 +599,6 @@ LISTS_AND_NUMBERS = [
         "Put these in a numbered list. One, milk. Two, eggs. And three, bread.",
         "Put these in a numbered list:\n1. Milk\n2. Eggs\n3. Bread",
     ),
-    (
-        "Ye numbered list mein chahiye. Ek, design final karo. Do, pricing page banao. Aur teen, sales ko brief karo.",
-        "Ye numbered list mein chahiye:\n1. Design final karo\n2. Pricing page banao\n3. Sales ko brief karo",
-    ),
-    (
-        "मुझे ये लिस्ट में चाहिए। एक, बैंक जाना है। दो, बिल भरना है। और तीन, माँ को फोन करना है।",
-        "मुझे ये लिस्ट में चाहिए:\n1. बैंक जाना है\n2. बिल भरना है\n3. माँ को फोन करना है",
-    ),
     # An item after the counted ones takes the next number, and a dangling last word goes (founder-021).
     (
         "i need to do the following first call the bank second pay the rent. Pick up the dry cleaning. And",
@@ -863,26 +613,8 @@ LISTS_AND_NUMBERS = [
         "here are a few things about me. i lead the design team. i love long hikes. i live in pune.",
         "Here are a few things about me:\n- I lead the design team\n- I love long hikes\n- I live in Pune",
     ),
-    ("सवा लीटर जूस", "1.25 लीटर जूस।"),
-    ("डेढ़ बजे बीस डॉलर", "1:30 बजे $20।"),
-    ("बजट ढाई लाख रुपये", "बजट ₹2.5 लाख।"),
-    ("साढ़े तीन प्रतिशत ब्याज", "3.5% ब्याज।"),
-    ("टीम पौने छह बजे आई", "टीम 5:45 बजे आई।"),
-    ("मकान मालिक को साढ़े पंद्रह हजार रुपये देने हैं", "मकान मालिक को ₹15,500 देने हैं।"),
-    ("सवा लाख का पैकेज", "₹1.25 लाख का पैकेज।"),
-    ("ढाई हज़ार रुपये भेजो", "₹2,500 भेजो।"),
-    ("sava paanch baje aana", "5:15 baje aana."),
-    ("dedh kilo aata lana", "1.5 kilo aata lana."),
-    ("dhai baje call hai", "2:30 baje call hai."),
-    ("paune do lakh rupaye", "₹1.75 lakh."),
     ("the truck reaches quarter to six", "The truck reaches 5:45."),
     ("thirteen interviews at 3pm", "13 interviews at 3 pm."),
-    ("नंबर नौ आठ एक शून्य दो है", "नंबर 98102 है।"),
-    ("बारहवीं की मार्कशीट लाओ", "12वीं की मार्कशीट लाओ।"),
-    ("neha ne file check kar liya", "Neha ne file check kar li."),
-    ("maine packing list bana diya", "Maine packing list bana di."),
-    ("राशि खाते पर जमा हो गई", "राशि खाते में जमा हो गई।"),
-    ("ye may be kal hoga", "Ye maybe kal hoga."),
 ]
 
 
@@ -894,10 +626,7 @@ def test_counted_lists_fractions_and_agreement_fixes_pass(said: str, wrote: str)
 @pytest.mark.parametrize(
     ("said", "wrote"),
     [
-        ("सवा पांच बजे", "6:15 बजे।"),
-        ("डेढ़ बजे आना", "2:30 बजे आना।"),
         ("the truck reaches quarter to six", "The truck reaches 6:45."),
-        ("पौने छह बजे", "6:45 बजे।"),
         (
             "I want the following in a numbered list. Buy milk. Call mom.",
             "I want the following:\n1. Buy milk\n5. Call mom",
@@ -934,7 +663,7 @@ def test_a_dropped_joining_word_is_named() -> None:
     assert dropped.reason == Reason(Reject.DROPPED_JOIN, ("and",))
 
 
-# Round 1 (11 Oct): right answers the guardrail refused, in English, Hinglish and Hindi.
+# Round 1 (11 Oct): right answers the guardrail refused.
 ACCEPTED_ROUND_1 = [
     # A lone "no" between two names, colours, sides, levels or family words takes the first back.
     (
@@ -953,23 +682,13 @@ ACCEPTED_ROUND_1 = [
     # "no wait" and "no actually" are strong cues: a new instruction after them replaces the one before.
     ("move it to the backlog no actually close it", "Close it."),
     ("approve it no wait reject it", "Reject it."),
-    # Marks said as words, in pairs and in Hindi.
+    # Marks said as words, in pairs.
     ("she said open quote hi close quote", 'She said "hi."'),
-    ("पहली बात नया पैराग्राफ दूसरी बात", "पहली बात।\n\nदूसरी बात।"),
-    ("नमस्ते नई लाइन कैसे हो", "नमस्ते\nकैसे हो?"),
-    ("क्या तुम आओगे क्वेश्चन मार्क", "क्या तुम आओगे?"),
-    # English number words said in Devanagari.
-    ("क्या टेबल वर्जन टू भेजा था या वर्जन थ्री", "क्या टेबल वर्जन 2 भेजा था या वर्जन 3?"),
     # A real negation stays, and so does a lone "no" before a negation phrase.
     ("the patient has no allergies actually no known allergies", "The patient has no known allergies."),
     ("june fifth no one objected", "June 5. No one objected."),
     # "not friday" names the version taken back.
     ("let's meet on friday at noon no wait make it thursday not friday", "Let's meet on Thursday at noon."),
-    # "X nahi Y" after a cue is the replacement, not a negation of it.
-    (
-        "प्रिय नेहा, mail में rate card जोड़ देना, sorry latest rate card नहीं पुराना वाला.",
-        "प्रिय नेहा, mail में पुराना वाला rate card जोड़ देना।",
-    ),
 ]
 
 
@@ -1026,21 +745,8 @@ REJECTED_ROUND_1 = [
         "team will pay the invoice the week after.",
         Reject.DROPPED_SENTENCE,
     ),
-    # A word translated.
-    (
-        "notes mein likha hai ki table rows ko alternate shade do",
-        "Notes in likha hai ki table rows ko alternate shade do.",
-        Reject.TRANSLATED,
-    ),
-    (
-        "the api is not broken bas auth header nahi ja raha hai",
-        "The API is not broken bas auth header not ja raha hai.",
-        Reject.TRANSLATED,
-    ),
-    ("वर्कर pool अभी खाली है", "वर्कर pool अभी खाली is।", Reject.TRANSLATED),
-    # A meridiem never said, and a qualifier dropped beside a plain "मतलब".
+    # A meridiem never said.
     ("the meeting is from two to three pm", "The meeting is from 2 to 3 am.", Reject.QUALIFIER),
-    ("यह फीडबैक कॉल का मतलब सिर्फ क्लैरिटी लेना है", "यह फीडबैक कॉल का मतलब क्लैरिटी लेना है।", Reject.QUALIFIER),
 ]
 
 
@@ -1078,20 +784,13 @@ MISHEARD_ROUND_3 = [
     ("the weather forecast says it will reign all weekend", "The weather forecast says it will rain all weekend."),
     ("the home loan has a ten your of twenty years", "The home loan has a tenure of 20 years."),
     ("the weather four cast says heavy rain on saturday", "The weather forecast says heavy rain on Saturday."),
-    ("home loan ka ten your fifteen years set kiya hai", "Home loan ka tenure 15 years set kiya hai."),
-    ("होम लोन का टेन योर पंद्रह साल रखा है", "होम लोन का टेन्योर 15 साल रखा है।"),
     ("the referral bones for analyst hires is two thousand dollars", "The referral bonus for analyst hires is $2,000."),
-    ("is saal diwali bones kab aayega", "Is saal Diwali bonus kab aayega?"),
     ("my doctor put me on a five day antibiotic chorus", "My doctor put me on a 5-day antibiotic course."),
     (
         "my grandmother was formally a teacher at the village school",
         "My grandmother was formerly a teacher at the village school.",
     ),
     ("we should negate a better rate with the landlord", "We should negotiate a better rate with the landlord."),
-    ("yeah se station sirf das minute hai auto le lo", "Yaha se station sirf 10 minute hai, auto le lo."),
-    ("yeah aao", "Yaha aao."),
-    ("कॉलेज ने एडमिशन के लिए माय ग्रेशन सर्टिफिकेट मांगा है", "कॉलेज ने एडमिशन के लिए माइग्रेशन सर्टिफिकेट मांगा है।"),
-    ("सर्वर का लाउड टेस्ट कल रात चलाना है", "सर्वर का लोड टेस्ट कल रात चलाना है।"),
 ]
 
 
@@ -1117,25 +816,15 @@ def test_round_3_a_number_sound_alike_never_changes_a_count(said: str, wrote: st
 
 # Round 3: right grammar fixes the guardrail refused. A past after a negated modal is a slip for the base form; a
 # verb agrees with its own clause's subject, not with a "main" in another clause; a future time word allows "will"
-# and a future form, a past one a past form; Hindi plurals are forms of their noun; Indian English "from morning"
-# becomes "since morning".
+# and a future form, a past one a past form; Indian English "from morning" becomes "since morning".
 GRAMMAR_ROUND_3 = [
     ("he did not went yesterday", "He did not go yesterday."),
     ("she did not gave the keys", "She did not give the keys."),
     ("they could not found the bug", "They could not find the bug."),
     ("we will not sent the file today", "We will not send the file today."),
     ("she can't came today", "She can't come today."),
-    ("meri gaadi kharab ho gaya isliye main late hua", "Meri gaadi kharab ho gayi, isliye main late hua."),
-    ("baarish ruk gaya toh hum nikal jayenge", "Baarish ruk gayi toh hum nikal jayenge."),
-    ("बारिश रुक गया तो हम चलेंगे", "बारिश रुक गई तो हम चलेंगे।"),
-    ("मेरी किताब खो गया तो मैं परेशान हूं", "मेरी किताब खो गई तो मैं परेशान हूं।"),
     ("next week we finished the audit", "Next week we will finish the audit."),
     ("tomorrow she joined the team", "Tomorrow she will join the team."),
-    ("agle mahine hum naya office shift kiya", "Agle mahine hum naya office shift karenge."),
-    ("अगले हफ्ते मीटिंग हुई थी", "अगले हफ्ते मीटिंग होगी।"),
-    ("पिछले साल हम मनाली जाते हैं", "पिछले साल हम मनाली गए थे।"),
-    ("रिपोर्ट में दो गलती है उन्हें ठीक कर दो", "रिपोर्ट में दो गलतियाँ हैं, उन्हें ठीक कर दो।"),
-    ("kal raat main der se soya hoon isliye late hua", "Kal raat main der se soya tha, isliye late hua."),
     (
         "this issue is there from yesterday and nobody are looking at it",
         "This issue has been there since yesterday, and nobody is looking at it.",
@@ -1162,37 +851,24 @@ def test_round_3_grammar_fixes_pass(said: str, wrote: str) -> None:
 @pytest.mark.parametrize(
     ("said", "wrote", "reason"),
     [
-        # A verb that agreed with its noun ("meri gaadi ... gayi") is never made to disagree.
-        ("meri gaadi kharab ho gayi", "Meri gaadi kharab ho gaya.", Reject.GENDER),
-        ("मेरी गाड़ी खराब हो गई", "मेरी गाड़ी खराब हो गया।", Reject.GENDER),
         # A time word allows its own tense only.
         ("we finished the audit", "We will finish the audit.", Reject.UNHEARD),
         ("he did not go yesterday", "He went yesterday.", Reject.TOO_MANY_CHANGES),
-        ("agle mahine hum shift karenge", "Agle mahine hum shift kiya.", Reject.UNHEARD),
-        ("main kal aaunga", "Main kal aaungi.", Reject.GENDER),
     ],
 )
 def test_round_3_grammar_never_breaks_agreement_or_tense(said: str, wrote: str, reason: Reject) -> None:
     assert check(said, wrote, []) == reason
 
 
-# Round 3: correction cues the guardrail did not know ("I meant", "oops", "nope", "correction", "mera matlab",
-# "galti se bola", "रुको"), a lone "no" swapping a name at the start, "no not X", and an antonym said as the fix.
+# Round 3: correction cues the guardrail did not know ("I meant", "oops", "nope", "correction"), a lone "no" swapping a
+# name at the start, "no not X", and an antonym said as the fix.
 CORRECTIONS_ROUND_3 = [
     ("send it to anna sorry I meant maria", "Send it to Maria."),
     ("send it to anna oops to maria", "Send it to Maria."),
     ("send it to anna nope maria", "Send it to Maria."),
-    ("anna ko bhejo mera matlab maria ko", "Maria ko bhejo."),
-    ("anna ko bhejo galti se bola maria ko bhejo", "Maria ko bhejo."),
-    ("anna ko bhejo ruko maria ko", "Maria ko bhejo."),
-    ("अन्ना को भेजो मेरा मतलब मारिया को", "मारिया को भेजो।"),
-    ("अन्ना को भेजो रुको मारिया को", "मारिया को भेजो।"),
     ("priya no rahul will lead the call", "Rahul will lead the call."),
     ("the meeting is on tuesday no not tuesday wednesday", "The meeting is on Wednesday."),
     ("the client is happy no unhappy with the draft", "The client is unhappy with the draft."),
-    ("report finance ko bhejo nahi legal ko", "Report legal ko bhejo."),
-    ("फाइल अमित को भेजो नहीं सुमित को", "फाइल सुमित को भेजो।"),
-    ("maria sorry mariam ko call karo", "Mariam ko call karo."),
 ]
 
 
@@ -1201,13 +877,39 @@ def test_round_3_more_correction_cues_take_words_back(said: str, wrote: str) -> 
     assert check(said, wrote, []) is None
 
 
+# A pronoun the speaker puts right after a cue, a lone "no" too, is the one written (14 Oct).
+@pytest.mark.parametrize(
+    ("said", "wrote"),
+    [
+        ("send it to him no her", "Send it to her."),
+        ("send it to him i mean her", "Send it to her."),
+        ("he no she will lead the call", "She will lead the call."),
+        ("tell the team that he no she will lead", "Tell the team that she will lead."),
+        ("put it on his no her desk", "Put it on her desk."),
+    ],
+)
+def test_a_pronoun_put_right_after_a_cue_is_written(said: str, wrote: str) -> None:
+    assert check(said, wrote, []) is None
+
+
+@pytest.mark.parametrize(
+    ("said", "wrote", "reason"),
+    [
+        # Without a cue, another person is never heard.
+        ("send it to him", "Send it to her.", Reject.UNHEARD),
+        # The pronoun taken back is never the one written.
+        ("send it to him no her", "Send it to him.", Reject.TOO_MANY_CHANGES),
+    ],
+)
+def test_a_pronoun_not_put_right_by_the_speaker_is_refused(said: str, wrote: str, reason: Reject) -> None:
+    assert check(said, wrote, []) == reason
+
+
 @pytest.mark.parametrize(
     ("said", "wrote"),
     [
         # The same words used plainly stay.
         ("the correction was filed on monday", "The was filed on Monday."),
-        ("ruko yahan main abhi aata hoon", "Main abhi aata hoon."),
-        ("galti se glass gir gaya", "Glass gir gaya."),
         ("i meant every word of it", "Every word of it."),
         ("priya will not lead the call", "Priya will lead the call."),
     ],
@@ -1229,8 +931,6 @@ def test_round_3_plain_uses_of_cue_words_stay(said: str, wrote: str) -> None:
             "please book the room for friday and send the agenda to the team",
             "Please book the room for Friday and send the agenda to the",
         ),
-        ("client ko invoice kal bhejna hai", "Client ko kal bhejna hai."),
-        ("मुझे रिपोर्ट कल तक भेजनी है", "मुझे कल तक भेजनी है।"),
         (
             "add a delay before the webhook fires then retry after ten minutes",
             "Add a delay before the webhook fires, 10 minutes.",
@@ -1271,7 +971,6 @@ def test_round_3_moved_grammar_and_number_words_are_not_dropped(said: str, wrote
             "I will mark it done and bill the client.",
         ),
         ("The teaser earned real cred.", ["CRED"], "The teaser earned real cred."),
-        ("Thoda slack chahiye.", ["Slack"], "Thoda slack chahiye."),
         ("Mail sales@northstar.com today.", ["Northstar"], "Mail sales@northstar.com today."),
         ("Open portal.snapbak.app now.", ["Snapbak"], "Open portal.snapbak.app now."),
         ("Call /api/events first.", ["API"], "Call /api/events first."),
@@ -1284,19 +983,14 @@ def test_round_3_tidy_recases_only_term_variants(text: str, terms: list[str], ti
     assert tidy(text, terms) == tidied
 
 
-# Round 3: a direct question written as a statement: an English one that opens with an auxiliary and its subject or
-# a question word and an auxiliary, and a Hindi or Hinglish one that opens or ends with "kya" or "क्या".
+# Round 3: a direct question written as a statement: one that opens with an auxiliary and its subject or a question
+# word and an auxiliary.
 @pytest.mark.parametrize(
     ("said", "wrote"),
     [
         ("what time is the standup tomorrow", "What time is the standup tomorrow."),
         ("can you send me the deck", "Can you send me the deck."),
         ("where is the invoice", "Where is the invoice."),
-        ("kya report ready hai", "Kya report ready hai."),
-        ("क्या रिपोर्ट तैयार है", "क्या रिपोर्ट तैयार है।"),
-        ("प्लंबर आज आएगा क्या", "प्लंबर आज आएगा क्या।"),
-        ("kya report ready hai", "Report ready hai."),
-        ("क्या तुम आओगे", "क्या तुम आओगे؟"),
     ],
 )
 def test_round_3_a_question_written_as_a_statement_is_refused(said: str, wrote: str) -> None:
@@ -1310,8 +1004,6 @@ def test_round_3_a_question_written_as_a_statement_is_refused(said: str, wrote: 
         ("i wonder if the bank portal is slow today", "I wonder if the bank portal is slow today."),
         ("what a relief", "What a relief!"),
         ("when you get time call me", "When you get time, call me."),
-        ("mujhe nahi pata kya hua", "Mujhe nahi pata kya hua."),
-        ("pata karo ki reports kab ready hongi", "Pata karo ki reports kab ready hongi."),
         ("what i mean is we need more time", "What I mean is we need more time."),
     ],
 )
@@ -1319,7 +1011,7 @@ def test_round_3_an_indirect_question_may_end_with_a_full_stop(said: str, wrote:
     assert check(said, wrote, []) is None
 
 
-# Round 3: an acknowledgement or sign-off the user never said ("Noted:", "Thanks!", a doubled "theek hai") is a
+# Round 3: an acknowledgement or sign-off the user never said ("Noted:", "Thanks!", a doubled "okay") is a
 # reply, wherever it stands; said once, it may stay once.
 @pytest.mark.parametrize(
     ("said", "wrote", "reason"),
@@ -1330,17 +1022,11 @@ def test_round_3_an_indirect_question_may_end_with_a_full_stop(said: str, wrote:
             Reject.REPLY,
         ),
         (
-            "theek hai sir warmup ke baad squats start karenge",
-            "Theek hai, theek hai, sir, warmup ke baad squats start karenge.",
-            Reject.REPLY,
-        ),
-        (
             "your appointment is confirmed for thursday thank you for the forms",
             "Your appointment is confirmed for Thursday. Thank you for the forms. Thanks!",
             Reject.REPLY,
         ),
         ("ship the build today", "Done. Ship the build today.", Reject.REPLY),
-        ("मीटिंग कल है", "ठीक है, मीटिंग कल है।", Reject.UNHEARD),
     ],
 )
 def test_round_3_an_unsaid_acknowledgement_is_a_reply(said: str, wrote: str, reason: Reject) -> None:
@@ -1351,7 +1037,6 @@ def test_round_3_an_unsaid_acknowledgement_is_a_reply(said: str, wrote: str, rea
     ("said", "wrote"),
     [
         ("okay ship it today", "Okay, ship it today."),
-        ("theek hai sir kal milte hain", "Theek hai sir, kal milte hain."),
         ("send the report thanks", "Send the report. Thanks!"),
         ("is it done", "Is it done?"),
     ],
@@ -1360,14 +1045,12 @@ def test_round_3_an_acknowledgement_said_stays(said: str, wrote: str) -> None:
     assert check(said, wrote, []) is None
 
 
-# Round 3: "still", "already", "yet", "even", "again", "exactly", "abhi", "bhi" and "अभी" say when or how much.
+# Round 3: "still", "already", "yet", "even", "again" and "exactly" say when or how much.
 @pytest.mark.parametrize(
     ("said", "wrote"),
     [
         ("the ingress logs still show errors", "The ingress logs show errors."),
         ("we already paid the invoice", "We paid the invoice."),
-        ("report abhi ready nahi hai", "Report ready nahi hai."),
-        ("main bhi aaunga", "Main aaunga."),
     ],
 )
 def test_round_3_a_dropped_time_or_degree_word_is_a_qualifier(said: str, wrote: str) -> None:
@@ -1386,8 +1069,6 @@ def test_round_3_a_qualifier_heard_split_is_that_qualifier() -> None:
     [
         ("the meeting is at three no four", "The meeting is at 3."),
         ("the price is fifty dollars wait sixty dollars", "The price is $50."),
-        ("meeting teen baje hai matlab chaar baje", "Meeting 3 baje hai."),
-        ("दो किलो चीनी लाना मतलब तीन किलो", "2 किलो चीनी लाना।"),
         ("the price is fifty dollars wait sixty dollars", "The price is $50, wait, $60."),
         ("the meeting is at three no four", "The meeting is at 3, no, 4."),
         ("call the plumber no the electrician", "Call the plumber, no, the electrician."),
@@ -1407,7 +1088,6 @@ def test_round_3_a_correction_keeps_only_the_new_version(said: str, wrote: str) 
     [
         ("the meeting is at three no four", "The meeting is at 4."),
         ("the price is fifty dollars wait sixty dollars", "The price is $60."),
-        ("meeting teen baje hai matlab chaar baje", "Meeting 4 baje hai."),
         ("call the plumber no the electrician", "Call the electrician."),
         ("book twenty five seats no thirty", "Book 30 seats."),
     ],
@@ -1436,8 +1116,7 @@ def test_round_3_a_digit_ordinal_in_the_prior_put_right_in_the_next_piece_is_jud
 
 
 # Round 3: right number and address formats the guardrail refused: a day said "the third of march", a range of
-# hundreds, a decimal lakh or crore, a phone number's "plus", minutes "to" an hour, "point eight", English number
-# words said in Devanagari, and an email whose labels are said in Devanagari.
+# hundreds, a decimal lakh or crore, a phone number's "plus", minutes "to" an hour and "point eight".
 @pytest.mark.parametrize(
     ("said", "wrote"),
     [
@@ -1448,21 +1127,15 @@ def test_round_3_a_digit_ordinal_in_the_prior_put_right_in_the_next_piece_is_jud
             "We will spend between $400 and $500 on the stall.",
         ),
         ("one lakh fifty thousand rupees", "₹1.5 lakh."),
-        ("ek crore bees lakh rupaye", "₹1.2 crore."),
         ("call me at plus nine one nine eight seven six five four three two one zero", "Call me at +91 98765 43210."),
         ("the call starts at ten to nine", "The call starts at 8:50."),
         (
             "the error rate dropped from two point four percent to point eight percent",
             "The error rate dropped from 2.4% to 0.8%.",
         ),
-        ("सेक्शन ट्वेल्व पढ़ कर आना", "सेक्शन 12 पढ़ कर आना।"),
-        ("बस नाइन थर्टी पर निकलेगी", "बस 9:30 पर निकलेगी।"),
-        ("मेल करो नेहा एट जीमेल डॉट कॉम पर", "मेल करो neha@gmail.com पर।"),
-        ("हमारे नॉलेज बेस का पता डब्ल्यू डब्ल्यू डब्ल्यू डॉट केबी डॉट सर्विसेज है", "हमारे नॉलेज बेस का पता www.kb.services है।"),
-        ("एडमिन एट माइकंपनी डॉट आईओ पर लिखो", "admin@mycompany.io पर लिखो।"),
     ],
 )
-def test_round_3_dates_ranges_lakhs_phones_and_devanagari_addresses_pass(said: str, wrote: str) -> None:
+def test_round_3_dates_ranges_lakhs_phones_and_points_pass(said: str, wrote: str) -> None:
     assert check(said, wrote, []) is None
 
 
@@ -1489,7 +1162,6 @@ def test_round_3_a_wrong_date_amount_or_time_is_still_refused(said: str, wrote: 
             "We hired:\n1. Designer\n2. Engineers\n3. Interns",
             Reject.FALSE_LIST,
         ),
-        ("ek chai do samose teen biscuit packet lao", "1. Chai\n2. Samose\n3. Biscuit packet lao", Reject.FALSE_LIST),
         (
             "my name is ravi i live in pune i like chess",
             "My name is Ravi:\n- I live in Pune\n- I like chess",
@@ -1514,14 +1186,9 @@ def test_round_3_a_list_never_made_or_an_order_changed_is_refused(said: str, wro
     [
         ("One, milk. Two, eggs. Three, bread.", "1. Milk\n2. Eggs\n3. Bread"),
         (
-            "ek, design final karo. do, pricing page banao. teen, sales ko brief karo.",
-            "1. Design final karo\n2. Pricing page banao\n3. Sales ko brief karo",
-        ),
-        (
             "some notes for the offsite we leave friday the venue has a pool we return sunday",
             "Some notes for the offsite:\n- We leave Friday\n- The venue has a pool\n- We return Sunday",
         ),
-        ("anna ko bhejo mera matlab maria ko", "Maria ko bhejo."),
         ("so what workflows will be", "So, what will the workflows be?"),
     ],
 )
@@ -1536,7 +1203,6 @@ def test_round_3_counted_or_announced_lists_and_moved_grammar_pass(said: str, wr
     [
         ("meet on may twenty ninth at two pm", "Meet on May 29 at 9 pm."),
         ("the shop opens at quarter to five", "The shop opens at 4:15."),
-        ("साढ़े चार बजे आना", "5:30 बजे आना।"),
         ("the fee is twenty euros", "The fee is $20."),
         ("the fee is twenty pounds", "The fee is ₹20."),
         ("growth was three point zero five percent", "Growth was 3.5%."),
@@ -1547,7 +1213,6 @@ def test_round_3_counted_or_announced_lists_and_moved_grammar_pass(said: str, wr
         ("we met at the office", "We met @ the office."),
         ("are you coming question mark", "Are you coming question mark?"),
         ("first line new paragraph second line", "First line. Second line."),
-        ("पहली बात नया पैराग्राफ दूसरी बात", "पहली बात। दूसरी बात।"),
     ],
 )
 def test_round_3_a_changed_format_is_refused(said: str, wrote: str) -> None:
@@ -1574,8 +1239,8 @@ def test_round_3_the_right_format_passes(said: str, wrote: str) -> None:
 
 
 # Round 3: a sound-alike written where the right word was said: a grammar word after "the" ("the whether"), "except"
-# where a verb goes ("will except"), a term after "the" or a subject ("the Lyft is broken", "I Reddit"); a Hindi
-# question with a question word ending in a danda; a strong cue dropped with both versions kept.
+# where a verb goes ("will except"), a term after "the" or a subject ("the Lyft is broken", "I Reddit"); a strong cue
+# dropped with both versions kept.
 @pytest.mark.parametrize(
     ("said", "wrote", "terms"),
     [
@@ -1583,7 +1248,6 @@ def test_round_3_the_right_format_passes(said: str, wrote: str) -> None:
         ("i will accept the job", "I will except the job.", []),
         ("the lift is broken take the stairs", "The Lyft is broken, take the stairs.", ["Lyft"]),
         ("i read it yesterday", "I Reddit yesterday.", ["Reddit"]),
-        ("मीटिंग कब है", "मीटिंग कब है।", []),
         ("approve it scratch that reject it", "Approve it. Reject it.", []),
     ],
 )
@@ -1602,7 +1266,6 @@ def test_round_3_an_over_fix_a_lost_question_or_both_versions_are_refused(
         ("we pay invoices through zero", "We pay invoices through Xero.", ["Xero"]),
         ("ask procall for the quote", "Ask Procol for the quote.", ["Procol"]),
         ("approve it scratch that reject it", "Reject it.", []),
-        ("pata nahi meeting kab hai", "Pata nahi meeting kab hai.", []),
         ("the travel in sure ance covers lost baggage", "The travel insurance covers lost baggage.", []),
         ("call shivon in lester", "Call Siobhan in Leicester.", ["Siobhan", "Leicester"]),
     ],
@@ -1611,25 +1274,12 @@ def test_round_3_a_fix_where_the_said_word_is_wrong_passes(said: str, wrote: str
     assert check(said, wrote, terms) is None
 
 
-# Round b1: a word the model respelled to another accepted spelling of the same word (a nukta, a chandrabindu, a
-# Roman Hindi variant) is written as the speaker said it (rule 6), so it is never refused as dropped or unheard.
+# Round b1: a word the model respelled to another accepted spelling of the same word ("ok" "okay") is written as the
+# speaker said it (rule 6), so it is never refused as dropped or unheard.
 @pytest.mark.parametrize(
     ("said", "wrote", "written"),
     [
-        (
-            "kabir server load subah nine am se badh rha hai",
-            "Kabir, server load subah 9 am se badh raha hai.",
-            "Kabir, server load subah 9 am se badh rha hai.",
-        ),
-        (
-            "amit uncle ki report aaj aa gai h",
-            "Amit uncle ki report aaj aa gai hai.",
-            "Amit uncle ki report aaj aa gai h.",
-        ),
-        ("acha didi notes bhejo", "Achha didi, notes bhejo.", "Acha didi, notes bhejo."),
         ("ok so we ship friday", "Okay, so we ship Friday.", "Ok, so we ship Friday."),
-        ("मरीज की जांच के लिए कागज दिया", "मरीज़ की जाँच के लिए कागज़ दिया।", "मरीज की जांच के लिए कागज दिया।"),
-        ("वो कल आयेगा और फाइल ले जायेगा", "वो कल आएगा और फ़ाइल ले जाएगा।", "वो कल आयेगा और फाइल ले जायेगा।"),
     ],
 )
 def test_round_b1_a_respelled_word_is_written_as_said(said: str, wrote: str, written: str) -> None:
@@ -1638,31 +1288,11 @@ def test_round_b1_a_respelled_word_is_written_as_said(said: str, wrote: str, wri
     assert judged.text == written
 
 
-@pytest.mark.parametrize(
-    ("said", "wrote"),
-    [
-        ("kal cake liye cake order karna hai", "Kal ke liye cake order karna hai."),
-        ("hum log mall may milenge", "Hum log mall mein milenge."),
-        ("रवि मेरी तारीफ से पूजा को धन्यवाद कह देना", "रवि, मेरी तरफ़ से पूजा को धन्यवाद कह देना।"),
-    ],
-)
-def test_round_b1_a_misheard_word_fixed_is_not_put_back(said: str, wrote: str) -> None:
-    judged = judge("", said, [], None, wrote)
-    assert judged.rejected is None
-    assert judged.text == wrote
-
-
-# Round b1: a joining word that ends the whole speech with nothing after it ("... use it. But", "... है और") drops,
+# Round b1: a joining word that ends the whole speech with nothing after it ("... use it. But") drops,
 # and the sentence it hung on gets its full stop (founder, 11 Oct).
 @pytest.mark.parametrize(
     ("said", "wrote", "written"),
     [
-        ("कल सुबह जल्दी उठना है और", "कल सुबह जल्दी उठना है और", "कल सुबह जल्दी उठना है।"),
-        (
-            "मुझे ये काम करने हैं पहला दवाई लेनी है दूसरा डॉक्टर को फोन करना है। रिपोर्ट प्रिंट करनी है। तो",
-            "मुझे ये काम करने हैं:\n1. दवाई लेनी है\n2. डॉक्टर को फोन करना है\n3. रिपोर्ट प्रिंट करनी है\nतो",
-            "मुझे ये काम करने हैं:\n1. दवाई लेनी है\n2. डॉक्टर को फोन करना है\n3. रिपोर्ट प्रिंट करनी है",
-        ),
         (
             "pack the charger and the cables. And",
             "Pack the charger and the cables. And",
@@ -1681,45 +1311,98 @@ def test_round_b1_a_dangling_final_joining_word_drops(said: str, wrote: str, wri
     assert judged.text == written
 
 
-# "so", "then", "phir" and "तो" end a sentence too ("I told him so", "kal milte hain phir"): only after a full stop
-# are they left dangling.
+# A subject said alone after a finished sentence, with nothing after it, starts nothing: the speaker stopped, or the
+# recognizer heard it in the silence at the end. It drops in any chunk, kept by the model or not (founder, 14 Oct).
+THREE_THINGS = (
+    "I mean, like, whatever may be. Three things are going to be there, like. Gym then there is work and then there "
+    "is going to be a personal project I."
+)
+THREE_THINGS_LISTED = (
+    "I mean, like, whatever may be. Three things are going to be there, like:\n- Gym\n- There is work\n"
+    "- There is going to be a personal project"
+)
+ASKED_ON_WEEKENDS = "They asked you What do you do outside work, and what do you do on weekends? You"
+POLISHED_ON_WEEKENDS = "They asked you: What do you do outside work, and what do you do on weekends?"
+
+
+@pytest.mark.parametrize(
+    ("said", "wrote", "written"),
+    [
+        (ASKED_ON_WEEKENDS, f"{POLISHED_ON_WEEKENDS} You.", POLISHED_ON_WEEKENDS),
+        (ASKED_ON_WEEKENDS, POLISHED_ON_WEEKENDS, POLISHED_ON_WEEKENDS),
+        # "I" or "we" can't close a clause after a noun: it opened one the speaker never said.
+        (THREE_THINGS, f"{THREE_THINGS_LISTED} I", THREE_THINGS_LISTED),
+        ("send the deck to priya we", "Send the deck to Priya we.", "Send the deck to Priya."),
+    ],
+)
+def test_a_lone_subject_ending_the_speech_drops(said: str, wrote: str, written: str) -> None:
+    judged = judge("", said, [], None, wrote)
+    assert judged.rejected is None
+    assert judged.text == written
+
+
+# A subject that answers "who", is asked, or ends a sentence it belongs to was meant.
+@pytest.mark.parametrize(
+    ("said", "wrote"),
+    [
+        ("who is presenting first? you", "Who is presenting first? You."),
+        ("is everyone ready? you?", "Is everyone ready? You?"),
+        ("i will miss you", "I will miss you."),
+        ("thank you", "Thank you."),
+        ("she runs faster than i", "She runs faster than I."),
+        ("the trip is for you and i", "The trip is for you and I."),
+        ("rahul likes tea and so do i", "Rahul likes tea, and so do I."),
+    ],
+)
+def test_a_subject_that_was_meant_stays(said: str, wrote: str) -> None:
+    judged = judge("", said, [], None, wrote)
+    assert judged.text == wrote
+
+
+def test_speech_typed_back_with_no_mark_or_capital_is_unpolished() -> None:
+    said = "thanks for the update ill review it tonight"
+    judged = judge("", said, [], None, said)
+    assert (judged.text, judged.rejected) == (said, Reject.UNPOLISHED)
+
+
+def test_speech_given_its_marks_and_capitals_is_polished() -> None:
+    said = "thanks for the update ill review it tonight"
+    wrote = "Thanks for the update, I'll review it tonight."
+    judged = judge("", said, [], None, wrote)
+    assert (judged.text, judged.rejected) == (wrote, None)
+
+
+# A plural noun that names the items, then the items, announces a list as "the following" does (founder, 14 Oct).
+def test_a_noun_naming_the_items_announces_a_list() -> None:
+    said = (
+        "Like, there are going to be only the priorities. The only priorities that are going to be there are "
+        "Personal project whenever I get time. Gym and then the walk. That's it."
+    )
+    wrote = (
+        "Like, there are going to be only the priorities. The only priorities that are going to be there are:\n"
+        "- Personal project whenever I get time\n- Gym\n- The walk\nThat's it."
+    )
+    judged = judge("", said, [], None, wrote)
+    assert judged.rejected is None
+    assert judged.text == wrote
+
+
+# "so" and "then" end a sentence too ("I told him so"): only after a full stop are they left dangling.
 @pytest.mark.parametrize(
     ("said", "wrote"),
     [
         ("salt and pepper", "Salt and pepper."),
         ("i told him so", "I told him so."),
-        ("kal milte hain phir", "Kal milte hain phir."),
         ("who are you sending it to", "Who are you sending it to?"),
         ("their team will call us then", "Their team will call us then."),
+        # A question tag ends on its subject (R7 suite-growth-en-02231, 15 Oct).
+        ("we are still on for lunch aren't we", "We are still on for lunch, aren't we?"),
+        ("they booked the venue didn't they", "They booked the venue, didn't they?"),
     ],
 )
 def test_round_b1_a_word_that_ends_a_sentence_stays(said: str, wrote: str) -> None:
     judged = judge("", said, [], None, wrote)
     assert judged.text == wrote
-
-
-# Round b1: raw Devanagari of four words or more, typed back with no mark at all, was never polished.
-def test_round_b1_raw_devanagari_is_unpolished() -> None:
-    said = "एक काम करो मुझे एक प्रस्ताव लिखना है क्लाइंट के लिए तो उसमें क्या होगा"
-    judged = judge("", said, [], None, said)
-    assert judged.rejected == Reject.UNPOLISHED
-
-
-# Round b1: "kitna" before a word of praise, or after an interjection, exclaims; a full stop or "!" is right.
-@pytest.mark.parametrize(
-    ("said", "wrote"),
-    [
-        ("कितनी प्यारी बच्ची है", "कितनी प्यारी बच्ची है।"),
-        ("kitna pyara ghar hai", "Kitna pyara ghar hai."),
-        ("order aa gaya wah packing kitni premium lagi", "Order aa gaya. Wah, packing kitni premium lagi."),
-    ],
-)
-def test_round_b1_an_exclamation_may_end_with_a_full_stop(said: str, wrote: str) -> None:
-    assert check(said, wrote, []) is None
-
-
-def test_round_b1_a_kitna_question_still_needs_its_question_mark() -> None:
-    assert check("kitne log aaye hain", "Kitne log aaye hain.", []) == Reject.QUESTION
 
 
 # Round b1: "slash" said as a verb after its subject or a modal is never a path's "/".
@@ -1734,7 +1417,7 @@ def test_round_b1_slash_as_a_verb_is_never_a_path(said: str, wrote: str) -> None
 # Round b2 fix (11 Oct): an accepted answer's list and marks are put in shape without a model: a bullet after
 # numbered items takes the next number, a first item glued to the line before goes on its own line, the words
 # before a list end with a colon, counting words left in a numbered item go, a "?" the speaker said on an item or
-# the piece's end comes back, and a "." after Devanagari ends a sentence as "।".
+# the piece's end comes back.
 @pytest.mark.parametrize(
     ("prior", "said", "wrote", "shaped"),
     [
@@ -1778,14 +1461,6 @@ def test_round_b1_slash_as_a_verb_is_never_a_path(said: str, wrote: str) -> None
             "and how is it going to show me the data",
             "and how is it going to show me the data?",
         ),
-        (
-            "मुझे ये देखना है:\n1. लिस्ट बुलेट में आती है या नहीं\n2. कितना अच्छा दिखता है",
-            "और डेटा कैसे दिखाता है?",
-            "और डेटा कैसे दिखाता है",
-            "और डेटा कैसे दिखाता है?",
-        ),
-        ("", "कल मीटिंग है. रिपोर्ट भेजो", "कल मीटिंग है. रिपोर्ट भेजो।", "कल मीटिंग है। रिपोर्ट भेजो।"),
-        ("", "डॉ. शर्मा कल आएंगे", "डॉ. शर्मा कल आएंगे।", "डॉ. शर्मा कल आएंगे।"),
     ],
 )
 def test_round_b2_an_accepted_answer_is_put_in_shape(prior: str, said: str, wrote: str, shaped: str) -> None:
@@ -1797,7 +1472,6 @@ def test_round_b2_an_accepted_answer_is_put_in_shape(prior: str, said: str, wrot
 @pytest.mark.parametrize(
     "wrote",
     [
-        "We need:\n1. पहली लाइन में कोड लिखो\n2. दूसरी लाइन में दाम",
         "Steps:\n1. First aid kit\n2. Second hand books",
         "Is this right?\n- Yes",
         "Done.\n\nNext we eat.",
@@ -1837,12 +1511,6 @@ def test_round_b2_a_refused_piece_keeps_its_joining_word_in_lowercase() -> None:
             "and how is it going to show me the data?",
         ),
         (
-            "मुझे ये देखना है:\n1. लिस्ट बुलेट में आती है या नहीं\n2. कितना अच्छा दिखता है",
-            "और डेटा कैसे दिखाता है?",
-            "3. डेटा कैसे दिखाता है?",
-            "और डेटा कैसे दिखाता है?",
-        ),
-        (
             "",
             "the trip was great new paragraph next year we want to go to japan",
             "The trip was great.\nNext year we want to go to Japan.",
@@ -1854,12 +1522,6 @@ def test_round_b2_a_refused_piece_keeps_its_joining_word_in_lowercase() -> None:
             "it will be a simple queue and it will pick the next job",
             "It will be a simple queue. It will pick the next job.",
             "It will be a simple queue. And it will pick the next job.",
-        ),
-        (
-            "",
-            "मीटिंग चार बजे होगी और नोट्स कल आएंगे",
-            "मीटिंग 4 बजे होगी। नोट्स कल आएंगे।",
-            "मीटिंग 4 बजे होगी। और नोट्स कल आएंगे।",
         ),
         (
             "",
@@ -1879,7 +1541,6 @@ def test_round_b2_a_refusal_with_a_known_repair_is_put_right(prior: str, said: s
         "terms": [],
         "app": "",
         "style": "chat",
-        "language": "en",
         "deadline_ms": 20000,
     }
     request = PolishRequest.model_validate(fields)
@@ -1889,19 +1550,13 @@ def test_round_b2_a_refusal_with_a_known_repair_is_put_right(prior: str, said: s
     assert judged.text == fixed
 
 
-# Round b2 fix: refused now. A short dictation's "phir", "bhi" or "then" dropped; a spoken number written as its word
-# and its digit ("two 2-liter"); an email with Devanagari in it; a fraction word left before an hour's digit ("saade
-# 6"); a revision that changes the prior's words though the piece takes nothing back.
+# Round b2 fix: refused now. A short dictation's "then" dropped; a spoken number written as its word and its digit
+# ("two 2-liter"); a revision that changes the prior's words though the piece takes nothing back.
 @pytest.mark.parametrize(
     ("said", "wrote", "rule"),
     [
-        ("kal milte hain phir", "Kal milte hain.", Reject.DROPPED_WORD),
-        ("main bhi aaunga", "Main aaunga.", Reject.QUALIFIER),
         ("see you then", "See you.", Reject.DROPPED_WORD),
         ("buy two liter bottles of oil", "Buy two 2-liter bottles of oil.", Reject.UNHEARD),
-        ("ईमेल राहुल एट मीरा डॉट इन", "ईमेल राहुल@मीरा.इन", Reject.FORMAT),
-        ("sava chhe baje gym chalenge", "Sava 6 baje gym chalenge.", Reject.FORMAT),
-        ("बारात साढ़े छह बजे पहुंचेगी", "बारात साढ़े 6 बजे पहुंचेगी।", Reject.FORMAT),
     ],
 )
 def test_round_b2_a_wrong_answer_is_refused(said: str, wrote: str, rule: Reject) -> None:
@@ -1911,11 +1566,8 @@ def test_round_b2_a_wrong_answer_is_refused(said: str, wrote: str, rule: Reject)
 @pytest.mark.parametrize(
     ("said", "wrote"),
     [
-        ("kal milte hain phir", "Kal milte hain phir."),
         ("we left. and", "We left."),
         ("buy two liter bottles of oil", "Buy 2 liter bottles of oil."),
-        ("sava chhe baje gym chalenge", "6:15 baje gym chalenge."),
-        ("बारात साढ़े छह बजे पहुंचेगी", "बारात साढ़े छह बजे पहुंचेगी।"),
         ("mail rahul at meera dot in", "Mail rahul@meera.in."),
     ],
 )
@@ -1963,17 +1615,6 @@ def test_round_b2_an_accepted_piece_lowercases_a_capital_the_recognizer_put_afte
     assert judged.text == "and how is it going to show me the data?"
 
 
-def test_round_b3_a_half_converted_clock_fraction_is_named_not_every_number() -> None:
-    # A long note with one "paune 8 baje" was refused naming all 22 numbers, so the correction could not fix it.
-    said = (
-        "subah chhe baje uth gayi aur saat baje walk ki trainer ne bola paune aath baje tak dinner aur raat nau baje "
-        "so jao"
-    )
-    wrote = "Subah 6 baje uth gayi aur 7 baje walk ki. Trainer ne bola paune 8 baje tak dinner aur raat 9 baje so jao."
-    assert verdict(said, wrote, []) == Reason(Reject.FORMAT, ("paune 8",))
-    assert verdict(said, wrote.replace("paune 8", "7:45"), []) is None
-
-
 def test_round_b3_a_number_out_of_order_names_only_that_number() -> None:
     found = verdict("send fifteen boxes and twenty bags today", "Send 20 boxes and 15 bags today.", [])
     assert found == Reason(Reject.UNHEARD, ("15",))
@@ -1992,7 +1633,6 @@ def test_round_b3_a_correction_that_says_the_negated_verb_again_takes_the_negati
 @pytest.mark.parametrize(
     ("said", "wrote", "shaped"),
     [
-        ("मकान मालिक ने तारीख पूछी?", "मकान मालिक ने तारीख पूछी।?", "मकान मालिक ने तारीख पूछी?"),
         (
             "Tom asked colon are we keeping the launch on Friday question mark period",
             "Tom asked: Are we keeping the launch on Friday?.",
@@ -2015,24 +1655,10 @@ def test_round_b3_stacked_end_marks_collapse_and_a_sign_off_name_takes_no_full_s
 @pytest.mark.parametrize(
     ("said", "wrote"),
     [
-        ("is mahine bujurg logon ke liye lift band rahegi", "Is mahine buzurg logon ke liye lift band rahegi."),
-        ("mujhe jyada time chahiye", "Mujhe zyada time chahiye."),
-    ],
-)
-def test_round_b3_a_roman_hindi_j_or_z_spelling_goes_back_to_the_speakers(said: str, wrote: str) -> None:
-    # suite-growth-hinglish-02192: a five-paragraph email was AI-skipped for "bujurg" written "Buzurg".
-    judged = judge("", said, [], None, wrote)
-    assert judged.rejected is None
-    assert judged.text == wrote.replace("buzurg", "bujurg").replace("zyada", "jyada")
-
-
-@pytest.mark.parametrize(
-    ("said", "wrote"),
-    [
-        # suite-growth-hinglish-05022: a sound-alike written in its plural is still the sound-alike.
-        ("car ke break thode tight karwa dena service me", "Car ke brakes thode tight karwa dena service me."),
-        # v2-grammar-hinglish-00045: a compound written with a hyphen sounds as its words joined.
-        ("brake glass access use nahi hua", "Break-glass access use nahi hua."),
+        # A sound-alike written in its plural is still the sound-alike.
+        ("the mechanic tightened both break on my car", "The mechanic tightened both brakes on my car."),
+        # A compound written with a hyphen sounds as its words joined.
+        ("brake glass access was not used", "Break-glass access was not used."),
     ],
 )
 def test_round_b4_a_sound_alike_may_take_a_plural_or_a_hyphen(said: str, wrote: str) -> None:
@@ -2083,16 +1709,6 @@ def test_round_b4_a_piece_with_no_correction_leaves_the_prior_as_typed() -> None
     )
     assert judged.revision is None
     assert judged.rejected is None
-
-
-def test_round_b4_too_many_changes_names_the_words_that_cost_it() -> None:
-    # v2-backtracking-hi-00113: the refusal named number words written as digits, not the moved "एक test", so the
-    # retry could not tell what to put back.
-    said = "मैं ने कल एक test expired token के लिए डाला और फिर रिपोर्ट भेजी"
-    wrote = "मैंने कल expired token के लिए एक test डाला, और फिर रिपोर्ट भेजी।"
-    reason = verdict(said, wrote, [])
-    assert reason is not None
-    assert "एक" in reason.words or "test" in reason.words
 
 
 ANNOUNCED = "Hi, I am Ravi. Here are a few things about my team. We ship on Fridays. We review code daily."
@@ -2166,13 +1782,11 @@ def test_round_b4_a_piece_that_says_a_mark_may_put_it_on_the_prior(prior: str, t
 @pytest.mark.parametrize(
     ("said", "wrote"),
     [
-        # Round b5 (founder-022, v2-stt-nearsound-hi-00198): a run-on split into sentences lost its spoken "and".
+        # Round b5 (founder-022): a run-on split into sentences lost its spoken "and".
         (
             "it will be a simple queue and it will pick the next job",
             "It will be a simple queue. It will pick the next job.",
         ),
-        ("server down tha aur sab log wait kar rahe the", "Server down tha. Sab log wait kar rahe the."),
-        ("मीटिंग चार बजे होगी और नोट्स कल आएंगे", "मीटिंग 4 बजे होगी। नोट्स कल आएंगे।"),
         ("the build failed so we rolled back", "The build failed. We rolled back."),
     ],
 )
@@ -2185,8 +1799,6 @@ def test_round_b5_a_joining_word_dropped_at_a_sentence_split_is_refused(said: st
 @pytest.mark.parametrize(
     ("said", "wrote"),
     [
-        ("server down tha aur sab log wait kar rahe the", "Server down tha, aur sab log wait kar rahe the."),
-        ("server down tha aur sab log wait kar rahe the", "Server down tha. Aur sab log wait kar rahe the."),
         (
             "it will be a simple queue and it will pick the next job",
             "It will be a simple queue, and it will pick the next job.",
@@ -2216,28 +1828,18 @@ def test_round_b5_lines_said_or_an_email_shape_are_no_false_list(said: str, wrot
     assert check(said, wrote, []) != Reject.FALSE_LIST
 
 
-@pytest.mark.parametrize(
-    ("said", "wrote"),
-    [
-        # v2-numbers-hi-00069: one spoken "क्या" ended one question and opened the next.
-        (
-            "driver nau baje pahunchega kya usse advance mil gaya",
-            "Driver 9 baje pahunchega kya? Kya usse advance mil gaya?",
-        ),
-        ("ड्राइवर नौ बजे पहुंचेगा क्या उसे एडवांस मिल गया", "ड्राइवर 9 बजे पहुंचेगा क्या? क्या उसे एडवांस मिल गया?"),
-    ],
-)
-def test_round_b5_a_question_word_written_more_often_than_said_is_refused(said: str, wrote: str) -> None:
-    assert check(said, wrote, []) == Reject.REPEATED
+def test_a_sentence_written_more_often_than_said_is_refused() -> None:
+    said = "can you resend the file"
+    assert check(said, "Can you resend the file? Can you resend the file?", []) == Reject.REPEATED
 
 
-def test_round_b5_a_question_word_said_twice_may_be_written_twice() -> None:
-    said = "driver pahunchega kya kya usse advance mila"
-    assert check(said, "Driver pahunchega kya? Kya usse advance mila?", []) != Reject.REPEATED
+def test_a_sentence_said_twice_may_be_written_twice() -> None:
+    said = "can you resend the file can you resend the file"
+    assert check(said, "Can you resend the file? Can you resend the file?", []) is None
 
 
 def test_round_b5_too_many_changes_names_no_number_written_as_digits() -> None:
-    # v2-backtracking-hi-00148: the refusal named every number word written as digits, hiding the moved words.
+    # Round b5: the refusal named every number word written as digits, hiding the moved words.
     said = "send the twelve invoices to priya and the three receipts to amit by friday"
     reason = verdict(said, "Send priya 12 invoices and amit 3 receipts by Friday.", [])
     assert reason is not None
@@ -2246,64 +1848,14 @@ def test_round_b5_too_many_changes_names_no_number_written_as_digits() -> None:
     assert "invoices" in reason.words
 
 
-HINDI_LIST = "मुझे ये देखना है:\n1. लिस्ट बुलेट में आती है या नहीं\n2. कितना अच्छा दिखता है"
-ROMAN_LIST = "Mujhe ye check karna hai:\n1. List bullet points mein aati hai ya nahi\n2. Kitna accha dikhta hai"
-
-
-@pytest.mark.parametrize(
-    ("prior", "text", "answer", "joined"),
-    [
-        # founder-018, round b5: a piece with no correction came back as the prior with the piece added as an item.
-        (
-            HINDI_LIST,
-            "और डेटा कैसे दिखाता है?",
-            {"revision": HINDI_LIST + "\n3. और डेटा कैसे दिखाता है?", "text": ""},
-            HINDI_LIST + " और डेटा कैसे दिखाता है?",
-        ),
-        # founder-017: the prior re-marked with the piece run into it, and the prior re-marked with the piece as a
-        # new item; the typed prior stays and the piece goes on with its last item.
-        (
-            ROMAN_LIST,
-            "Aur Data kaise dikhata hai?",
-            {"revision": ROMAN_LIST.replace("nahi", "nahi?") + " aur data kaise dikhata hai?", "text": ""},
-            ROMAN_LIST + " aur data kaise dikhata hai?",
-        ),
-        (
-            ROMAN_LIST,
-            "Aur Data kaise dikhata hai?",
-            {"revision": ROMAN_LIST.replace("nahi", "nahi?") + "?", "text": "3. Data kaise dikhata hai?"},
-            ROMAN_LIST + " aur Data kaise dikhata hai?",
-        ),
-    ],
-)
-def test_round_b5_a_piece_with_no_correction_never_rewrites_the_typed_prior(
-    prior: str, text: str, answer: dict[str, str], joined: str
-) -> None:
-    from snapbak_backend.schemas.polish import PolishRequest
-    from snapbak_backend.transformers.polish import fold, read
-
-    fields = {"text": text, "prior": prior, "terms": [], "app": "", "style": "chat", "language": "hi"}
-    request = PolishRequest.model_validate({**fields, "deadline_ms": 20000})
-    polished = read(request, fold(request), json.dumps(answer, ensure_ascii=False))
-    assert polished.rejected is None
-    assert polished.revision is None
-    assert f"{prior} {polished.text}" == joined
-
-
 def read_answer(said: str, wrote: str, terms: list[str] | None = None, prior: str = "") -> Polished:
     from snapbak_backend.schemas.polish import PolishRequest
     from snapbak_backend.transformers.polish import fold, read
 
-    fields = {"text": said, "prior": prior, "terms": terms or [], "app": "", "style": "chat", "language": "en"}
+    fields = {"text": said, "prior": prior, "terms": terms or [], "app": "", "style": "chat"}
     request = PolishRequest.model_validate({**fields, "deadline_ms": 20000})
     answer = json.dumps({"revision": None, "text": wrote}, ensure_ascii=False)
     return read(request, fold(request), answer)
-
-
-def test_round_b6_a_question_mark_said_after_a_danda_replaces_it() -> None:
-    # v2-punctuation-hi-00070: the "?" said came back after the model's "।" ("पूछी।?").
-    said = "मकान मालिक ने किराया जमा करने की तारीख पूछी?"
-    assert judge("", said, [], None, "मकान मालिक ने किराया जमा करने की तारीख पूछी।").text == said
 
 
 def test_round_b6_a_direct_question_left_with_a_full_stop_is_mended_without_a_model() -> None:
@@ -2355,10 +1907,6 @@ def test_round_b6_a_mended_answer_that_breaks_another_rule_stays_refused() -> No
             "thing, read the chapter with her, then sign the reading log. The teacher wants it on the blue folder",
             "Dad, please check Nia's backpack before dinner. Her library card is probably in the side pocket. Do one "
             "thing:\n- Read the chapter with her\n- Sign the reading log\nThe teacher wants it on the blue folder.",
-        ),
-        (
-            "ek kaam karo, report bhejo phir usko call karo",
-            "Ek kaam karo:\n- Report bhejo\n- Usko call karo",
         ),
     ],
 )
@@ -2427,23 +1975,13 @@ def test_round_b6_an_address_left_half_spoken_is_refused() -> None:
 @pytest.mark.parametrize(
     ("prior", "text", "wrote"),
     [
-        # v2-backtracking-en-00114, v2-backtracking-hi-00151, hinglish-backtracking-043: a piece that opens with a
+        # v2-backtracking-en-00114: a piece that opens with a
         # cue, answered with the cue still between the old and the new version.
         (
             "doctor chen asked me to confirm my follow up for next friday at three fifteen",
             "i mean at eight forty five because the lab closes early that day",
             "Doctor Chen asked me to confirm my follow up for next Friday at 3:15. I mean, at 8:45, because the lab "
             "closes early that day.",
-        ),
-        (
-            "मुख्य फेरों का सेटअप ताज लैंड्स एंड के ballroom में",
-            "wait जेडब्ल्यू मैरियट जुहू के lotus lawn में रखना",
-            "मुख्य फेरों का सेटअप ताज लैंड्स एंड के ballroom में—wait, जेडब्ल्यू मैरियट जुहू के lotus lawn में रखना।",
-        ),
-        (
-            "ecg normal hai",
-            "make that borderline t wave changes hai",
-            "ECG normal hai. Make that borderline T wave changes hain.",
         ),
     ],
 )
@@ -2473,16 +2011,6 @@ def test_round_b6_a_plain_cue_word_opening_a_piece_stays(prior: str, text: str, 
     assert read_answer(text, wrote, prior=prior).rejected is None
 
 
-def test_round_b6_a_word_said_on_both_sides_of_a_correction_may_be_written_once() -> None:
-    # v2-backtracking-hi-00148: the fluent answer merged the two "स्लॉट" around the cue.
-    said = (
-        "राहुल को मैसेज भेजना कि उसके हेडफोन का डिलीवरी स्लॉट आज सुबह दस से बारह के बीच रहेगा नहीं नहीं कुरियर ने "
-        "स्लॉट बदलकर कल शाम पांच से सात का कर दिया है"
-    )
-    wrote = "राहुल को मैसेज भेजना कि उसके हेडफोन का डिलीवरी स्लॉट कुरियर ने बदलकर कल शाम 5 से 7 का कर दिया है।"
-    assert verdict(said, wrote, []) is None
-
-
 @pytest.mark.parametrize(
     ("said", "wrote"),
     [
@@ -2492,10 +2020,6 @@ def test_round_b6_a_word_said_on_both_sides_of_a_correction_may_be_written_once(
             "entire.",
             "Let's do one thing: call Archana, then we'll talk to Arun. Then we can talk to Reliance team in the "
             "entire.",
-        ),
-        (
-            "ek kaam karo pehle bank jao phir passbook update karao phir mujhe balance bata do",
-            "Ek kaam karo: pehle bank jao, phir passbook update karao, phir mujhe balance bata do.",
         ),
     ],
 )
@@ -2508,10 +2032,6 @@ def test_round_b6_three_steps_after_do_one_thing_written_as_prose_are_refused(sa
     ("said", "wrote"),
     [
         ("do one thing call priya then send her the file", "Do one thing: call Priya, then send her the file."),
-        (
-            "एक काम करो डॉक्टर से बात करो फिर जो वो कहें वही करना फिर मुझे बताना",
-            "एक काम करो: डॉक्टर से बात करो, फिर जो वो कहें वही करना, फिर मुझे बताना।",
-        ),
     ],
 )
 def test_round_b6_two_steps_or_a_step_on_what_someone_says_stay_prose(said: str, wrote: str) -> None:
@@ -2547,15 +2067,392 @@ def test_round_b6_asking_someone_what_to_do_is_no_direct_question() -> None:
     assert verdict("can you ask him what to do", "Can you ask him what to do?", []) is None
 
 
+def test_here_is_what_we_do_announces_the_steps_after_it() -> None:
+    # v2-lists-en-00053: "here's what we do" leads the steps in, as "the following" does (14 Oct, English only).
+    said = "here's what we do reset the link then resend the label then ask her to test it"
+    wrote = "Here's what we do:\n- Reset the link\n- Resend the label\n- Ask her to test it"
+    assert check(said, wrote, []) is None
+
+
+# Answers prompt rules 3, 5 and 6 call right, which the guardrail refused (14 Oct false-rejection audit): each refusal
+# typed the raw speech for a correct polish.
+RULE_RIGHT = [
+    # An irregular verb said regularized, its last consonant doubled ("runned" ran).
+    ("the kid runned to the bus", "The kid ran to the bus."),
+    ("i forgetted the keys", "I forgot the keys."),
+    ("we swimmed in the lake", "We swam in the lake."),
+    ("she singed a song", "She sang a song."),
+    # A past written the same as its base ("readed" read).
+    ("i readed the doc", "I read the doc."),
+    ("we cutted the cost", "We cut the cost."),
+    # A pronoun in the object case opening a clause is its subject ("him is" he is), and one after a preposition the
+    # other way ("to he" to him).
+    ("him is the new lead", "He is the new lead."),
+    ("her is coming tomorrow", "She is coming tomorrow."),
+    ("them are late again", "They are late again."),
+    ("us need more time", "We need more time."),
+    ("give it to he today", "Give it to him today."),
+    ("me and him went to the store", "He and I went to the store."),
+    ("her and i fixed it", "She and I fixed it."),
+    ("between you and i it is late", "Between you and me, it is late."),
+    ("there going home", "They're going home."),
+    ("your welcome", "You're welcome."),
+    # A sound-alike before a time word, a clock time, an irregular plural, or a plural ("few ours" hours).
+    ("we went their yesterday", "We went there yesterday."),
+    ("i will see you at for", "I will see you at four."),
+    ("we need too people", "We need two people."),
+    ("ice packs help in the first few ours", "Ice packs help in the first few hours."),
+    # A plural noun that names the items announces them ("the blockers are"), also with a "like" before the first.
+    (
+        "the blockers are the api is down then the tests are flaky then the designer is out",
+        "The blockers are:\n- The API is down\n- The tests are flaky\n- The designer is out",
+    ),
+    (
+        "the blockers are like the api is down then the tests are flaky",
+        "The blockers are:\n- The API is down\n- The tests are flaky",
+    ),
+]
+
+
+@pytest.mark.parametrize(("said", "wrote"), RULE_RIGHT)
+def test_answers_the_prompt_rules_call_right_pass(said: str, wrote: str) -> None:
+    assert verdict(said, wrote, []) is None
+
+
+# The same fixes reaching past what the rule allows still fail: another verb, another gender, a homophone where the
+# said word is right, a list never announced, a "like" dropped from inside an item.
+RULE_WRONG = [
+    ("the kid runned to the bus", "The kid walked to the bus.", Reject.UNHEARD),
+    ("we swam in the lake", "We swim in the lake.", Reject.TENSE),
+    ("i readed the doc", "I wrote the doc.", Reject.UNHEARD),
+    ("him is the new lead", "She is the new lead.", Reject.UNHEARD),
+    ("send it to their office", "Send it to there office.", Reject.UNHEARD),
+    ("i want to go", "I want two go.", Reject.UNHEARD),
+    ("i woke up then made coffee", "I woke up:\n- Made coffee", Reject.FALSE_LIST),
+    ("we woke up then the kids made coffee", "We woke:\n- Up\n- The kids made coffee", Reject.FALSE_LIST),
+    (
+        "the blockers are the api is down then i like the tests",
+        "The blockers are:\n- The API is down\n- I the tests",
+        Reject.DROPPED_WORD,
+    ),
+]
+
+
+@pytest.mark.parametrize(("said", "wrote", "reason"), RULE_WRONG)
+def test_fixes_past_what_the_rule_allows_still_fail(said: str, wrote: str, reason: Reject) -> None:
+    found = verdict(said, wrote, [])
+    assert found is not None and found.rule == reason
+
+
+# A pronoun written for a said one of another person, number or gender changes who did it, though the new one was
+# said elsewhere (14 Oct swap audit: "we" for "they" passed 89 % of the time). Only its case may change.
+PRONOUN_SWAPS = [
+    (
+        "we should wait until the finance team closes the books",
+        "They should wait until the finance team closes the books.",
+        "they",
+    ),
+    (
+        "please send the renewal reminder before you leave",
+        "Please send the renewal reminder before they leave.",
+        "they",
+    ),
+    ("him is the new lead", "They are the new lead.", "they"),
+    (
+        "i think we should ship it on friday because the team is ready",
+        "I think they should ship it on Friday because the team is ready.",
+        "they",
+    ),
+    (
+        "our designers and their engineers meet on monday",
+        "Their designers and their engineers meet on Monday.",
+        "their",
+    ),
+    (
+        "can you send me the deck so the team can review it with us",
+        "Can you send us the deck so the team can review it with us?",
+        "us",
+    ),
+    (
+        "here are the next steps one i call the vendor two we sign the lease three they move in",
+        "Here are the next steps:\n1. I call the vendor\n2. They sign the lease\n3. They move in",
+        "they",
+    ),
+    (
+        "we can ship the segmenter to staging today scratch that to production today",
+        "They can ship the segmenter to production today.",
+        "they",
+    ),
+    (
+        "he said the invoice is ready and she will send it today",
+        "She said the invoice is ready and she will send it today.",
+        "she",
+    ),
+    (
+        "tell him the meeting moved to friday and ask her to confirm",
+        "Tell her the meeting moved to Friday and ask her to confirm.",
+        "her",
+    ),
+    ("his laptop is broken so she will lend him hers", "Her laptop is broken, so she will lend him hers.", "her"),
+    ("him is the new lead and she starts monday", "She is the new lead and she starts Monday.", "she"),
+    (
+        "here is the plan one he books the room two she sends the invites",
+        "Here is the plan:\n1. She books the room\n2. She sends the invites",
+        "she",
+    ),
+    (
+        "call him no wait email him about the contract her team signed",
+        "Email her about the contract her team signed.",
+        "her",
+    ),
+    ("she wrote it herself and he checked it himself", "She wrote it himself and he checked it himself.", "himself"),
+]
+
+
+@pytest.mark.parametrize(("said", "wrote", "swapped"), PRONOUN_SWAPS)
+def test_a_pronoun_of_another_person_or_gender_is_unheard(said: str, wrote: str, swapped: str) -> None:
+    assert verdict(said, wrote, []) == Reason(Reject.UNHEARD, (swapped,))
+
+
+def test_a_pronoun_swapped_in_a_later_chunk_is_unheard() -> None:
+    said = "they said we can pay the deposit by friday"
+    assert judge("We met the vendor.", said, [], None, "They said we can pay the deposit by Friday.").rejected is None
+    swapped = judge("We met the vendor.", said, [], None, "We said we can pay the deposit by Friday.")
+    assert swapped.reason == Reason(Reject.UNHEARD, ("we",))
+
+
+def test_a_paragraph_that_opens_with_here_is_after_new_paragraph_is_no_reply() -> None:
+    # v2-long-en-00203 chunked: "new paragraph here is what ..." was said, so "Here is" answers nothing.
+    prior = "Take the van."
+    said = "new paragraph here is what you need to do park in the short stay lot"
+    judged = judge(prior, said, [], None, "\n\nHere is what you need to do: park in the short stay lot.")
+    assert judged.rejected is None
+    assert (
+        judge(
+            prior, "new paragraph park in the short stay lot", [], None, "Here is the text: park in the short stay lot."
+        ).rejected
+        == Reject.REPLY
+    )
+
+
+# 14 Oct 2026: "delete that" and "no, don't do this" take back what was said before them, as "scratch that" does;
+# "don't do that" without the "no" is an everyday instruction.
 @pytest.mark.parametrize(
-    ("said", "wrote", "kept"),
+    ("said", "wrote"),
     [
-        # v2-punctuation-hinglish-00479, v2-backtracking-hinglish-00124, suite-growth-hinglish-06217: a Roman Hindi
-        # word respelled goes back to the speaker's spelling.
-        ("usne pucha ki meeting kab hai", "Usne poocha ki meeting kab hai.", "Usne pucha ki meeting kab hai."),
-        ("aaj dupahar teen baje aana", "Aaj dopahar 3 baje aana.", "Aaj dupahar 3 baje aana."),
-        ("apni target sheet lani hai", "Apni target sheet laani hai.", "Apni target sheet lani hai."),
+        ("Send the report to Sam. Delete that. Send the deck to Priya.", "Send the deck to Priya."),
+        ("book the room for monday, delete that, for tuesday", "Book the room for Tuesday."),
+        ("Send it to Sam. No, don't do this. Send it to Priya.", "Send it to Priya."),
+        ("Write the intro first. No, don't do that. Write the summary first.", "Write the summary first."),
+        ("send it to sam no don't do that send it to priya", "Send it to Priya."),
     ],
 )
-def test_round_b6_a_roman_hindi_word_respelled_goes_back_to_the_said_spelling(said: str, wrote: str, kept: str) -> None:
-    assert judge("", said, [], None, wrote).text == kept
+def test_delete_that_and_dont_do_this_take_the_words_before_back(said: str, wrote: str) -> None:
+    assert check(said, wrote, []) is None
+
+
+@pytest.mark.parametrize(
+    ("said", "wrote"),
+    [
+        # The same words used plainly stay.
+        ("please delete that file from the drive", "Please file from the drive."),
+        ("please cancel that order from the shop", "Please order from the shop."),
+        ("we told them not to merge on friday and please don't do that again", "Please don't do that again."),
+        ("Ship it today. Please don't do this in production.", "Please don't do this in production."),
+        ("Ship it today. Don't do that, it breaks the build.", "Don't do that, it breaks the build."),
+    ],
+)
+def test_delete_that_and_dont_do_this_used_plainly_take_nothing_back(said: str, wrote: str) -> None:
+    assert check(said, wrote, []) is not None
+
+
+# 14 Oct 2026, the English bench's formatting misses that a rule mends after the guardrail accepts the words: the
+# words before a list end with a colon, not a comma (formatting-066, -427); a line break the text came with stays one
+# (formatting-327, -457); "NAME at DOMAIN dot TLD" sent to someone is one address (formatting-429, -460).
+@pytest.mark.parametrize(
+    ("said", "wrote", "shaped"),
+    [
+        (
+            "mom bullet please check on the baby bullet please check on the laundry",
+            "Mom,\n- Please check on the baby\n- Please check on the laundry",
+            "Mom:\n- Please check on the baby\n- Please check on the laundry",
+        ),
+        (
+            "anya first keep the title short second move the caption",
+            "Anya,\n1. Keep the title short\n2. Move the caption",
+            "Anya:\n1. Keep the title short\n2. Move the caption",
+        ),
+        (
+            "the timeline begins in january and ends in june\nshow the final draft by friday",
+            "The timeline begins in January and ends in June. Show the final draft by Friday.",
+            "The timeline begins in January and ends in June.\nShow the final draft by Friday.",
+        ),
+        (
+            "Budget note:\ntwenty percent down.\nMonthly payment about sixteen hundred dollars.",
+            "Budget note: 20% down. Monthly payment about $1,600.",
+            "Budget note:\n20% down.\nMonthly payment about $1,600.",
+        ),
+        (
+            "For the mobile spec, direct feedback to ux at lanternworks dot io.",
+            "For the mobile spec, direct feedback to UX at lanternworks.io.",
+            "For the mobile spec, direct feedback to ux@lanternworks.io.",
+        ),
+        (
+            "turn in the essay to noor at silverline dot school then copy the teacher",
+            "Turn in the essay to Noor at silverline.school, then copy the teacher.",
+            "Turn in the essay to noor@silverline.school, then copy the teacher.",
+        ),
+    ],
+)
+def test_an_accepted_answer_gets_its_list_colon_line_breaks_and_address(said: str, wrote: str, shaped: str) -> None:
+    judged = judge("", said, [], None, wrote)
+    assert judged.rejected is None
+    assert judged.text == shaped
+
+
+@pytest.mark.parametrize(
+    ("said", "wrote"),
+    [
+        # An email's greeting keeps its comma before a list.
+        ("hi team bullet ship the fix bullet close the ticket", "Hi team,\n- Ship the fix\n- Close the ticket"),
+        # A web address after "at" is no email, nor is one no one is sent anything at.
+        ("the docs are at docs dot example dot org", "The docs are at docs.example.org."),
+        ("book a slot at calendly dot com slash hirewell", "Book a slot at calendly.com/hirewell."),
+        ("sign up at learnfast dot io", "Sign up at learnfast.io."),
+        # A break said where the answer already breaks the line stays as it is.
+        ("Hi Sam,\nthe build is green", "Hi Sam,\n\nThe build is green."),
+        ("please buy milk\nalso eggs", "Please buy milk.\nAlso eggs."),
+    ],
+)
+def test_shaping_leaves_greetings_web_addresses_and_kept_breaks_alone(said: str, wrote: str) -> None:
+    from snapbak_backend.ai.guardrail.shape import shaped
+
+    assert shaped(said, wrote) == wrote
+
+
+# 15 Oct 2026, the English bench's formatting misses that a rule mends after the guardrail accepts the words, each
+# from the 11 stored runs: a spoken colon's next word stays lowercase (formatting-038); a colon the speaker never said,
+# when they say their marks, becomes the comma they said or goes (formatting-226, -259); "Noor at noor@" and "UX@" as
+# the speaker said the address (formatting-460, -429); a said lead's colon kept (formatting-457); an item's "and"
+# kept and an item split mid-way joined back (formatting-145, -241); a first item glued after a comma (formatting-427);
+# "mb" as "MB" (formatting-231); and a list's lead run on after the sentence before it (founder-variants-en-00001).
+@pytest.mark.parametrize(
+    ("said", "wrote", "shaped"),
+    [
+        (
+            "Priya said colon kick off at ten thirty am comma break at noon comma wrap by four pm full stop",
+            "Priya said: Kick off at 10:30 am, break at noon, wrap by 4 pm.",
+            "Priya said: kick off at 10:30 am, break at noon, wrap by 4 pm.",
+        ),
+        (
+            "Please show the receipt numbers for the last three payments comma 1042 comma 1043 comma 1044.",
+            "Please show the receipt numbers for the last three payments: 1042, 1043, 1044.",
+            "Please show the receipt numbers for the last three payments, 1042, 1043, 1044.",
+        ),
+        (
+            "the spec for the billing page says show invoice history comma payment method comma and download receipt "
+            "link period",
+            "The spec for the billing page says: show invoice history, payment method, and download receipt link.",
+            "The spec for the billing page says show invoice history, payment method, and download receipt link.",
+        ),
+        (
+            "the review says Priya is right comma but the copy is long period",
+            "The review says: Priya is right, but the copy is long.",
+            "The review says Priya is right, but the copy is long.",
+        ),
+        # A speech said all in lowercase can't tell a name: the model's capital stays (decided 15 Oct).
+        (
+            "the review says priya is right comma but the copy is long period",
+            "The review says: Priya is right, but the copy is long.",
+            "The review says Priya is right, but the copy is long.",
+        ),
+        (
+            "turn in the essay to noor at silverline dot school then copy the teacher",
+            "Turn in the essay to Noor at noor@silverline.school, then copy the teacher.",
+            "Turn in the essay to noor@silverline.school, then copy the teacher.",
+        ),
+        (
+            "For the mobile spec, direct feedback to ux at lanternworks dot io.",
+            "For the mobile spec, direct feedback to UX@lanternworks.io.",
+            "For the mobile spec, direct feedback to ux@lanternworks.io.",
+        ),
+        (
+            "Budget note:\ntwenty percent down.\nMonthly payment about sixteen hundred dollars.",
+            "Budget note.\n20% down.\nMonthly payment about $1,600.",
+            "Budget note:\n20% down.\nMonthly payment about $1,600.",
+        ),
+        (
+            "for emily bullet the meeting recap should mention scope bullet risks bullet and next steps",
+            "For Emily:\n- The meeting recap should mention scope\n- Risks\n- Next steps",
+            "For Emily:\n- The meeting recap should mention scope\n- Risks\n- And next steps",
+        ),
+        (
+            "for the renewal email bullet confirm pricing lock bullet include case study from lena",
+            "For the renewal email:\n- Confirm pricing\n- Lock\n- Include case study from Lena",
+            "For the renewal email:\n- Confirm pricing lock\n- Include case study from Lena",
+        ),
+        (
+            "anya first keep the page title on one line second move the caption under the image third make the "
+            "margins consistent",
+            "Anya, 1. Keep the page title on one line\n2. Move the caption under the image\n3. Make the margins "
+            "consistent",
+            "Anya:\n1. Keep the page title on one line\n2. Move the caption under the image\n3. Make the margins "
+            "consistent",
+        ),
+        (
+            "keep each upload below two mb",
+            "Keep each upload below 2 mb.",
+            "Keep each upload below 2 MB.",
+        ),
+        (
+            "Quick note for the new joiners. Here are a few things about the office. The cafeteria is on the ground "
+            "floor. Parking is free for visitors.",
+            "Quick note for the new joiners.\nHere are a few things about the office:\n- The cafeteria is on the "
+            "ground floor\n- Parking is free for visitors",
+            "Quick note for the new joiners. Here are a few things about the office:\n- The cafeteria is on the "
+            "ground floor\n- Parking is free for visitors",
+        ),
+    ],
+)
+def test_an_accepted_answer_gets_its_marks_addresses_and_items_as_said(said: str, wrote: str, shaped: str) -> None:
+    judged = judge("", said, [], None, wrote)
+    assert judged.rejected is None
+    assert judged.text == shaped
+
+
+@pytest.mark.parametrize(
+    ("said", "wrote"),
+    [
+        # A question after a spoken colon keeps its capital, and so does a word in an all-lowercase speech, which could
+        # be a name.
+        (
+            "Tom asked colon are we keeping the site launch on Friday question mark period",
+            "Tom asked: Are we keeping the site launch on Friday?",
+        ),
+        ("note colon bring id", "Note: Bring ID."),
+        # A name the speaker said before the address stays.
+        (
+            "You can email Neha at neha at snipandsuds dot in for the Saturday slot",
+            "You can email Neha at neha@snipandsuds.in for the Saturday slot.",
+        ),
+        # Items said after "bullet one", "bullet two" stay apart.
+        (
+            "Design review agenda, bullet one, simplify the onboarding steps; bullet two, keep the dark mode toggle "
+            "visible.",
+            "Design review agenda:\n- Simplify the onboarding steps\n- Keep the dark mode toggle visible",
+        ),
+        # A paragraph said before a list's lead stays, and so does a semicolon for a said comma.
+        (
+            "hi everyone thanks for coming new paragraph here are the three goals launch the app cut the tickets",
+            "Hi everyone, thanks for coming.\n\nHere are the three goals:\n1. Launch the app\n2. Cut the tickets",
+        ),
+        (
+            "we rolled back the deployment comma however the ingress logs still show errors",
+            "We rolled back the deployment; however, the ingress logs still show errors.",
+        ),
+    ],
+)
+def test_shaping_leaves_said_capitals_names_and_marks_alone(said: str, wrote: str) -> None:
+    from snapbak_backend.ai.guardrail.shape import shaped
+
+    assert shaped(said, wrote) == wrote

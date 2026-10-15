@@ -4,7 +4,7 @@ import time
 
 import pytest
 
-from snapbak_backend.ai import chain
+from snapbak_backend.ai import chain, routing
 from snapbak_backend.ai.chain import ProviderFailed, Tiers
 from snapbak_backend.ai.providers.base import ProviderError, Turn, Usage
 from snapbak_backend.ai.providers.fake import Fake
@@ -47,7 +47,7 @@ class Scripted:
 
 
 def said(text: str, **changes: object) -> PolishRequest:
-    fields = {"text": text, "prior": "", "terms": [], "app": "", "style": "chat", "language": "en"}
+    fields = {"text": text, "prior": "", "terms": [], "app": "", "style": "chat"}
     return PolishRequest.model_validate({**fields, "deadline_ms": 2000, **changes})
 
 
@@ -56,6 +56,14 @@ def answer(text: str, revision: str | None = None) -> str:
 
 
 UNUSED = Scripted("test:unused", None)
+
+
+@pytest.mark.anyio
+async def test_an_english_chunk_reasons_at_medium_on_the_small_tier_too() -> None:
+    # Founder, 14 Oct: English always thinks at medium; a plain chunk stays on the small model.
+    small = Scripted("test:small", answer("Ship it today."))
+    response, _ = await polish(said("ship it today"), Tiers(small=small, big=UNUSED, fallback=None))
+    assert (response.text, small.reasoned) == ("Ship it today.", "medium")
 
 
 @pytest.mark.anyio
@@ -70,17 +78,13 @@ async def test_a_plain_chunk_is_polished_on_the_small_tier() -> None:
 
 @pytest.mark.anyio
 @pytest.mark.parametrize(
-    ("text", "language", "output"),
-    [
-        ("deploy on tuesday actually wednesday", "en", "Deploy on Wednesday."),
-        ("kal milte hain nahi nahi parso", "hinglish", "Parso milte hain."),
-        ("कल मिलते हैं नहीं नहीं परसों", "hi", "परसों मिलते हैं।"),
-    ],
+    ("text", "output"),
+    [("deploy on tuesday actually wednesday", "Deploy on Wednesday."), ("ship it no wait send it", "Send it.")],
 )
-async def test_corrections_and_hindi_go_straight_to_the_big_tier(text: str, language: str, output: str) -> None:
+async def test_corrections_go_straight_to_the_big_tier(text: str, output: str) -> None:
     small = Scripted("test:small", None)
     big = Scripted("test:big", answer(output))
-    response, _ = await polish(said(text, language=language), Tiers(small=small, big=big, fallback=None))
+    response, _ = await polish(said(text), Tiers(small=small, big=big, fallback=None))
     assert (response.text, response.tier, response.engine, response.rejected) == (
         output,
         "big",
@@ -133,8 +137,8 @@ async def test_a_rejected_small_answer_is_retried_on_the_big_tier(bad: str) -> N
 async def test_a_rejected_big_answer_is_corrected_once_with_reasoning() -> None:
     # gpt-6-luna sometimes "repairs" a garbled phrase with an unheard word; told which word, it takes it out (D1, 11
     # Oct). The correction reasons: accuracy over speed (D7), with 20 s to answer (D2).
-    big = Scripted("test:big", answer("Sure, ship it."))
-    outputs = iter([answer("Sure, ship it."), answer("Ship it.")])
+    big = Scripted("test:big", answer("Sure, send it."))
+    outputs = iter([answer("Sure, send it."), answer("Send it.")])
 
     async def complete(turns: list[Turn], max_tokens: int, timeout: float, reason: str = "") -> tuple[str, Usage]:
         big.calls += 1
@@ -142,9 +146,9 @@ async def test_a_rejected_big_answer_is_corrected_once_with_reasoning() -> None:
         return next(outputs), USAGE
 
     big.complete = complete  # type: ignore[method-assign]
-    request = said("ship it", language="hinglish", deadline_ms=6000)
+    request = said("ship it no wait send it", deadline_ms=6000)
     response, calls = await polish(request, Tiers(small=UNUSED, big=big, fallback=None))
-    assert (response.text, response.rejected, response.tier) == ("Ship it.", False, "big")
+    assert (response.text, response.rejected, response.tier) == ("Send it.", False, "big")
     assert [call.verdict for call in calls] == ["reply", "ok"]
     assert (big.calls, big.reasoned) == (2, "medium")
 
@@ -212,11 +216,9 @@ async def test_a_stutter_dropped_from_a_counted_list_is_accepted() -> None:
         "Ok, so this is just a simple test that I am running:\n1. It needs to be an audit set\n"
         "2. I want to buy a chair\n3. Let's get eggs for the breakfast."
     )
-    big = Scripted("test:big", answer("It's finished.", revision))
-    request = said(
-        "Third lets get eggs for the breakfast. It's it's finished finished.", prior=prior, language="hinglish"
-    )
-    response, _ = await polish(request, Tiers(small=UNUSED, big=big, fallback=None))
+    model = Scripted("test:small", answer("It's finished.", revision))
+    request = said("Third lets get eggs for the breakfast. It's it's finished finished.", prior=prior)
+    response, _ = await polish(request, Tiers(small=model, big=UNUSED, fallback=None))
     assert (response.revision, response.text, response.rejected) == (revision, "It's finished.", False)
 
 
@@ -281,11 +283,12 @@ async def test_a_slow_tier_is_backed_up_by_the_fallback_and_the_first_answer_win
     # 11 Oct: gpt-6-luna once took over 5.75 s on a dictation it usually answers in 2.5 s; the fallback, asked
     # once the tier is late, answers in about 1.5 s without reasoning.
     monkeypatch.setattr(chain, "HEDGE_S", 0.1)
-    big = Scripted("test:big", answer("Ship it now."), delay=2.0)
+    monkeypatch.setitem(routing.EFFORTS, "plain", "medium")
+    tier = Scripted("test:small", answer("Ship it now."), delay=2.0)
     fallback = Scripted("test:fallback", answer("Ship it."), delay=0.05)
     started = time.monotonic()
-    request = said("ship it", language="hinglish", deadline_ms=6000)
-    response, calls = await polish(request, Tiers(small=UNUSED, big=big, fallback=fallback))
+    request = said("ship it", deadline_ms=6000)
+    response, calls = await polish(request, Tiers(small=tier, big=UNUSED, fallback=fallback))
     assert time.monotonic() - started < 0.6
     assert (response.text, response.engine) == ("Ship it.", "test:fallback")
     assert (fallback.calls, fallback.reasoned) == (1, "")
@@ -295,22 +298,23 @@ async def test_a_slow_tier_is_backed_up_by_the_fallback_and_the_first_answer_win
 @pytest.mark.anyio
 async def test_a_tier_that_answers_before_the_backup_wins(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(chain, "HEDGE_S", 0.1)
-    big = Scripted("test:big", answer("Ship it."), delay=0.3)
+    monkeypatch.setitem(routing.EFFORTS, "plain", "medium")
+    tier = Scripted("test:small", answer("Ship it."), delay=0.3)
     fallback = Scripted("test:fallback", answer("Ship it now."), delay=2.0)
     started = time.monotonic()
-    request = said("ship it", language="hinglish", deadline_ms=6000)
-    response, _ = await polish(request, Tiers(small=UNUSED, big=big, fallback=fallback))
+    request = said("ship it", deadline_ms=6000)
+    response, _ = await polish(request, Tiers(small=tier, big=UNUSED, fallback=fallback))
     assert time.monotonic() - started < 0.8
-    assert (response.text, response.engine, fallback.calls) == ("Ship it.", "test:big", 1)
+    assert (response.text, response.engine, fallback.calls) == ("Ship it.", "test:small", 1)
 
 
 @pytest.mark.anyio
 async def test_a_tier_that_answers_in_time_never_asks_the_backup() -> None:
-    big = Scripted("test:big", answer("Ship it."), delay=0.05)
+    tier = Scripted("test:small", answer("Ship it."), delay=0.05)
     fallback = Scripted("test:fallback", answer("Ship it now."))
-    request = said("ship it", language="hinglish", deadline_ms=6000)
-    response, _ = await polish(request, Tiers(small=UNUSED, big=big, fallback=fallback))
-    assert (response.engine, fallback.calls) == ("test:big", 0)
+    request = said("ship it", deadline_ms=6000)
+    response, _ = await polish(request, Tiers(small=tier, big=UNUSED, fallback=fallback))
+    assert (response.engine, fallback.calls) == ("test:small", 0)
 
 
 @pytest.mark.anyio
@@ -383,7 +387,7 @@ async def test_a_small_answer_after_the_deadline_is_a_failure() -> None:
 @pytest.mark.anyio
 async def test_a_command_always_runs_on_the_big_tier() -> None:
     small = Scripted("test:small", None)
-    asked = CommandRequest(selection="send the deck", instruction="shout", app="", language="en", deadline_ms=6000)
+    asked = CommandRequest(selection="send the deck", instruction="shout", app="", deadline_ms=6000)
     response, _ = await command(asked, Tiers(small=small, big=Fake("edit"), fallback=None))
     assert (response.text, response.engine, response.tokens) == ("SEND THE DECK", "fake:edit", 0)
     assert small.calls == 0
@@ -391,7 +395,7 @@ async def test_a_command_always_runs_on_the_big_tier() -> None:
 
 @pytest.mark.anyio
 async def test_a_command_falls_back_and_a_malformed_command_answer_fails() -> None:
-    asked = CommandRequest(selection="hey", instruction="formal", app="", language="en", deadline_ms=6000)
+    asked = CommandRequest(selection="hey", instruction="formal", app="", deadline_ms=6000)
     fallback = Scripted("test:fallback", json.dumps({"text": "Hello."}))
     response, _ = await command(asked, Tiers(small=UNUSED, big=Fake("fail"), fallback=fallback))
     assert (response.text, response.engine) == ("Hello.", "test:fallback")
@@ -405,9 +409,10 @@ async def test_the_output_budget_grows_with_the_text_and_prior() -> None:
     small = Scripted("test:small", answer("a" * 500))
     await polish(said("a" * 500, prior="b" * 300), Tiers(small=small, big=UNUSED, fallback=None))
     big = Scripted("test:big", json.dumps({"text": "x"}))
-    asked = CommandRequest(selection="x" * 1000, instruction="shout", app="", language="en", deadline_ms=6000)
+    asked = CommandRequest(selection="x" * 1000, instruction="shout", app="", deadline_ms=6000)
     await command(asked, Tiers(small=UNUSED, big=big, fallback=None))
-    assert (small.max_tokens, big.max_tokens) == (900, 2200)
+    # English reasons at medium, so it gets the reasoning room too (founder, 14 Oct).
+    assert (small.max_tokens, big.max_tokens) == (4900, 2200)
 
 
 @pytest.mark.anyio
@@ -418,24 +423,22 @@ async def test_a_correction_reasons_with_room_for_the_reasoning_tokens() -> None
     await polish(said("deploy on tuesday"), Tiers(small=small, big=UNUSED, fallback=None))
     # Round b3: medium reasoning needs room of its own, 4,000 tokens (1,000 cut some answers off empty).
     assert (big.reasoned, big.max_tokens) == ("medium", 4136)
-    assert (small.reasoned, small.max_tokens) == ("", 117)
+    # English reasons at medium on the small tier too (founder, 14 Oct).
+    assert (small.reasoned, small.max_tokens) == ("medium", 4117)
 
 
 @pytest.mark.anyio
-@pytest.mark.parametrize(
-    ("text", "language"),
-    [("kal ki meeting cancel karo", "hinglish"), ("कल की मीटिंग रद्द करो", "hi"), (" ".join(["word"] * 151), "en")],
-)
-async def test_every_big_tier_chunk_reasons_with_room_for_the_reasoning_tokens(text: str, language: str) -> None:
+async def test_a_long_big_tier_chunk_reasons_with_room_for_the_reasoning_tokens() -> None:
+    text = " ".join(["word"] * 151)
     big = Scripted("test:big", answer(text))
-    await polish(said(text, language=language), Tiers(small=UNUSED, big=big, fallback=None))
+    await polish(said(text), Tiers(small=UNUSED, big=big, fallback=None))
     assert (big.reasoned, big.max_tokens) == ("medium", len(text) + 4100)
 
 
 @pytest.mark.anyio
 async def test_a_command_answer_is_trimmed() -> None:
     big = Scripted("test:big", json.dumps({"text": "  Hello.\n"}))
-    asked = CommandRequest(selection="hey", instruction="formal", app="", language="en", deadline_ms=6000)
+    asked = CommandRequest(selection="hey", instruction="formal", app="", deadline_ms=6000)
     response, _ = await command(asked, Tiers(small=UNUSED, big=big, fallback=None))
     assert response.text == "Hello."
 
@@ -466,20 +469,6 @@ async def corrected(prior: str, text: str, output: str) -> tuple[PolishResponse,
             "Hi team.",
             "Let's meet on Friday. no wait thursday",
         ),
-        (
-            "Report ready hai. Kal meeting hai.",
-            "nahi nahi parso",
-            "Parso meeting hai.",
-            "Report ready hai.",
-            "Kal meeting hai. nahi nahi parso",
-        ),
-        (
-            "रिपोर्ट तैयार है। कल मीटिंग है।",
-            "नहीं नहीं परसों",
-            "परसों मीटिंग है।",
-            "रिपोर्ट तैयार है।",
-            "कल मीटिंग है। नहीं नहीं परसों",
-        ),
     ],
 )
 async def test_a_correction_gets_the_last_sentence_of_the_prior_to_fix_in_one_piece(
@@ -500,8 +489,6 @@ async def test_a_correction_gets_the_last_sentence_of_the_prior_to_fix_in_one_pi
             "We shipped the fix. No problem, I mean it.",
             "No problem, I mean it.",
         ),
-        ("Report ready hai.", "matlab kal bhejenge", "Report ready hai. Matlab kal bhejenge.", "Matlab kal bhejenge."),
-        ("रिपोर्ट तैयार है।", "मतलब कल भेजेंगे", "रिपोर्ट तैयार है। मतलब कल भेजेंगे।", "मतलब कल भेजेंगे।"),
     ],
 )
 async def test_a_correction_that_leaves_the_prior_as_it_was_comes_back_as_the_chunk_alone(
@@ -567,33 +554,23 @@ async def test_a_chat_piece_goes_on_with_a_list_typed_with_round_bullets() -> No
 
 
 @pytest.mark.anyio
-async def test_a_long_english_chunk_goes_to_the_big_tier_without_reasoning() -> None:
+async def test_a_long_english_chunk_goes_to_the_big_tier_and_reasons_at_medium() -> None:
     text = " ".join(["ship it"] * 80)
     big = Scripted("test:big", answer(text.capitalize() + "."))
     tiers = Tiers(small=UNUSED, big=big, fallback=None)
     response, _ = await polish(said(text), tiers)
-    assert (response.tier, big.reasoned) == ("big", "")
+    assert (response.tier, big.reasoned) == ("big", "medium")
 
 
 @pytest.mark.anyio
-async def test_a_call_without_reasoning_is_backed_up_early_and_a_reasoning_one_keeps_its_time(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    # Founder, 13 Oct: an answer that does not reason is backed up after FAST_HEDGE_S by the fallback, which answers
-    # alike; a reasoning answer keeps HEDGE_S, since the fallback does not reason (round b3).
+async def test_a_reasoning_call_keeps_its_time_before_the_backup(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Every route reasons (14 Oct), and the fallback does not: it joins only after HEDGE_S (round b3).
     monkeypatch.setattr(chain, "HEDGE_S", 5.0)
-    monkeypatch.setattr(chain, "FAST_HEDGE_S", 0.1)
-    small = Scripted("test:small", answer("Ship it now."), delay=2.0)
-    fallback = Scripted("test:fallback", answer("Ship it."), delay=0.05)
-    started = time.monotonic()
-    response, _ = await polish(said("ship it", deadline_ms=6000), Tiers(small=small, big=UNUSED, fallback=fallback))
-    assert time.monotonic() - started < 0.6
-    assert (response.text, response.engine) == ("Ship it.", "test:fallback")
-    big = Scripted("test:big", answer("Ship it."), delay=0.4)
+    reasoning = Scripted("test:small", answer("Ship it."), delay=0.4)
     late = Scripted("test:fallback", answer("Ship it now."), delay=0.05)
-    request = said("ship it", language="hinglish", deadline_ms=6000)
-    response, _ = await polish(request, Tiers(small=UNUSED, big=big, fallback=late))
-    assert (response.engine, late.calls) == ("test:big", 0)
+    request = said("ship it", deadline_ms=6000)
+    response, _ = await polish(request, Tiers(small=reasoning, big=UNUSED, fallback=late))
+    assert (response.engine, late.calls) == ("test:small", 0)
 
 
 @pytest.mark.anyio
@@ -623,7 +600,6 @@ async def test_a_dictation_with_a_said_paragraph_is_polished_one_paragraph_per_c
     [
         ("ship it on friday i mean monday", "Ship it on Friday, I mean, Monday.", "Ship it on Monday."),
         ("print five no wait six copies", "Print five, no wait, six copies.", "Print six copies."),
-        ("बैठक सोमवार नहीं नहीं मंगलवार को है", "बैठक सोमवार, नहीं नहीं, मंगलवार को है।", "बैठक मंगलवार को है।"),
     ],
 )
 async def test_both_versions_kept_around_a_cue_are_mended_without_a_second_call(
@@ -632,17 +608,27 @@ async def test_both_versions_kept_around_a_cue_are_mended_without_a_second_call(
     # Founder, 13 Oct: the guardrail names the old version, the cue and the new one; the old one and the cue go and
     # the answer is judged again, so no correction call is needed. A mend the guardrail refuses still gets the call.
     big = Scripted("test:big", answer(kept))
-    response, _ = await polish(
-        said(text, language="hi" if "ह" in text else "en"), Tiers(small=UNUSED, big=big, fallback=None)
-    )
+    response, _ = await polish(said(text), Tiers(small=UNUSED, big=big, fallback=None))
     assert (response.text, response.rejected, big.calls) == (mended, False, 1)
 
 
+@pytest.mark.anyio
+async def test_an_answer_that_writes_the_prior_again_is_read_as_the_piece_after_it() -> None:
+    # 14 Oct: the model sometimes writes the prior again before the piece, with no revision; the piece's answer is
+    # what follows it, so no correction call is needed.
+    small = Scripted("test:small", answer("Paris buffer: 0.8%"))
+    response, _ = await polish(
+        said("zero point eight percent", prior="Paris buffer:"), Tiers(small=small, big=UNUSED, fallback=None)
+    )
+    assert (response.rejected, response.revision, small.calls) == (False, None, 1)
+    assert response.text.startswith("0.8%")
+
+
 def test_a_piece_that_opens_with_its_cue_is_not_mended_by_taking_words_out() -> None:
-    # The guardrail names only the cue here ("galti se bola"): the piece needs a revision of the prior, not a cut.
+    # The guardrail names only the cue here ("let me rephrase"): the piece needs a revision of the prior, not a cut.
     from snapbak_backend.ai.guardrail.judge import Reason, Reject
     from snapbak_backend.transformers.polish import mendings
 
-    request = said("galti se bola parso milte hain", prior="Kal milte hain.", language="hinglish")
-    reason = Reason(Reject.KEPT_CORRECTION, ("galti", "se", "bola"))
-    assert mendings(request, "Galti se bola, parso milte hain.", reason) == []
+    request = said("let me rephrase we meet on friday", prior="We meet on Thursday.")
+    reason = Reason(Reject.KEPT_CORRECTION, ("let", "me", "rephrase"))
+    assert mendings(request, "Let me rephrase, we meet on Friday.", reason) == []

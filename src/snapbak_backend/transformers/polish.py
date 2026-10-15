@@ -32,7 +32,7 @@ from snapbak_backend.ai.providers.base import Turn
 from snapbak_backend.schemas.polish import PolishRequest
 
 # A full stop after a digit numbers a list item ("1. ") or ends a number, and starts no new sentence.
-SENTENCE_END = re.compile(r"(?<!\d)[.?!।]\s+|\n")
+SENTENCE_END = re.compile(r"(?<!\d)[.?!]\s+|\n")
 
 
 MALFORMED = Reason(Reject.MALFORMED)
@@ -69,6 +69,10 @@ def read(request: PolishRequest, asked: PolishRequest, output: str) -> Polished:
         return Polished(request.text, None, Reject.MALFORMED, MALFORMED)
     if not isinstance(text, str) or not isinstance(revision, str | None):
         return Polished(request.text, None, Reject.MALFORMED, MALFORMED)
+    # An answer that writes the prior again before the piece, with no revision, answers the piece after it (14 Oct).
+    prior = asked.prior.strip()
+    if revision is None and prior and text.startswith(prior) and text[len(prior) :].strip():
+        text = text[len(prior) :].strip()
     kept, chunk = unfold(request, asked, revision, text)
     # A piece that takes nothing back leaves the typed prior as it is: a revision that holds it and goes on is the
     # piece's answer (round b5).

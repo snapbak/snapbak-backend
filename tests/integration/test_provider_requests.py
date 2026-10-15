@@ -181,13 +181,40 @@ async def test_anthropic_puts_the_rules_in_system_and_sends_its_headers() -> Non
     assert request.headers["x-api-key"] == "sk-ant-1"
     assert request.headers["anthropic-version"] == "2023-06-01"
     assert "authorization" not in request.headers
+    cached = {"type": "ephemeral"}
     assert sent(route) == {
         "model": "claude-haiku-4-5",
         "max_tokens": 64,
         "temperature": 0,
-        "system": "the rules",
-        "messages": [{"role": role, "content": content} for role, content in TURNS[1:]],
+        "system": [{"type": "text", "text": "the rules", "cache_control": cached}],
+        "messages": [
+            {"role": "user", "content": "said"},
+            {"role": "assistant", "content": [{"type": "text", "text": "cleaned", "cache_control": cached}]},
+            {"role": "user", "content": '{"text": "kal milte hain"}'},
+        ],
     }
+    await provider.aclose()
+
+
+# The rules and the worked examples are the same in every request: they are cached up to the last example, and the
+# tokens read from the cache are counted as cached input.
+@pytest.mark.anyio
+async def test_anthropic_counts_the_tokens_served_from_its_cache() -> None:
+    provider = make_provider("anthropic:claude-haiku-4-5", KEYS)
+    with respx.mock(assert_all_called=True) as mock:
+        mock.post("https://api.anthropic.com/v1/messages").respond(
+            json={
+                "content": [{"type": "text", "text": REPLY}],
+                "usage": {
+                    "input_tokens": 30,
+                    "cache_read_input_tokens": 5000,
+                    "cache_creation_input_tokens": 100,
+                    "output_tokens": 11,
+                },
+            }
+        )
+        output = await provider.complete(TURNS, 64, 2.0)
+    assert output == (REPLY, Usage(5130, 11, 5000))
     await provider.aclose()
 
 

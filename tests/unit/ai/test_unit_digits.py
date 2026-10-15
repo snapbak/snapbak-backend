@@ -14,8 +14,6 @@ from snapbak_backend.ai.guardrail.shape import shaped
             "They need my six slips, two years of returns.",
             "They need my six slips, 2 years of returns.",
         ),
-        ("meri teen saal ki beti", "Meri teen saal ki beti.", "Meri 3 saal ki beti."),
-        ("उन्हें पांच दिन आराम करना है", "उन्हें पांच दिन आराम करना है।", "उन्हें 5 दिन आराम करना है।"),
     ],
 )
 def test_a_number_word_before_a_unit_becomes_digits(said: str, wrote: str, mended: str) -> None:
@@ -25,16 +23,10 @@ def test_a_number_word_before_a_unit_becomes_digits(said: str, wrote: str, mende
 @pytest.mark.parametrize(
     ("said", "wrote"),
     [
-        # A rough pair ("a couple of days"), joined or hyphenated.
-        ("do chaar din me ho jayega", "Do chaar din me ho jayega."),
-        ("do-chaar din ka delay chalega", "Do-chaar din ka delay chalega."),
-        # A fraction word goes with the number after it.
-        ("साढ़े तीन किलो चावल चाहिए", "साढ़े तीन किलो चावल चाहिए।"),
+        # A rough pair ("two or three days").
+        ("it takes two three days", "It takes two three days."),
         # A sentence that opens with the number keeps the word.
         ("two days ago she told me", "Two days ago she told me."),
-        # "do" and "दो" are also the verb "give".
-        ("mujhe do din do", "Mujhe do din do."),
-        ("मैंने दो किलो लिए", "मैंने दो किलो लिए।"),
         # A count of things, not a unit, stays a word.
         ("we have three problems", "We have three problems."),
     ],

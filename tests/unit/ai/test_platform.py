@@ -27,9 +27,9 @@ def test_a_code_app_gets_each_item_as_a_sentence_after_its_lead() -> None:
     assert in_style(COUNTED, "code") == "Do three things: Call Ishan. Send the deck. Book the room."
 
 
-def test_a_code_app_keeps_an_items_own_end_mark_and_hindi_stops() -> None:
-    hindi = "आज के काम:\n- राहुल को कॉल करो\n- डेक भेजो?"
-    assert in_style(hindi, "code") == "आज के काम: राहुल को कॉल करो। डेक भेजो?"
+def test_a_code_app_keeps_an_items_own_end_mark() -> None:
+    asked = "Today:\n- Call Rahul\n- Send the deck?"
+    assert in_style(asked, "code") == "Today: Call Rahul. Send the deck?"
 
 
 def test_a_code_app_keeps_text_before_and_after_a_list() -> None:

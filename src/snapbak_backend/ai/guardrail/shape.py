@@ -2,23 +2,18 @@
 
 import re
 
-from snapbak_backend.ai.guardrail.tokens import word_set, words
+from snapbak_backend.ai.guardrail.tokens import align, word_set, words
 
 ITEM = re.compile(r"^(\d+)\.\s+")
 BULLET = re.compile(r"^[-•*]\s+")
 LIST_LINE = re.compile(r"^(?:\d+\.|[-•*])\s+")
-# A first item glued to the line before it ("I am running. 1. It needs..."), told by a "2. " on the next line.
-GLUED_FIRST = re.compile(r"^(.*[.:!?।])\s+1\.\s+(\S.*)$")
-COUNTERS = word_set(
-    "first second third fourth fifth sixth seventh eighth ninth tenth firstly secondly thirdly "
-    "pehla pehli doosra doosri dusra dusri teesra teesri tisra chautha chauthi "
-    "पहला पहली दूसरा दूसरी तीसरा तीसरी चौथा चौथी"
-)
+# A first item glued to the line before it ("I am running. 1. It needs...", "Anya, 1. Keep"), told by a "2. " on the
+# next line.
+GLUED_FIRST = re.compile(r"^(.*[.:!?,])\s+1\.\s+(\S.*)$")
+COUNTERS = word_set("first second third fourth fifth sixth seventh eighth ninth tenth firstly secondly thirdly")
 # A counting word the model kept at the start of a numbered item, set off by its comma ("1. First, can you").
-COUNTER_LEAD = re.compile(r"^(\d+\.\s+)(?:(?:and|aur|और)\s+)?([^\s,]+),\s+(\S)", re.IGNORECASE)
-ENDS_BARE = re.compile(r"[\wऀ-ॿ]$", re.MULTILINE)
-DEVANAGARI_STOP = re.compile(r"(?<=[ऀ-ॿ])\.(?=\s|$)")
-ABBREVIATIONS = word_set("डॉ प्रो श्री सं क्र पृ")
+COUNTER_LEAD = re.compile(r"^(\d+\.\s+)(?:and\s+)?([^\s,]+),\s+(\S)", re.IGNORECASE)
+ENDS_BARE = re.compile(r"\w$", re.MULTILINE)
 # Words the recognizer capitalised after a joining word that are never a name ("and How is it").
 NEVER_NAMES = word_set(
     "how what when where why who which whose is are was were can could will would should do does did the a an it "
@@ -60,14 +55,81 @@ def numbered(lines: list[str]) -> list[str]:
     return found
 
 
+# An email's greeting keeps its comma, also before a list ("Hi team,").
+GREETING = re.compile(r"^(?:hi|hello|hey|dear)\b", re.IGNORECASE)
+
+
 def introduced(lines: list[str]) -> list[str]:
-    """The words before a list end with a colon, not a full stop (a list going on from the prior has none)."""
+    """The words before a list end with a colon, not a full stop or a comma ("Mom," Mom:), but for a greeting's (a
+    list going on from the prior has none)."""
     found = list(lines)
     for index in range(1, len(found)):
         before = found[index - 1]
         starts = BULLET.match(found[index]) or found[index].startswith("1. ")
-        if starts and before.endswith(".") and not before.endswith("..") and not LIST_LINE.match(before):
+        stopped = before.endswith(".") and not before.endswith("..")
+        commaed = before.endswith(",") and GREETING.match(before) is None
+        if starts and (stopped or commaed) and not LIST_LINE.match(before):
             found[index - 1] = before[:-1] + ":"
+    return found
+
+
+SAID_BULLET = re.compile(r"\bbullet\b", re.IGNORECASE)
+
+
+def items_as_said(said: str, lines: list[str]) -> list[str]:
+    """Bulleted items as the speaker said them after each "bullet": an item the model split mid-way joins the one
+    before ("bullet confirm pricing lock" - Confirm pricing, - Lock), and one said after "and" keeps it."""
+    said_items = [f" {' '.join(words(piece))} " for piece in SAID_BULLET.split(said)[1:]]
+    if len(said_items) < 2:
+        return lines
+    found: list[str] = []
+    for line in lines:
+        item = BULLET.match(line)
+        before = BULLET.match(found[-1]) if found else None
+        if item is None:
+            found.append(line)
+            continue
+        rest = line[item.end() :]
+        item_words = words(rest)
+        lowered = rest[:1].lower() + rest[1:]
+        if before is not None:
+            run = " ".join(words(found[-1][before.end() :]) + item_words)
+            if any(f" {run} " in said_item for said_item in said_items):
+                found[-1] = f"{found[-1]} {lowered}"
+                continue
+        opening = " ".join(item_words[:2])
+        if item_words and any(said_item.startswith(f" and {opening} ") for said_item in said_items):
+            line = f"{line[: item.end()]}And {lowered}"
+        found.append(line)
+    return found
+
+
+def leads_kept(said: str, lines: list[str]) -> list[str]:
+    """A line the speaker ended with a colon ("Budget note:") keeps it where the model wrote a full stop."""
+    leads = {tuple(words(line)) for line in said.split("\n") if line.rstrip().endswith(":")}
+    if not leads:
+        return lines
+    found = list(lines)
+    for index, line in enumerate(found):
+        if line.endswith(".") and not line.endswith("..") and tuple(words(line)) in leads:
+            found[index] = line[:-1] + ":"
+    return found
+
+
+def leads_run_on(said: str, lines: list[str]) -> list[str]:
+    """A list's lead the model put on a line of its own runs on after the sentence before it, when the speaker said
+    no line break ("joiners.", new line, "Here are a few things:" joiners. Here are a few things:)."""
+    if "\n" in said:
+        return lines
+    found: list[str] = []
+    for index, line in enumerate(lines):
+        following = lines[index + 1] if index + 1 < len(lines) else ""
+        before = found[-1] if found else ""
+        leads = line.endswith(":") and LIST_LINE.match(following) is not None and LIST_LINE.match(line) is None
+        if leads and before.endswith((".", "!", "?")) and LIST_LINE.match(before) is None:
+            found[-1] = f"{before} {line}"
+            continue
+        found.append(line)
     return found
 
 
@@ -90,17 +152,6 @@ def asked_back(said: str, text: str) -> str:
     return asked
 
 
-def hindi_stops(text: str) -> str:
-    """A full stop after a Devanagari word ends the sentence as "।" (an abbreviation's dot stays: "डॉ.")."""
-
-    def stop(found: re.Match[str]) -> str:
-        before = text[: found.start()].split()
-        return "." if before and before[-1] in ABBREVIATIONS else "।"
-
-    stopped = DEVANAGARI_STOP.sub(stop, text)
-    return stopped
-
-
 def rejoined(text: str, output: str) -> str:
     """An answer to a piece going on with a sentence, made a new list item or without the piece's joining word, with
     the word back in lowercase going on with the line ("3. how is it" and how is it)."""
@@ -116,12 +167,10 @@ def rejoined(text: str, output: str) -> str:
     return f"{joining.lower()} {rest}"
 
 
-PARAGRAPH_SAID = [
-    tuple(words(phrase)) for phrase in "new paragraph|naya paragraph|naya para|नया पैराग्राफ|नया पैरा".split("|")
-]
+PARAGRAPH_SAID = tuple(words("new paragraph"))
 CONTEXT_WORDS = 3
 TOKEN = re.compile(r"\S+")
-SENTENCE_GAP = re.compile(r"(?<=[.?!।])[ \t]*\n?[ \t]*(?=\S)")
+SENTENCE_GAP = re.compile(r"(?<=[.?!])[ \t]*\n?[ \t]*(?=\S)")
 
 
 def paragraphed(said: str, text: str) -> str | None:
@@ -135,8 +184,7 @@ def paragraphed(said: str, text: str) -> str | None:
     places: list[int] = []
     for start in range(1, len(raw)):
         said_here = tuple(word for found in heard[start : start + 2] for word in found)
-        phrase = next((phrase for phrase in PARAGRAPH_SAID if said_here[: len(phrase)] == phrase), None)
-        if phrase is None:
+        if said_here[: len(PARAGRAPH_SAID)] != PARAGRAPH_SAID:
             continue
         before = [word for found in heard[max(0, start - CONTEXT_WORDS) : start] for word in found][-CONTEXT_WORDS:]
         size = len(before)
@@ -160,8 +208,44 @@ def paragraphed(said: str, text: str) -> str | None:
     return fixed
 
 
+def breaks_kept(said: str, text: str) -> str:
+    """The answer with a line break the text came with put back where the model ran the two lines on: after the
+    written word the line's last said word is, or before the one the next line's first is."""
+    if "\n" not in said:
+        return text
+    said_lines = said.split("\n")
+    said_words = words(said)
+    spans = list(TOKEN.finditer(text))
+    owner = [index for index, span in enumerate(spans) for _ in words(span.group())]
+    written = [word for span in spans for word in words(span.group())]
+    same = {
+        start + k: written_start + k
+        for op, start, end, written_start, _ in align(said_words, written)
+        if op == "equal"
+        for k in range(end - start)
+    }
+    gaps: set[int] = set()
+    boundary = 0
+    for line in said_lines[:-1]:
+        boundary += len(words(line))
+        if boundary - 1 in same:
+            at = same[boundary - 1] + 1
+        elif boundary in same:
+            at = same[boundary]
+        else:
+            continue
+        if 0 < at < len(written) and owner[at - 1] != owner[at]:
+            gaps.add(owner[at - 1])
+    fixed = text
+    for index in sorted(gaps, reverse=True):
+        gap_start, gap_end = spans[index].end(), spans[index + 1].start()
+        if "\n" not in fixed[gap_start:gap_end]:
+            fixed = fixed[:gap_start] + "\n" + fixed[gap_end:]
+    return fixed
+
+
 BLANK = re.compile(r"\n\n+")
-SPOKEN_BREAK = re.compile(r"\n|new paragraph|naya para|नया पैरा", re.IGNORECASE)
+SPOKEN_BREAK = re.compile(r"\n|new paragraph", re.IGNORECASE)
 SIGN_OFF_WORDS = 3
 
 
@@ -184,13 +268,13 @@ def unparagraphed(said: str, text: str) -> str:
     return run_on
 
 
-# Two end marks stacked on one sentence ("पूछी।?", "Friday?."): the question or exclamation mark stays (round b3).
-STACKED = re.compile(r"(?<=[^\s.?!।])(?:[.।]+[?!]|[?!][.।]+|।\.|\.।)")
+# Two end marks stacked on one sentence ("Friday?."): the question or exclamation mark stays (round b3).
+STACKED = re.compile(r"(?<=[^\s.?!])(?:\.+[?!]|[?!]\.+)")
 # A question or exclamation closed by a quote takes no stop after the quote ("?”." ?”), round b4.
-QUOTE_STOPPED = re.compile("(?<=[?!][\u201d\u2019\"'])[.\u0964]")
+QUOTE_STOPPED = re.compile("(?<=[?!][\u201d\u2019\"'])\\.")
 # The name under a sign-off ("Cheers,\nTom.") ends the letter with no full stop (round b3).
 SIGNED_NAME = re.compile(
-    r"(\n(?:thanks|thank you|best|cheers|regards|best regards|warm regards|dhanyavaad|shukriya),"
+    r"(\n(?:thanks|thank you|best|cheers|regards|best regards|warm regards),"
     r"\n[^\n.]{1,30})\.$",
     re.IGNORECASE,
 )
@@ -206,33 +290,20 @@ def unstacked(text: str) -> str:
 
 
 # A count word before a unit of time, money or measure is written as digits (prompt rule 4: "four days" 4 days),
-# which the model sometimes leaves as a word. "one" ("one day we will") and "do"/"दो" (also "give") are left alone,
-# and so are rough pairs ("do chaar din"), fractions ("साढ़े तीन किलो") and a sentence's first word.
+# which the model sometimes leaves as a word. "one" ("one day we will") is left alone, and so are rough pairs ("two
+# three days") and a sentence's first word.
 COUNT_DIGITS = {
-    word: str(value)
-    for value, names in {
-        2: "two",
-        3: "three teen तीन",
-        4: "four chaar char चार",
-        5: "five paanch panch पांच पाँच",
-        6: "six chhe छह",
-        7: "seven saat सात",
-        8: "eight aath आठ",
-        9: "nine nau नौ",
-        10: "ten das दस",
-    }.items()
-    for word in names.split()
+    word: str(value) for value, word in enumerate("two three four five six seven eight nine ten".split(), start=2)
 }
 MEASURES = word_set(
     "seconds minutes hours days weeks months years minute hour day week month year dollars rupees euros percent "
-    "kilos kilograms grams meters metres kilometers km kg litres liters din ghante ghanta hafte mahine saal rupaye "
-    "kilo दिन घंटे घंटा हफ्ते हफ़्ते महीने साल मिनट रुपये प्रतिशत किलो"
+    "kilos kilograms grams meters metres kilometers km kg litres liters kilo"
 )
-NOT_AFTER = {*"saade sade sava paune dedh dhai साढ़े सवा पौने डेढ़ ढाई one ek एक do दो".split(), *COUNT_DIGITS}
+NOT_AFTER = {"one", *COUNT_DIGITS}
 COUNT_BEFORE_MEASURE = re.compile(
-    r"(?<![\wऀ-ॿ-])(" + "|".join(sorted(COUNT_DIGITS, key=len, reverse=True)) + r")(\s+)(\S+)", re.IGNORECASE
+    r"(?<![\w-])(" + "|".join(sorted(COUNT_DIGITS, key=len, reverse=True)) + r")(\s+)(\S+)", re.IGNORECASE
 )
-LAST_WORD = re.compile(r"([\wऀ-ॿ]+)\W*$")
+LAST_WORD = re.compile(r"(\w+)\W*$")
 
 
 def measured_in_digits(text: str) -> str:
@@ -241,8 +312,8 @@ def measured_in_digits(text: str) -> str:
     def digits(found: re.Match[str]) -> str:
         before = text[: found.start()].rstrip()
         previous = LAST_WORD.search(before)
-        unit = found.group(3).rstrip(".,।?!:;").lower()
-        opens = not before or before[-1] in ".?!।:\n"
+        unit = found.group(3).rstrip(".,?!:;").lower()
+        opens = not before or before[-1] in ".?!:\n"
         if unit not in MEASURES or opens or (previous and previous.group(1).lower() in NOT_AFTER):
             return found.group(0)
         return f"{COUNT_DIGITS[found.group(1).lower()]}{found.group(2)}{found.group(3)}"
@@ -251,26 +322,101 @@ def measured_in_digits(text: str) -> str:
     return written
 
 
+# "NAME at DOMAIN dot TLD" sent to someone is one address (prompt rule 4), which the model sometimes writes with "at"
+# as a word ("to UX at lanternworks.io"); a web address after "at" ("the docs are at docs.example.org") is none.
+SENT_TO_AT = re.compile(r"(?<=\bto )([A-Za-z][\w.+-]*) at ((?:[\w-]+\.)+[a-z]{2,})(?![\w/])", re.IGNORECASE)
+# The name kept before its own address ("Noor at noor@silverline.school"), and an address's name capitalised where the
+# speaker said it in lowercase ("UX@lanternworks.io").
+NAMED_ADDRESS = re.compile(r"\b([A-Za-z][\w.+-]*) at (?=\1@)", re.IGNORECASE)
+WRITTEN_NAME = re.compile(r"(?<![\w.+-])[A-Za-z][\w.+-]*(?=@(?:[\w-]+\.)+[a-z]{2,})")
+
+
+def addressed(said: str, text: str) -> str:
+    """Each "to NAME at DOMAIN" the speaker said as an address written as one, name@domain, and each address written
+    with its name as the speaker said it."""
+    if "@" not in text and SENT_TO_AT.search(text) is None:
+        return text
+    heard = f" {' '.join(words(said))} "
+
+    def address(found: re.Match[str]) -> str:
+        name, domain = found.group(1).lower(), found.group(2)
+        spoken = f" {name} at {domain.split('.')[0].lower()} dot "
+        return f"{name}@{domain}" if spoken in heard else found.group(0)
+
+    joined = SENT_TO_AT.sub(address, text)
+
+    def unnamed_once(found: re.Match[str]) -> str:
+        name = found.group(1).lower()
+        return found.group() if f" {name} at {name} at " in heard else ""
+
+    unnamed = NAMED_ADDRESS.sub(unnamed_once, joined)
+    spoken = f" {' '.join(said.split())} "
+    lowered = WRITTEN_NAME.sub(
+        lambda found: found.group().lower() if f" {found.group().lower()} at " in spoken else found.group(), unnamed
+    )
+    return lowered
+
+
+# A size after a number is written in capitals ("2 mb" 2 MB).
+SIZE_UNIT = re.compile(r"(?<=\d )(?:kb|mb|gb|tb)\b")
+SPOKEN_COLON = re.compile(r"\bcolon\b", re.IGNORECASE)
+SPOKEN_COMMA = re.compile(r"\bcomma\b", re.IGNORECASE)
+MID_COLON = re.compile(r"(\w+): (\w[\w']*)([^\n]*)")
+# The sentence after the colon is a question.
+ASKS = re.compile(r"[^.?!]*\?")
+
+
+def colons_as_said(said: str, text: str) -> str:
+    """A colon inside a line as the speaker said it. After a spoken "colon" the next word keeps the lowercase it was
+    said in ("said colon kick off" said: kick off), but for a question. When the speaker says their marks but no colon,
+    the model's colon becomes the comma they said ("payments comma 1042" payments, 1042) or goes ("says show" says
+    show). A capital stays on "I" and in a speech said all in lowercase, where the word could be a name."""
+    spoken = SPOKEN_COLON.search(said) is not None
+    if not spoken and (":" in said or SPOKEN_COMMA.search(said) is None):
+        return text
+    heard = f" {' '.join(words(said))} "
+    said_words = {word.strip(".,?!:;") for word in said.split()}
+    cased = said != said.lower()
+
+    def as_said(found: re.Match[str]) -> str:
+        before, after, rest = found.groups()
+        word = after.lower() if cased and after != "I" and after not in said_words else after
+        if spoken:
+            asked = ASKS.match(rest) is not None
+            return f"{before}: {word}{rest}" if not asked else found.group()
+        if f" {before.lower()} comma " in heard:
+            return f"{before}, {after}{rest}"
+        if f" {before.lower()} {after.lower()} " in heard:
+            return f"{before} {word}{rest}"
+        return found.group()
+
+    mended = MID_COLON.sub(as_said, text)
+    return mended
+
+
 def shaped(said: str, text: str) -> str:
-    text = measured_in_digits(text)
+    text = breaks_kept(said, addressed(said, text))
+    text = SIZE_UNIT.sub(lambda found: found.group().upper(), measured_in_digits(text))
     paragraphs = unparagraphed(said, text)
     text = unstacked(paragraphs)
     lines = text.split("\n")
     if "\n" in text:
         lines = unglued(lines)
         lines = numbered(lines)
-        lines = introduced(lines)
+        lines = items_as_said(said, lines)
+        lines = introduced(leads_kept(said, lines))
+        lines = leads_run_on(said, lines)
     joined = "\n".join(lines)
-    # A "?" said goes back on a line left bare, and replaces a danda the model ended it with ("पूछी।" पूछी?).
+    # A "?" said goes back on a line left bare.
     asked = unstacked(asked_back(said, joined)) if "?" in said and ENDS_BARE.search(joined) else joined
-    stopped = hindi_stops(asked) if "." in asked and not asked.isascii() else asked
-    return stopped
+    colons = colons_as_said(said, asked)
+    return colons
 
 
 # Round b6: answers refused only for a mark or a list's shape, after every word passed, mended without a model.
-SENTENCE_STOP = re.compile(r"[.।](?=\s|$)")
+SENTENCE_STOP = re.compile(r"\.(?=\s|$)")
 ASKED_MARK = re.compile(r"\?(?=\s|$)")
-WRITTEN_SENTENCES = re.compile(r"(?<=[.!?।])\s+")
+WRITTEN_SENTENCES = re.compile(r"(?<=[.!?])\s+")
 
 
 def end_marks_swapped(text: str, marks: re.Pattern[str], mark: str) -> list[str]:
@@ -281,7 +427,7 @@ def end_marks_swapped(text: str, marks: re.Pattern[str], mark: str) -> list[str]
 
 
 def asked_marked(text: str) -> list[str]:
-    """A direct question left with a full stop or "।": the text with one of them made "?", each in turn."""
+    """A direct question left with a full stop: the text with one of them made "?", each in turn."""
     return end_marks_swapped(text, SENTENCE_STOP, "?")
 
 
@@ -301,7 +447,7 @@ def announced_list(text: str, announcement: str) -> str | None:
     if at is None:
         return None
     items = sentences[at + 1 :]
-    if len(items) < 2 or any(item[-1:] not in ".।" for item in items):
+    if len(items) < 2 or any(item[-1:] != "." for item in items):
         return None
     lead = " ".join(sentences[: at + 1])
     bulleted = "\n".join(f"- {item[:-1]}" for item in items)
@@ -324,7 +470,6 @@ def bullets_numbered(text: str, first: int) -> str:
 # sentences in code editors and terminals. The guardrail judges the plain form ("- ", "1. "); styling comes after.
 DASH_ITEM = re.compile(r"^- ", re.MULTILINE)
 ROUND_ITEM = re.compile(r"^• ", re.MULTILINE)
-DEVANAGARI_END = re.compile(r"[ऀ-ॿ]$")
 
 
 def plain_bullets(text: str) -> str:
@@ -364,18 +509,17 @@ def unlisted(text: str) -> str:
 
 
 def ended(sentence: str) -> str:
-    """A sentence with its end mark: its own, or a full stop ("।" in Hindi)."""
-    if sentence[-1:] in ".?!।":
+    """A sentence with its end mark: its own, or a full stop."""
+    if sentence[-1:] in ".?!":
         return sentence
-    stop = "।" if DEVANAGARI_END.search(sentence) else "."
-    return sentence + stop
+    return sentence + "."
 
 
 # Both versions kept around a cue ("Friday, I mean, Monday"): the guardrail names the old one, the cue and the new one
 # (founder, 13 Oct: mended without a correction call). Marks and spaces between them go with the old version.
 BETWEEN = r"[\s,;:\u2013\u2014-]*"
-EDGE_BEFORE = r"(?<![\wऀ-ॿ])"
-EDGE_AFTER = r"(?![\wऀ-ॿ])"
+EDGE_BEFORE = r"(?<!\w)"
+EDGE_AFTER = r"(?!\w)"
 
 
 def one_version(text: str, kept: tuple[str, ...]) -> str | None:

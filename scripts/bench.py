@@ -3,7 +3,7 @@
 `uv run scripts/bench.py SPEC [SPEC ...] [--split dev|heldout] [--limit N | --per-slice N | --heldout N]
 [--failures PATH] [--ledger PATH --budget-usd USD]`. A SPEC is `provider:model` (both tiers that model) or
 `small+big` (the real escalation). Each corpus item goes through the server's own `polish()` with its tiers, and is
-scored against the gates overall, per language, per length and per slice, then graded per area. Needs the providers'
+scored against the gates overall, per length and per slice, then graded per area. Needs the providers'
 keys in the environment (`just bench` loads `.env`). With `--ledger`, each run appends what it spent to that JSONL
 file, and with `--budget-usd` it stops sending once the ledger's total and its own spend reach the budget.
 """
@@ -29,7 +29,6 @@ from pathlib import Path
 from snapbak_backend.ai.chain import MARGIN_MS, Call, ProviderFailed, Tiers, elapsed_ms
 from snapbak_backend.ai.guardrail.judge import Reject, check, in_address, judge
 from snapbak_backend.ai.guardrail.numbers import NUMBER_NAMES
-from snapbak_backend.ai.guardrail.respell import SPELLING_KEY
 from snapbak_backend.ai.guardrail.shape import in_style
 from snapbak_backend.ai.providers.base import Provider, Turn, Usage
 from snapbak_backend.ai.providers.factory import make_provider
@@ -45,7 +44,6 @@ CONCURRENCY = 16
 # What the app gives the last chunk from when it is sent (LAST_MS in the app's dictation.rs); a short hold is one
 # last chunk.
 DEADLINE_MS = 20_000
-LANGUAGES = {"hinglish": "hinglish", "hi": "hi"}
 SEED = 7
 NUMBER_WORDS = {word for names in NUMBER_NAMES.values() for word in names.split()}
 DEV_PER_SLICE = 40
@@ -62,7 +60,6 @@ GATES = {
     "clean text unchanged": (99, True),
     "dictionary terms kept": (99, True),
     "false rejects": (3, False),
-    "hinglish and hindi": (95, True),
     "list shape": (95, True),
     "false lists": (1, False),
     "misheard words fixed": (95, True),
@@ -72,21 +69,17 @@ GATES = {
     "term twins kept": (99, True),
     "spoken forms to terms": (97, True),
     "no unheard content": (0.5, False),
-    "script kept": (99.5, True),
     "no reply": (99.5, True),
     "numbers right": (97, True),
     "length parity": (95, True),
     "paragraphs kept": (99, True),
 }
-# Gates whose bar holds in each language too, and the bar sentence correctness holds in every language x length cell
-# with this many rows; length parity also fails this many points under the sentence bucket.
-PER_LANGUAGE = {"grammar"}
+# The bar sentence correctness holds in every length bucket with this many rows; length parity also fails this many
+# points under the sentence bucket.
 CELL_BAR, CELL_ROWS = 93, 30
 PARITY_GAP = 2
 LENGTHS = ("1-4", "sentence", "2-5", "paragraph", "multi")
-CELLS = ("en", "hinglish", "hi", *LENGTHS)
-# Area -> its gates (docs/bench.md, Grades). Hinglish and Hindi also takes every gate's hinglish and hi cell, and
-# Grammar every language cell of the grammar gate.
+# Area -> its gates (docs/bench.md, Grades).
 AREAS = {
     "Misheard words": ["misheard words fixed", "words not over-fixed"],
     "Grammar": ["grammar", "grammar kept"],
@@ -95,65 +88,48 @@ AREAS = {
     "Formatting": ["list shape", "false lists", "numbers right", "paragraphs kept"],
     "Corrections": ["backtracking"],
     "Dictionary": ["dictionary terms kept", "dictionary strict", "term twins kept", "spoken forms to terms"],
-    "Safety": ["clean text unchanged", "no unheard content", "script kept", "no reply", "false rejects"],
-    "Hinglish and Hindi": ["hinglish and hindi"],
+    "Safety": ["clean text unchanged", "no unheard content", "no reply", "false rejects"],
 }
 REPLY_BAIT = {"assistant-bait", "reply-bait"}
 
-MARKS = ".,;:!?।\"')\u2026\u2014\u2013"
+MARKS = ".,;:!?\"')\u2026\u2014\u2013"
 # An em or en dash between words is a mark ending the word before it (round b3 fix).
 DASH = re.compile("([\u2014\u2013])")
 # Marks that open a quote or an aside, scored like the marks that end a word.
 OPENING = "\"'("
 STRAIGHT = str.maketrans({"\u201c": '"', "\u201d": '"', "\u2018": "'", "\u2019": "'"})
 # A full stop ending a list item: optional, as the founder decided (D3, 11 Oct).
-ITEM_STOP = re.compile(r"^(\s*(?:\d+\.|[-•]) .*?)[.।]$", re.MULTILINE)
-DEVANAGARI = re.compile(r"[ऀ-ॿ]")
-LATIN = re.compile(r"[A-Za-z]")
-HYPHEN = re.compile(r"(?<=[\wऀ-ॿ])-(?=[\wऀ-ॿ])")
-# Spellings a careful editor writes either way (round b2 fix, 11 Oct): chandrabindu or anusvara, a nukta, a Latin
-# accent ("entrée" entree). Each is read one way before scoring.
-CHANDRABINDU = str.maketrans({"\N{DEVANAGARI SIGN CANDRABINDU}": "\N{DEVANAGARI SIGN ANUSVARA}"})
-NUKTA_OR_ACCENT = re.compile("[\N{DEVANAGARI SIGN NUKTA}\u0300-\u036f]")
+ITEM_STOP = re.compile(r"^(\s*(?:\d+\.|[-•]) .*?)\.$", re.MULTILINE)
+HYPHEN = re.compile(r"(?<=\w)-(?=\w)")
+# A spelling a careful editor writes either way (round b2 fix, 11 Oct): a Latin accent ("entrée" entree), read one
+# way before scoring.
+ACCENT = re.compile("[\u0300-\u036f]")
 # Marks a careful editor may write either way (round 3, 11 Oct): a comma before the last "and" of a series or
 # between clauses, a comma after a short opening phrase of time or place, a semicolon or a full stop between two
 # clauses, and "a.m." for "am". Each is read one way before scoring.
-SERIES_COMMA = re.compile(r",(?= (?:and|aur|और) )")
+SERIES_COMMA = re.compile(r",(?= and )")
 OPENING_COMMA = re.compile(
-    r"(^|[.?!।]\s+)((?:on|in|at|after|before|by|during|since|until|last|next|this|yesterday|today|tomorrow)"
-    r"(?: [^\s,.?!।]+){0,3}),",
+    r"(^|[.?!]\s+)((?:on|in|at|after|before|by|during|since|until|last|next|this|yesterday|today|tomorrow)"
+    r"(?: [^\s,.?!]+){0,3}),",
     re.IGNORECASE,
 )
 # Round b1: a comma before a clause of reason or purpose, and after a sentence's opening "so", "okay" or "well".
-REASON_COMMA = re.compile(r",(?= (?:because|kyunki|kyonki|क्योंकि|taaki|ताकि|isliye|इसलिए) )", re.IGNORECASE)
+REASON_COMMA = re.compile(r",(?= because )", re.IGNORECASE)
 # Round b6: also after an opening sentence adverb or greeting word ("Also,", "Finally,", "Hello, Amit").
 OPENER_COMMA = re.compile(
-    r"(^|[.?!।]\s+)(so|okay|ok|well|bas|बस|also|finally|actually|anyway|hi|hello|hey|haan|arre|waise|sorry|सॉरी|अरे"
-    r"|namaste|नमस्ते|dekho|देखो),(?= )",
-    re.IGNORECASE | re.MULTILINE,
+    r"(^|[.?!]\s+)(so|okay|ok|well|also|finally|actually|anyway|hi|hello|hey|sorry),(?= )", re.IGNORECASE | re.MULTILINE
 )
 SEMICOLON = re.compile(r"; (\w)")
-# Round b2 fix: a title's full stop ("Ms." Ms), a full stop or a comma before a joining word ("dungi. Lekin" dungi,
-# lekin), and a comma before a sequence's "phir", after a reporting verb, or between an "agar" or "jab" clause and
-# its "to".
+# Round b2 fix: a title's full stop ("Ms." Ms), a full stop or a comma before a joining word ("done. But" done,
+# but), and a comma before a sequence's "then" or after a reporting verb.
 TITLE_STOP = re.compile(r"\b(Dr|Mr|Mrs|Ms|Prof|St)\.(?=\s)")
-JOINED_SENTENCE = re.compile(r"[.;।]\s+(But|And|So|Then|Phir|Lekin|Par|Magar|Warna|Aur|लेकिन|पर|मगर|वरना|और|फिर)(?=\s)")
-SEQUENCE_COMMA = re.compile(r"[,;](?= (?:phir|then|फिर) )", re.IGNORECASE)
+JOINED_SENTENCE = re.compile(r"[.;]\s+(But|And|So|Then)(?=\s)")
+SEQUENCE_COMMA = re.compile(r"[,;](?= then )", re.IGNORECASE)
 # Round b3 fix: a comma before a contrast word ("It works, but the fan is loud.") is optional too.
-CONTRAST_COMMA = re.compile(r",(?= (?:but|par|lekin|magar|warna|लेकिन|पर|मगर|वरना) )", re.IGNORECASE)
-# Round b5: also a reporting verb said with its auxiliary ("bol rahe the", "कहते हैं") and "note kiya", "bataya".
-REPORTED_COMMA = re.compile(
-    r"((?:^|\s)(?:bola|boli|bole|kaha|poocha|pucha|bataya|likha|note kiya|कहा|बोला|बोली|बोले|पूछा|बताया|लिखा"
-    r"|lagta hai|lagta h|laga|socha|लगता है|लगा|सोचा|said|says|asked|told me|told us|wrote"
-    r"|(?:bol|pooch|puch|keh|kah) (?:raha|rahi|rahe|rha|rhi|rhe)(?: (?:hai|hain|h|tha|thi|the))?"
-    r"|keh(?:te|ti|ta) (?:hai|hain|h|tha|thi|the)"
-    r"|(?:बोल|पूछ|कह) (?:रहा|रही|रहे)(?: (?:है|हैं|था|थी|थे))?|कह(?:ते|ती|ता) (?:है|हैं|था|थी|थे))),(?= )",
-    re.IGNORECASE,
-)
-# Round b5: a comma before the "to" or "तो" that opens a result clause, with or without "agar" before it.
-RESULT_COMMA = re.compile(r",(?= (?:to|तो) )")
-# Founder, 12 Oct: "Ek kaam karo:" or "Ek kaam karo," before the task.
-TASK_MARK = re.compile(r"((?:^|[.?!।]\s+)(?:ek kaam (?:karo|kro)|एक काम करो|do one thing)):(?= )", re.IGNORECASE)
+CONTRAST_COMMA = re.compile(r",(?= but )", re.IGNORECASE)
+REPORTED_COMMA = re.compile(r"((?:^|\s)(?:said|says|asked|told me|told us|wrote)),(?= )", re.IGNORECASE)
+# Founder, 12 Oct: "Do one thing:" or "Do one thing," before the task.
+TASK_MARK = re.compile(r"((?:^|[.?!]\s+)do one thing):(?= )", re.IGNORECASE)
 # Round b5: an email's greeting on a line of its own (rule 2) or run on into the first sentence; read run on.
 # Round b6: a comma after the greeting word ("Hey, Leo,") and a title's full stop in the name ("Hi Ms. Rao,") too.
 GREETING = re.compile(
@@ -163,16 +139,12 @@ GREETING = re.compile(
 # Round b6: an email's sign-off set off by a blank line or one line break, with or without a full stop after a lone
 # sign-off word, is one layout.
 SIGN_OFF = re.compile(
-    r"\n\n?((?:thanks|thank you|best|regards|best regards|warm regards|kind regards|cheers|dhanyavaad|shukriya)"
+    r"\n\n?((?:thanks|thank you|best|regards|best regards|warm regards|kind regards|cheers)"
     r"(?:,\n[^\n]{1,30}|\.)?)\Z",
     re.IGNORECASE,
 )
-IF_THEN_COMMA = re.compile(r"((?:^|\s)(?:agar|jab|अगर|जब)\s[^.?!।,\n]*),(?= (?:to|तो) )", re.IGNORECASE)
 MERIDIEM = re.compile(r"(?<=\d)(\s?)([ap])\.m\.|(?<=\d)(\s?)([AP])M\b")
 LIST_LINE = re.compile(r"^(?:(\d+\.)|[-•]) ", re.MULTILINE)
-# Round b3 fix: Roman Hindi has no one spelling ("me" "mein", "yaha" "yahan"); each word is read as its group's first
-# spelling, as the guardrail's respell does.
-LATIN_WORD = re.compile(r"[A-Za-z]+")
 
 
 @dataclass(frozen=True)
@@ -193,7 +165,6 @@ class Item:
     text: str
     prior: str
     terms: list[str]
-    language: str
     style: str
     expected: list[str]
     continues: bool = False
@@ -225,15 +196,10 @@ def tokens(text: str) -> list[tuple[str, str, str]]:
     return found
 
 
-def keyed(found: list[tuple[str, str, str]]) -> list[tuple[str, str, str]]:
-    """The tokens with each Roman Hindi word read as its group's first spelling, for scoring."""
-    return [(SPELLING_KEY.get(word, word), marks, raw) for word, marks, raw in found]
-
-
 def canonical(text: str) -> str:
-    """The text in NFC with straight quotes, and chandrabindu, a nukta and a Latin accent read one way."""
-    decomposed = unicodedata.normalize("NFD", text.translate(STRAIGHT).translate(CHANDRABINDU))
-    plain = NUKTA_OR_ACCENT.sub("", decomposed)
+    """The text in NFC with straight quotes, and a Latin accent read one way."""
+    decomposed = unicodedata.normalize("NFD", text.translate(STRAIGHT))
+    plain = ACCENT.sub("", decomposed)
     composed = unicodedata.normalize("NFC", plain)
     return composed
 
@@ -267,9 +233,7 @@ def unstopped(text: str) -> str:
     unsequenced = SEQUENCE_COMMA.sub("", rejoined)
     contrasted = CONTRAST_COMMA.sub("", unsequenced)
     reported = REPORTED_COMMA.sub(r"\1", contrasted)
-    conditioned = IF_THEN_COMMA.sub(r"\1", reported)
-    resulted = RESULT_COMMA.sub("", conditioned)
-    tasked = TASK_MARK.sub(r"\1,", resulted)
+    tasked = TASK_MARK.sub(r"\1,", reported)
     return tasked
 
 
@@ -295,19 +259,19 @@ def scored_once(output: str, answers: tuple[str, ...], said: str) -> Score:
     output = unstopped(canonical(unquoted(output, answers)))
     expected = [unstopped(canonical(out)) for out in answers]
     said = unstopped(canonical(said))
-    wrote = keyed(tokens(output))
+    wrote = tokens(output)
     wrote_words = [word for word, _, _ in wrote]
 
     def closeness(candidate: str) -> tuple[float, float]:
-        candidate_words = [word for word, _, _ in keyed(tokens(candidate))]
+        candidate_words = [word for word, _, _ in tokens(candidate)]
         words = SequenceMatcher(a=wrote_words, b=candidate_words, autojunk=False).ratio()
         text = SequenceMatcher(a=output, b=candidate, autojunk=False).ratio()
         return words, text
 
     best_text = max(expected, key=closeness)
-    best = keyed(tokens(best_text))
+    best = tokens(best_text)
     best_words = [word for word, _, _ in best]
-    heard = keyed(tokens(said))
+    heard = tokens(said)
     source: dict[int, tuple[str, str, str]] = {}
     heard_words = [word for word, _, _ in heard]
     for block in SequenceMatcher(a=best_words, b=heard_words, autojunk=False).get_matching_blocks():
@@ -327,22 +291,15 @@ def scored_once(output: str, answers: tuple[str, ...], said: str) -> Score:
                 punctuation += wrote_marks == best_marks
             if said_raw != best_raw:
                 case_needed += 1
-                case += same_case(wrote_raw, best_raw)
+                case += wrote_raw == best_raw
     right = wrote_words == best_words or unhyphenated_words(output) == unhyphenated_words(best_text)
     return Score(right, punctuation_needed, punctuation, case_needed, case)
-
-
-def same_case(wrote: str, best: str) -> bool:
-    """Whether a word is cased as expected; one Roman Hindi word spelled two ways compares its capitals only."""
-    if wrote.lower() == best.lower():
-        return wrote == best
-    return wrote[:1].isupper() == best[:1].isupper() and wrote.isupper() == best.isupper()
 
 
 def unhyphenated_words(text: str) -> list[str]:
     """The words with each hyphen inside a word read away ("sign-up" signup)."""
     joined = HYPHEN.sub("", canonical(text))
-    found = [word for word, _, _ in keyed(tokens(joined))]
+    found = words_of(joined)
     return found
 
 
@@ -351,18 +308,8 @@ def normal(text: str) -> str:
     straight = canonical(text)
     lines = [" ".join(line.split()) for line in straight.strip().splitlines()]
     tidied = re.sub(r"\n{3,}", "\n\n", "\n".join(lines))
-    keyed = LATIN_WORD.sub(spelled_one_way, tidied)
-    bare = unstopped(keyed)
+    bare = unstopped(tidied)
     return bare
-
-
-def spelled_one_way(found: re.Match[str]) -> str:
-    """A Roman Hindi word as its group's first spelling, keeping a capital it had."""
-    word = found.group()
-    key = SPELLING_KEY.get(word.lower())
-    if key is None or key == word.lower():
-        return word
-    return key[0].upper() + key[1:] if word[0].isupper() else key
 
 
 # Round b6: quote marks around a few words the expected answers never quote (UI text, a phrase mentioned) are
@@ -388,30 +335,13 @@ def unquoted(output: str, expected: tuple[str, ...] | list[str]) -> str:
     return QUOTED.sub(bare, straight)
 
 
-SENTENCE_OPEN = re.compile(r"(?:\A|[.?!।:\n])\s*$")
+SENTENCE_OPEN = re.compile(r"(?:\A|[.?!:\n])\s*$")
 
 
-# Founder, 12 Oct: between two Hindi or Hinglish clauses a comma, a full stop or "।" is the writer's choice; the next
-# word's capital goes with the mark. A "?" or "!" still counts.
-CLAUSE_MARK = re.compile(r"(?<=[\wऀ-ॿ])[,.।] +(\S)")
-# The comma before a result clause's "to" is already optional (RESULT_COMMA), so a full stop there is too.
-RESULT_BREAK = re.compile(r" \| (to|तो)(?= )")
-
-
-def exact(output: str, expected: list[str], language: str = "en") -> bool:
+def exact(output: str, expected: list[str]) -> bool:
     """Whether the output is an expected answer in every word, mark and capital."""
-
-    def read(text: str) -> set[str]:
-        found = spellings(text)
-        if language not in LANGUAGES.values():
-            return found
-        clauses = {
-            RESULT_BREAK.sub(r" \1", CLAUSE_MARK.sub(lambda mark: " | " + mark.group(1).lower(), one)) for one in found
-        }
-        return clauses
-
-    written = read(unquoted(output, expected))
-    right = any(not written.isdisjoint(read(out)) for out in expected)
+    written = spellings(unquoted(output, expected))
+    right = any(not written.isdisjoint(spellings(out)) for out in expected)
     return right
 
 
@@ -423,12 +353,6 @@ def spellings(text: str) -> set[str]:
 
 def words_of(text: str) -> list[str]:
     found = [word for word, _, _ in tokens(text)]
-    return found
-
-
-def scored_words(text: str) -> list[str]:
-    """The words as scoring reads them: each Roman Hindi word as its group's first spelling."""
-    found = [word for word, _, _ in keyed(tokens(text))]
     return found
 
 
@@ -449,12 +373,12 @@ def matched(a: list[str], b: list[str]) -> set[int]:
 def placed(output: str, item: Item, phrase: str, changed: bool) -> bool:
     """Whether the output holds the phrase where an expected answer has it: where the answer changed what was said
     for a fix (`changed`), anywhere it has it for a kept word."""
-    wrote = scored_words(output)
-    said = scored_words(item.said)
-    target = scored_words(phrase)
+    wrote = words_of(output)
+    said = words_of(item.said)
+    target = words_of(phrase)
     size = len(target)
     for answer in item.expected:
-        written = scored_words(answer)
+        written = words_of(answer)
         starts = [start for start in range(len(written) - size + 1) if written[start : start + size] == target]
         heard = matched(said, written)
         new = [start for start in starts if not set(range(start, start + size)) <= heard]
@@ -466,7 +390,7 @@ def placed(output: str, item: Item, phrase: str, changed: bool) -> bool:
 
 
 # Where a sentence or a list item starts: an all-lowercase term takes a capital there (rule 9, round b3 fix).
-OPENS_SENTENCE = re.compile(r"(?:^|[.?!।:\n]|\n\s*(?:-|\d+\.))[\s\"'(]*$")
+OPENS_SENTENCE = re.compile(r"(?:^|[.?!:\n]|\n\s*(?:-|\d+\.))[\s\"'(]*$")
 
 
 def term_count(text: str, term: str) -> int:
@@ -489,17 +413,17 @@ def term_at(text: str, match: re.Match[str], term: str) -> bool:
 
 def known(item: Item) -> set[str]:
     """The words said, in an expected answer or in a term."""
-    found = {word for text in [item.said, *item.expected, *item.terms] for word in scored_words(text)}
+    found = {word for text in [item.said, *item.expected, *item.terms] for word in words_of(text)}
     return found
 
 
 def invented(item: Item, output: str) -> list[str]:
     """Output words in no expected answer that were never said, and words written more often than said and than any
-    expected answer holds them (round b5: one "क्या" written twice): a digit counts as said when a number was."""
-    numbered = bool(re.search(r"\d", item.said)) or not NUMBER_WORDS.isdisjoint(scored_words(item.said))
+    expected answer holds them (round b5: one word written twice): a digit counts as said when a number was."""
+    numbered = bool(re.search(r"\d", item.said)) or not NUMBER_WORDS.isdisjoint(words_of(item.said))
     heard = known(item)
     folded = {canonical(word) for word in heard}
-    written = scored_words(output)
+    written = words_of(output)
     found = [
         word
         for word in written
@@ -507,8 +431,8 @@ def invented(item: Item, output: str) -> list[str]:
         and canonical(word) not in folded
         and not (numbered and re.fullmatch(r"[\d.,:%₹$€£]+", word))
     ]
-    said_times = Counter(scored_words(item.said))
-    answer_times = [Counter(scored_words(answer)) for answer in item.expected]
+    said_times = Counter(words_of(item.said))
+    answer_times = [Counter(words_of(answer)) for answer in item.expected]
     times = Counter(word for word in written if word in heard and not re.fullmatch(r"[\d.,:%₹$€£]+", word))
     found += [
         word
@@ -521,18 +445,6 @@ def invented(item: Item, output: str) -> list[str]:
 def expected_words(item: Item) -> set[str]:
     found = {word for answer in item.expected for word in words_of(answer)}
     return found
-
-
-def wrong_script(item: Item, output: str) -> tuple[int, int]:
-    """(words in a script, of them those in the other script than the speaker's that no answer or the speaker has).
-    The speaker's script is the one most of the said words are in, whatever the language tag says (founder, 13 Oct)."""
-    heard = known(item)
-    said = words_of(item.said)
-    devanagari = sum(bool(DEVANAGARI.search(word)) for word in said)
-    other = LATIN if devanagari > len(said) - devanagari else DEVANAGARI
-    scripted = [word for word in words_of(output) if LATIN.search(word) or DEVANAGARI.search(word)]
-    wrong = sum(bool(other.search(word)) and word not in heard for word in scripted)
-    return len(scripted), wrong
 
 
 def list_shape(text: str) -> list[str]:
@@ -578,7 +490,7 @@ def paragraph_cuts(said: str, written: str) -> list[tuple[str, str]]:
 
 
 def is_v2(name: str) -> bool:
-    """Whether a slice file holds v2 rows: their own id, language, length and split (docs/bench.md)."""
+    """Whether a slice file holds v2 rows: their own id, length and split (docs/bench.md)."""
     v2 = "v2-" in name or name in {"founder-variants", "suite-growth"}
     return v2
 
@@ -601,20 +513,16 @@ def load() -> list[Item]:
     items = []
     for path in sorted(CORPUS.glob("*.jsonl.gz")):
         name = path.name.removesuffix(".jsonl.gz")
-        language = LANGUAGES.get(name.split("-")[0], "en")
         with gzip.open(path, "rt", encoding="utf-8") as rows:
             for line in rows:
                 row = json.loads(line)
-                kind = row["kind"]
-                tagged = "hinglish" if "Hinglish" in kind else "hi" if "Hindi" in kind else language
                 style = row.get("app_style", "other")
                 item = Item(
                     name,
-                    kind,
+                    row["kind"],
                     row["said"],
                     row.get("prior", ""),
                     [term for term in row.get("dictionary", []) if term],
-                    row.get("language", tagged),
                     style,
                     # A row keeps the plain answer the guardrail judges; the app's style writes its lists.
                     [in_style(out, style) for out in row["expected"]],
@@ -701,7 +609,6 @@ def request_of(item: Item) -> PolishRequest:
         "terms": item.terms[:200],
         "app": "",
         "style": item.style,
-        "language": item.language,
         "continues": item.continues,
         "deadline_ms": DEADLINE_MS,
     }
@@ -754,7 +661,7 @@ def falsely_rejected(result: Result) -> bool:
             request = request_of(result.item)
             revision, text = unfold(request, fold(request), answer.get("revision"), answer["text"])
             joined = written(result.item.prior, revision, text)
-            if exact(joined, result.item.expected, result.item.language):
+            if exact(joined, result.item.expected):
                 return True
     return False
 
@@ -770,7 +677,7 @@ def misses(results: list[Result]) -> list[dict]:
         styled = scored.punctuation_right < scored.punctuation_needed or scored.case_right < scored.case_needed
         list_answer = list_right(result.text, entry.expected)
         wrong_list = list_answer is False or (list_answer is None and bool(list_shape(result.text)))
-        right = exact(result.text, entry.expected, entry.language)
+        right = exact(result.text, entry.expected)
         # An answer the gold accepts has every fix the gold accepts, also one a fix's single spelling misses, and so
         # does one with the words of an accepted answer (round b4 fix).
         fixes_missed = (
@@ -802,7 +709,6 @@ def misses(results: list[Result]) -> list[dict]:
                 "failed": result.failed,
                 "id": entry.id,
                 "split": entry.split,
-                "language": entry.language,
                 "length": entry.length,
                 "exact": right,
                 "fixes_missed": fixes_missed,
@@ -843,14 +749,13 @@ def gates(results: list[Result]) -> dict[str, float | None]:
     backtracking += [s for r, s in pairs if r.item.slice.endswith("backtracking-chunked")]
     grammar = [s for r, s in pairs if r.item.slice.endswith("grammar") and not r.item.kind.startswith("trap")]
     grammar_traps = [s for r, s in pairs if r.item.slice.endswith("grammar") and r.item.kind.startswith("trap")]
-    indic = [s for r, s in pairs if r.item.language in LANGUAGES.values()]
     with_terms = [r for r in results if any(term_count(e, t) for t in r.item.terms for e in r.item.expected)]
     kept = [r for r in with_terms if all(term_count(r.text, t) for t in expected_terms(r.item))]
     lists = [list_right(r.text, r.item.expected) for r in results]
     listed = [right for right in lists if right is not None]
     prose = [bool(list_shape(r.text)) for r, right in zip(results, lists, strict=True) if right is None]
     fixes = [
-        exact(r.text, r.item.expected, r.item.language)
+        exact(r.text, r.item.expected)
         or score(r.text, r.item.expected, r.item.said).words_right
         or placed(r.text, r.item, written, True)
         for r in results
@@ -858,11 +763,10 @@ def gates(results: list[Result]) -> dict[str, float | None]:
     ]
     keeps = [placed(r.text, r.item, keep, False) for r in results for keep in r.item.keeps]
     keeps += [set(words_of(r.text)) <= expected_words(r.item) for r in results if r.item.kind.startswith("trap")]
-    exacts = [exact(r.text, r.item.expected, r.item.language) for r in results]
+    exacts = [exact(r.text, r.item.expected) for r in results]
     strict = [r for r in results if any(term_count(e, t) for t in r.item.terms for e in r.item.expected)]
     twins = [r for r in results if any(not any(term_count(e, t) for e in r.item.expected) for t in r.item.terms)]
     spoken = [r for r in strict if any(not term_count(r.item.said, t) for t in r.item.terms)]
-    scripts = [wrong_script(r.item, r.text) for r in results]
     baits = [
         r for r in results if REPLY_BAIT & set(r.item.tags) or "reply" in r.item.kind or "assistant" in r.item.kind
     ]
@@ -880,7 +784,6 @@ def gates(results: list[Result]) -> dict[str, float | None]:
         "clean text unchanged": percent(sum(s.words_right for s in traps), len(traps)),
         "dictionary terms kept": percent(len(kept), len(with_terms)),
         "false rejects": percent(sum(falsely_rejected(r) for r in results), len(results)),
-        "hinglish and hindi": percent(sum(s.words_right for s in indic), len(indic)),
         "list shape": percent(sum(listed), len(listed)),
         "false lists": percent(sum(prose), len(prose)),
         "misheard words fixed": percent(sum(fixes), len(fixes)),
@@ -890,7 +793,6 @@ def gates(results: list[Result]) -> dict[str, float | None]:
         "term twins kept": percent(sum(twins_kept(r) for r in twins), len(twins)),
         "spoken forms to terms": percent(sum(terms_right(r) for r in spoken), len(spoken)),
         "no unheard content": percent(sum(bool(invented(r.item, r.text)) for r in results), len(results)),
-        "script kept": percent(sum(total - wrong for total, wrong in scripts), sum(total for total, _ in scripts)),
         "no reply": percent(sum(not invented(r.item, r.text) for r in baits), len(baits)),
         "numbers right": percent(sum(s.words_right for s in numbers), len(numbers)),
         "length parity": parity(pairs),
@@ -936,8 +838,8 @@ def parity(pairs: list[tuple[Result, Score]]) -> float | None:
 
 
 def cell(results: list[Result], name: str) -> list[Result]:
-    """The results of a language or a length bucket."""
-    picked = [r for r in results if name in {r.item.language, r.item.length}]
+    """The results of a length bucket."""
+    picked = [r for r in results if r.item.length == name]
     return picked
 
 
@@ -946,25 +848,18 @@ def under(value: float | None, bar: float, higher: bool) -> bool:
 
 
 def failures(results: list[Result]) -> list[str]:
-    """Each bar a run misses: a gate overall, a per-language gate in a language, sentence correctness in a language x
-    length cell of 30 rows or more, or the long buckets more than 2 points under the sentence bucket."""
+    """Each bar a run misses: a gate overall, sentence correctness in a length bucket of 30 rows or more, or the long
+    buckets more than 2 points under the sentence bucket."""
     found = []
     overall = gates(results)
     for gate, (bar, higher) in GATES.items():
         if under(overall[gate], bar, higher):
             found.append(f"{gate} {overall[gate]:.1f} {'<' if higher else '>'} {bar}")
-    for gate in sorted(PER_LANGUAGE):
-        bar, higher = GATES[gate]
-        for language in CELLS[:3]:
-            value = gates([r for r in results if r.item.language == language])[gate]
-            if under(value, bar, higher):
-                found.append(f"{gate} {language} {value:.1f} {'<' if higher else '>'} {bar}")
-    for language in CELLS[:3]:
-        for length in LENGTHS:
-            picked = [r for r in results if r.item.language == language and r.item.length == length]
-            value = percent(sum(exact(r.text, r.item.expected, r.item.language) for r in picked), len(picked))
-            if len(picked) >= CELL_ROWS and under(value, CELL_BAR, True):
-                found.append(f"sentence correctness {language} {length} {value:.1f} < {CELL_BAR}")
+    for length in LENGTHS:
+        picked = cell(results, length)
+        value = percent(sum(exact(r.text, r.item.expected) for r in picked), len(picked))
+        if len(picked) >= CELL_ROWS and under(value, CELL_BAR, True):
+            found.append(f"sentence correctness {length} {value:.1f} < {CELL_BAR}")
     pairs = [(r, score(r.text, r.item.expected, r.item.said)) for r in results]
     sentence = words_right_by_length(pairs)["sentence"]
     long = overall["length parity"]
@@ -986,17 +881,11 @@ def grade(value: float | None, bar: float, higher: bool) -> float | None:
 
 
 def grades(results: list[Result]) -> dict[str, float | None]:
-    """Each area's grade, its weakest gate (Hinglish and Hindi also its weakest gate cell in those languages, Grammar
-    its weakest language), and the overall grade, the weakest area."""
+    """Each area's grade, its weakest gate, and the overall grade, the weakest area."""
     overall = gates(results)
-    by_language = {language: gates([r for r in results if r.item.language == language]) for language in CELLS[:3]}
     found: dict[str, float | None] = {}
     for area, names in AREAS.items():
         values = [grade(overall[name], *GATES[name]) for name in names]
-        if area == "Grammar":
-            values += [grade(by_language[language]["grammar"], *GATES["grammar"]) for language in CELLS[:3]]
-        if area == "Hinglish and Hindi":
-            values += [grade(by_language[lang][name], *GATES[name]) for lang in ("hinglish", "hi") for name in GATES]
         graded = [value for value in values if value is not None]
         found[area] = min(graded, default=None)
     areas = [value for value in found.values() if value is not None]
@@ -1048,7 +937,7 @@ def route(result: Result) -> str:
         return "paragraphs"
     if result.tier == "small":
         return "small"
-    return "big reasoned" if effort(result.item.text, result.item.language) else "big plain"
+    return "big reasoned" if effort(result.item.text) else "big plain"
 
 
 def by_route(results: list[Result]) -> dict[str, Timing]:
@@ -1085,12 +974,12 @@ def report(spec: str, results: list[Result]) -> bool:
     if errors * 100 > MAX_FAILED_PERCENT * len(results):
         print(f"  NOT RUN: {100 * errors / len(results):.1f} % provider errors; no gate is graded on raw input")
         return False
-    print(f"  {'gate':<24}{'bar':>7}" + "".join(f"{name:>10}" for name in ["all", *CELLS]))
-    table = {name: gates(cell(results, name)) for name in CELLS}
+    print(f"  {'gate':<24}{'bar':>7}" + "".join(f"{name:>10}" for name in ["all", *LENGTHS]))
+    table = {name: gates(cell(results, name)) for name in LENGTHS}
     table["all"] = gates(results)
     missed = failures(results)
     for gate, (bar, higher) in GATES.items():
-        values = [table[name][gate] for name in ["all", *CELLS]]
+        values = [table[name][gate] for name in ["all", *LENGTHS]]
         cells = "".join(f"{'-':>10}" if value is None else f"{value:>10.1f}" for value in values)
         fails = any(failure.startswith(f"{gate} ") for failure in missed)
         print(f"  {gate:<24}{('≥' if higher else '≤') + str(bar):>7}{cells}{'  FAILS' if fails else ''}")

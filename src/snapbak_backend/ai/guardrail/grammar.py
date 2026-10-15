@@ -4,27 +4,21 @@ import re
 from collections import Counter
 from itertools import pairwise
 
-# Python 3.14 calls a method of a from-imported name without its method fast path, so the shared patterns are
-# reached through their module.
-from snapbak_backend.ai.guardrail import tokens
 from snapbak_backend.ai.guardrail.numbers import is_number
-from snapbak_backend.ai.guardrail.tokens import Edit, word_set, words
+from snapbak_backend.ai.guardrail.tokens import Edit, word_set
 
 LONGEST_JOIN = 6
-PIECE = re.compile(r"(\d+)(?:st|nd|rd|th|वां|वीं|वें)?|[^\d_-]+")
+PIECE = re.compile(r"(\d+)(?:st|nd|rd|th)?|[^\d_-]+")
 
 
-# Small grammar words that tell a language apart.
-ENGLISH_GRAMMAR = word_set(
+# Small grammar words.
+FUNCTION_WORDS = word_set(
     "a an the is are was were be been am has have had do does did to of and or for in on at with that this it its i "
     "isn't aren't wasn't weren't hasn't haven't hadn't don't doesn't didn't"
 )
-ROMAN_HINDI_GRAMMAR = word_set("hai hain hoon hun tha thi raha rahi rahe ka ki ke ko se ne mein")
-DEVANAGARI_GRAMMAR = word_set("है हैं हूं था थी थे थीं रहा रही रहे का की के को से ने में पर")
-FUNCTION_WORDS = ENGLISH_GRAMMAR | ROMAN_HINDI_GRAMMAR | DEVANAGARI_GRAMMAR
 
 
-# The grammar words a fix may add unsaid, or swap for another of its group ("has" "have", "ka" "ki"). A group
+# The grammar words a fix may add unsaid, or swap for another of its group ("has" "have"). A group
 # keeps its tense, so "is" "was" is a change, as is adding any other grammar word ("and", "or", "in").
 FIXES = [
     word_set(group)
@@ -39,16 +33,6 @@ FIXES = [
         "do does don't doesn't",
         "did didn't",
         "to",
-        "hai hain hoon hun",
-        "tha thi the",
-        "raha rahi rahe",
-        "ka ki ke",
-        "है हैं हूं",
-        "था थी थे थीं",
-        "रहा रही रहे",
-        "का की के",
-        # Hindi postpositions, which a grammar fix swaps ("ग्राहक को बात करके" से, "खाते पर जमा" में).
-        "को से में पर",
     )
 ]
 INSERTABLE = set().union(*FIXES)
@@ -56,17 +40,15 @@ INSERTABLE = set().union(*FIXES)
 
 FORMAT_WORDS = word_set(
     "at dot slash comma period full stop question mark exclamation point colon semicolon dash hyphen underscore "
-    "new line paragraph bullet बुलेट next dollar dollars rupee rupees rupaye percent cents and एट डॉट स्लैश डॉलर "
-    "रुपये रुपए प्रतिशत"
+    "new line paragraph bullet next dollar dollars rupee rupees percent cents and"
 )
 
 
-# Words whose loss changes what was meant: how much, how sure, when ("only", "maybe", "today", "sirf", "शायद").
+# Words whose loss changes what was meant: how much, how sure, when ("only", "maybe", "today").
 QUALIFIERS = word_set(
     "all almost always approximately both could definitely each every just likely may maybe might mostly must nearly "
     "often only perhaps possibly probably rarely roughly seldom should sometimes today tomorrow tonight twice usually "
-    "would yesterday aaj aksar bas hamesha kal lagbhag parso shayad sirf zaroor अक्सर आज कल परसों बस लगभग शायद सिर्फ "
-    "हमेशा ज़रूर still already yet even again exactly abhi bhi अभी भी whether very really extremely bahut बहुत"
+    "would yesterday still already yet even again exactly whether very really extremely"
 )
 
 
@@ -74,11 +56,13 @@ QUALIFIERS = word_set(
 # form is a slip for the base form ("will sent", "did went") or a participle ("can be informed"), and after an
 # article or "most" an adjective ("the signed contract", "most qualified"): no past either way.
 PAST = word_set(
-    "was were wasn't weren't had hadn't did didn't tha thi था थी थे थीं done went gone saw seen "
+    "was were wasn't weren't had hadn't did didn't done went gone saw seen "
     "got gotten made paid sent took taken gave given came wrote written bought brought thought told said found knew "
     "known left met ran began begun broke broken chose chosen spoke spoken drove driven forgot forgotten kept felt "
     "held built spent lost sold taught caught fell fallen grew grown threw thrown led meant heard understood won ate "
-    "eaten drank drunk slept"
+    "eaten drank drunk slept swam swum sang sung rang rung sat stood wore worn rode ridden flew flown drew drawn blew "
+    "blown woke woken fought hung dug stuck lent bent dealt swept hid hidden shook shaken stole stolen froze frozen "
+    "tore torn swung sought sank sunk struck"
 )
 HAVE = word_set("has have had")
 NO_TENSE_AFTER = word_set(
@@ -94,37 +78,14 @@ EED_WORDS = word_set(
 )
 
 
-# Words that say the time is past, so a fix may put a verb in the past ("i stop it yesterday" "stopped"). Not "kal"
-# or "कल", which is tomorrow as often as yesterday.
+# Words that say the time is past, so a fix may put a verb in the past ("i stop it yesterday" "stopped").
 # Two words that put a story earlier today ("this morning our contractor forgets the permit" forgot).
 PAST_PAIRS = {("this", "morning"), ("this", "afternoon")}
-PAST_TIMES = word_set("yesterday ago last already earlier pichle pehle ne maine usne humne पिछले पहले ने मैंने उसने हमने")
+PAST_TIMES = word_set("yesterday ago last already earlier")
 # A date: a day of a month may be past or to come, so either tense fits it ("on april fifth liam save" saved).
 MONTHS = word_set("january february march april may june july august september october november december")
-# Words that say the time is to come, so a fix may add "will" or put a verb in the future ("next week we finished"
-# will finish, "agle mahine shift kiya" karenge). Not "kal" or "कल", which is yesterday as often as tomorrow.
-FUTURE_TIMES = word_set("next tomorrow tonight upcoming agle agli aane parso अगले अगली आने परसों")
-# A Hindi verb's forms by tense: what a past time may make it, and what a future time may.
-VERB_TENSES = [
-    (words(present), words(past), words(future))
-    for present, past, future in (
-        ("jaa jana jaana jata jaata jati jaati jate jaate", "gaya gayi gaye gai", "jayega jayegi jayenge jaunga"),
-        ("जा जाना जाता जाती जाते", "गया गई गए गयी", "जाएगा जाएगी जाएंगे जाऊंगा"),
-        ("hona hota hoti hote", "hua hui hue", "hoga hogi honge"),
-        ("होना होता होती होते", "हुआ हुई हुए", "होगा होगी होंगे"),
-        ("karna karta karti karte", "kiya kiye ki", "karega karegi karenge karunga karungi"),
-        ("करना करता करती करते", "किया किए की", "करेगा करेगी करेंगे करूंगा करूंगी"),
-        ("dena deta deti dete", "diya diye di", "dega degi denge dunga"),
-        ("देना देता देती देते", "दिया दिए दी", "देगा देगी देंगे दूंगा"),
-        ("lena leta leti lete", "liya liye li", "lega legi lenge lunga"),
-        ("लेना लेता लेती लेते", "लिया लिए ली", "लेगा लेगी लेंगे लूंगा"),
-        ("aana aata aati aate", "aaya aayi aaye", "aayega aayegi aayenge aaunga"),
-        ("आना आता आती आते", "आया आई आए", "आएगा आएगी आएंगे आऊंगा"),
-    )
-]
-PAST_OF = {word: set(past) for present, past, future in VERB_TENSES for word in (*present, *future)}
-FUTURE_OF = {word: {"will", *future} for present, past, future in VERB_TENSES for word in (*present, *past)}
-PAST_AUXILIARIES = word_set("tha thi the था थी थे थीं")
+# Words that say the time is to come, so a fix may add "will" ("next week we finished" will finish).
+FUTURE_TIMES = word_set("next tomorrow tonight upcoming")
 # Words a careful editor puts for another in Indian English and common usage ("from morning" since, "less people"
 # fewer, "between you and i" me): written for the other, each is said.
 PARTNERS = {
@@ -132,13 +93,6 @@ PARTNERS = {
     for group in map(word_set, ("from since", "since for", "less fewer", "borrow lend", "i me", "who whom"))
     for word in group
 }
-
-
-# A first-person subject with no ergative "ne": the verb's gender is the speaker's. A fix may make a verb agree
-# with an auxiliary of the gender said ("बनाता थी" "बनाती थी") or put "hum" in the plural ("bhejti" "bhejte").
-FIRST_PERSON = word_set("main mai hum मैं हम")
-ERGATIVE = word_set("ne maine humne usne ने मैंने हमने उसने")
-GENDER_SAID = {"f": word_set("thi thin rahi gayi gai थी थीं रही गई गयी"), "m": word_set("tha raha gaya था रहा गया")}
 
 
 # Irregular forms a grammar fix may swap; regular ones ("send" "sends") pass as inflections.
@@ -204,61 +158,40 @@ IRREGULAR = [
         "eat eats ate eaten",
         "drink drinks drank drunk",
         "sleep sleeps slept",
-        "hua hui hue",
-        # Short Hinglish verbs agree with their object or subject ("list bana diya" di, "booking kar liya" li).
-        "liya li liye",
-        "diya di diye",
-        "gaya gayi gai gaye",
-        "laga lagi lage",
-        "aaya aayi aai aaye",
-        "karna karta karti karte kiya kiye",
-        "गया गई गईं गए गयी",
-        "आया आई आए आईं आयी",
-        "करना करता करती करते किया की किए",
-        "देना देता देती देते दिया दी दिए",
-        "लेना लेता लेती लेते लिया ली लीं लिए",
-        "हुआ हुई हुए",
-        "होगा होगी होंगे",
-        "जाएगा जाएगी जाएंगे जाऊंगा",
-        "aaunga aayega aayegi aayenge aaoge",
-        "karunga karega karegi karenge karoge",
-        "dunga dega degi denge doge",
-        "lunga lega legi lenge loge",
-        "आऊंगा आएगा आएगी आएंगे आओगे",
-        "करूंगा करेगा करेगी करेंगे करोगे",
-        "दूंगा देगा देगी देंगे दोगे",
-        "लूंगा लेगा लेगी लेंगे लोगे",
+        "swim swims swam swum",
+        "sing sings sang sung",
+        "ring rings rang rung",
+        "sit sits sat",
+        "stand stands stood",
+        "wear wears wore worn",
+        "ride rides rode ridden",
+        "fly flies flew flown",
+        "draw draws drew drawn",
+        "blow blows blew blown",
+        "wake wakes woke woken",
+        "fight fights fought",
+        "hang hangs hung",
+        "dig digs dug",
+        "stick sticks stuck",
+        "lend lends lent",
+        "bend bends bent",
+        "deal deals dealt",
+        "sweep sweeps swept",
+        "hide hides hid hidden",
+        "shake shakes shook shaken",
+        "steal steals stole stolen",
+        "freeze freezes froze frozen",
+        "tear tears tore torn",
+        "swing swings swung",
+        "seek seeks sought",
+        "sink sinks sank sunk",
+        "strike strikes struck",
     )
 ]
 # Each irregular form and the other forms of its word.
 FORMS = {word: set().union(*(group for group in IRREGULAR if word in group)) for forms in IRREGULAR for word in forms}
-# Endings of a word's forms past their shared stem: English and Roman Hindi.
-ENDINGS = set(
-    "|s|'s|es|ed|d|ing|er|est|ies|ied|y|a|i|e|o|ii|ee|en|na|ni|ne|ta|ti|te|ga|gi|ge|nga|ngi|nge|yan|yaan|iyan|iyaan".split(
-        "|"
-    )
-)
-# Roman Hindi future endings, which only swap with each other ("bhejega" "bhejunga", never "bheja").
-FUTURE = set("ega egi enge unga ungi oge".split())
-# Devanagari endings are vowel signs and nasal marks, maybe after an independent vowel or य and around त, न or
-# ग ("भेजता" "भेजा", "बनाया" "बनाई", "आई" "आईं", "पहुंचती" "पहुंचेगी").
-DEVANAGARI_ENDING = re.compile(r"[इ-ऐय]?[ँ-ःा-ौ]*(?:[तनगय][ँ-ःा-ौ]*)?")
-
-
-def grammar_words(said: list[str]) -> set[str]:
-    """The small grammar words of each language spoken: Devanagari by its script, Roman Hindi by one of its own
-    grammar words, and English by one of its own or by Latin words with no Roman Hindi grammar word."""
-    spoken = set(said)
-    hindi = bool(spoken & ROMAN_HINDI_GRAMMAR)
-    latin = any(not tokens.DEVANAGARI.search(word) for word in said)
-    grammar = set()
-    if spoken & ENGLISH_GRAMMAR or (latin and not hindi):
-        grammar |= ENGLISH_GRAMMAR
-    if hindi:
-        grammar |= ROMAN_HINDI_GRAMMAR | {"the"}
-    if tokens.DEVANAGARI.search(" ".join(said)):
-        grammar |= DEVANAGARI_GRAMMAR
-    return grammar
+# Endings of a word's forms past their shared stem.
+ENDINGS = set("|s|'s|es|ed|d|ing|er|est|ies|ied|y|e|en".split("|"))
 
 
 def joins(said: list[str]) -> set[str]:
@@ -271,7 +204,10 @@ def joins(said: list[str]) -> set[str]:
 def ending(tail: str, stem: str) -> bool:
     """An inflection ending, maybe after a doubled last letter ("stopped")."""
     doubled = tail[:1] == stem[-1:] and tail[1:] in ENDINGS
-    return tail in ENDINGS or doubled or DEVANAGARI_ENDING.fullmatch(tail) is not None
+    return tail in ENDINGS or doubled
+
+
+SHORTEST_STEM = 3
 
 
 def inflects(said: str, word: str) -> bool:
@@ -282,14 +218,15 @@ def inflects(said: str, word: str) -> bool:
         shared += 1
     stem = said[:shared]
     tails = said[shared:], word[shared:]
-    future = all(tail in FUTURE for tail in tails)
-    shortest = 2 if tokens.DEVANAGARI.search(stem) else 3
-    return shared >= shortest and (future or all(ending(tail, stem) for tail in tails))
+    return shared >= SHORTEST_STEM and all(ending(tail, stem) for tail in tails)
 
 
 def related(said: str, word: str) -> bool:
-    """Another form of the same word: an inflection or an irregular form, also of a regularized slip ("buyed")."""
-    stems = {said, said.removesuffix("ed"), said.removesuffix("d"), said.removesuffix("s")}
+    """Another form of the same word: an inflection or an irregular form, also of a regularized slip ("buyed",
+    "runned")."""
+    stem = said.removesuffix("ed")
+    undoubled = stem[:-1] if len(stem) > 2 and stem[-1] == stem[-2] else stem
+    stems = {said, stem, undoubled, said.removesuffix("d"), said.removesuffix("s")}
     irregular = bool(stems & FORMS.get(word, set()))
     return irregular or inflects(said, word)
 
@@ -306,34 +243,22 @@ def explained(word: str, known: set[str], heard: set[str]) -> bool:
     return True
 
 
-# Each word's usage partners and other tenses, together.
-RETIMED = {
-    word: PARTNERS.get(word, set()) | PAST_OF.get(word, set()) | FUTURE_OF.get(word, set())
-    for word in {*PARTNERS, *PAST_OF, *FUTURE_OF}
-}
-
-
 def timed_forms(said: list[str]) -> set[str]:
-    """Words a fix may write that the user never said: a usage partner of a said word ("since" for "from"), and a
-    past or future form of a said Hindi verb when a time word says when ("पिछले साल ... जाते" गए, "agle mahine ...
-    kiya" karenge, "next week" will)."""
+    """Words a fix may write that the user never said: a usage partner of a said word ("since" for "from"), and
+    "will" when a time word says the time is to come ("next week")."""
     found = {partner for word in said for partner in PARTNERS.get(word, ())}
-    spoken = set(said)
-    if spoken & PAST_TIMES:
-        found |= {form for word in said for form in PAST_OF.get(word, ())}
-    if spoken & FUTURE_TIMES:
-        found |= {form for word in said for form in FUTURE_OF.get(word, ())} | {"will"}
+    if not FUTURE_TIMES.isdisjoint(said):
+        found.add("will")
     return found
 
 
 def form_fix(word: str, written: list[str]) -> bool:
     """A fix of `word` in place: another form of it, a grammar word for another of its group ("has" "had"), the
-    word joined into a written one ("no fault" no-fault), its usage partner or its other tense ("हुई थी" होगी)."""
+    word joined into a written one ("no fault" no-fault) or its usage partner ("from" since)."""
     swapped = any(word in group and any(other in group for other in written) for group in FIXES)
     joined = any(word in other and other not in FUNCTION_WORDS for other in written)
-    retimed = word in RETIMED and not RETIMED[word].isdisjoint(written)
-    retimed = retimed or (word in PAST_AUXILIARIES and futures(written) > 0)
-    return swapped or joined or retimed or any(related(word, other) for other in written)
+    partnered = word in PARTNERS and not PARTNERS[word].isdisjoint(written)
+    return swapped or joined or partnered or any(related(word, other) for other in written)
 
 
 def regular_past(word: str) -> bool:
@@ -344,8 +269,8 @@ def past_form(word: str) -> bool:
     return word in PAST or regular_past(word)
 
 
-def pasts(found: list[str], places: range | list[int], hinglish: bool) -> list[str]:
-    """The words at `places` that put the sentence in the past; Hinglish "the" is the plural of "tha"."""
+def pasts(found: list[str], places: range | list[int]) -> list[str]:
+    """The words at `places` that put the sentence in the past."""
     past: list[str] = []
     for index in places:
         word = found[index]
@@ -354,7 +279,7 @@ def pasts(found: list[str], places: range | list[int], hinglish: bool) -> list[s
             before_at -= 1
         before = found[before_at] if before_at >= 0 else ""
         slip = before in NO_TENSE_AFTER or before.endswith("'ll")
-        if not slip and (word in PAST or regular_past(word) or (hinglish and word == "the")):
+        if not slip and (word in PAST or regular_past(word)):
             past.append(word)
     return past
 
@@ -376,7 +301,6 @@ def retensed(
     send it"), or into the past though nothing said was past ("he is coming" "He was coming"). A misheard word and
     its sound-alike ("threw" through, "new" knew) carry no tense."""
     heard_wrong, written_for = misheard
-    hinglish = bool(set(said) & ROMAN_HINDI_GRAMMAR)
     removed: list[str] = []
     added: list[str] = []
     removed_done: list[str] = []
@@ -387,8 +311,8 @@ def retensed(
             # A past said apart and written joined stays ("under paid" underpaid, "wait listed" waitlisted).
             joined = wrote[written_start:written_end]
             kept = {i for i in range(start, end) if any(word != said[i] and word.endswith(said[i]) for word in joined)}
-            removed += pasts(said, [i for i in range(start, end) if i not in heard_wrong | kept], hinglish)
-            added += pasts(wrote, [j for j in range(written_start, written_end) if j not in written_for], hinglish)
+            removed += pasts(said, [i for i in range(start, end) if i not in heard_wrong | kept])
+            added += pasts(wrote, [j for j in range(written_start, written_end) if j not in written_for])
         if op != "equal" and done:
             removed_done += perfects(said, [i for i in range(start, end) if i not in heard_wrong])
             added_done += perfects(wrote, [j for j in range(written_start, written_end) if j not in written_for])
@@ -398,20 +322,10 @@ def retensed(
     if len(added) > len(removed):
         earlier_today = any(pair in PAST_PAIRS for pair in pairwise(said))
         dated = not MONTHS.isdisjoint(said) and any(is_number(word) for word in said)
-        said_past = pasts(said, range(len(said)), hinglish) or not PAST_TIMES.isdisjoint(said) or earlier_today
-        return not (said_past or dated or perfective(said))
+        said_past = pasts(said, range(len(said))) or not PAST_TIMES.isdisjoint(said) or earlier_today
+        return not (said_past or dated)
     kept_removed = Counter(removed + removed_done) - Counter(retracted)
     return kept_removed.total() > len(added) + len(added_done)
-
-
-# A Hindi perfective participle said with "hoon" or "hai" ("soya hoon", "गया हूं"): an action done, which a fix may
-# put in the past ("soya tha").
-PERFECTIVE = re.compile(r"^(?:[a-z]{2,}(?:ya|yi|ye)|[ऀ-ॿ]+(?:या|यी|ये|ई|ए))$")
-PRESENT_AUXILIARIES = word_set("hoon hun hai hain हूं है हैं")
-
-
-def perfective(said: list[str]) -> bool:
-    return any(PERFECTIVE.match(word) and after in PRESENT_AUXILIARIES for word, after in pairwise(said))
 
 
 # Qualifiers a recognizer splits in two, and each qualifier's forms owning a thing ("today's", "todays").
@@ -439,103 +353,9 @@ def qualifiers(found: list[str]) -> Counter[str]:
     return counted
 
 
-def gender(word: str) -> str | None:
-    """A Hindi verb form's gender by its last vowel ("raha" "rahi", "रहा" "रही"), "e" and "े" being plural."""
-    last = word.removesuffix("ं")[-1:]
-    if last in ("a", "e", "ा", "े", "ए"):
-        return "m"
-    return "f" if last in ("i", "ी", "ई") else None
-
-
-# Words that start a new clause, whose verb has its own subject ("gaadi kharab ho gayi isliye main late hua").
-CLAUSE_BREAKS = word_set("toh to isliye kyunki lekin magar aur तो इसलिए क्योंकि लेकिन मगर और")
-# A possessive tells its noun's gender ("meri gaadi"), which the verb of its clause agrees with.
-POSSESSIVE_GENDER = {
-    **dict.fromkeys(
-        words("meri teri uski hamari tumhari apni aapki unki iski मेरी तेरी उसकी हमारी तुम्हारी अपनी आपकी उनकी इसकी"), "f"
-    ),
-    **dict.fromkeys(
-        words("mera tera uska hamara tumhara apna aapka unka iska मेरा तेरा उसका हमारा तुम्हारा अपना आपका उनका इसका"), "m"
-    ),
-}
-
-
-POSSESSIVES = frozenset(POSSESSIVE_GENDER)
-
-
-def clauses(said: list[str]) -> list[int]:
-    """Each said word's clause, counted from 0: a clause word ("toh", "isliye", "और") starts the next."""
-    found: list[int] = []
-    clause = 0
-    for word in said:
-        clause += word in CLAUSE_BREAKS
-        found.append(clause)
-    return found
-
-
-def misgenders(said: list[str], wrote: list[str], opcodes: list[Edit]) -> str | None:
-    """A verb whose gender the output flipped against its subject, as written: a first-person verb ("main aaunga"
-    "main aaungi") in a clause whose subject is "main" or "hum", or one that agreed with its noun's possessive
-    ("meri gaadi kharab ho gayi" gaya). A verb in a clause of its own may agree with its own noun ("meri gaadi ...
-    gaya isliye main" gayi)."""
-    if FIRST_PERSON.isdisjoint(said) and POSSESSIVES.isdisjoint(said):
-        return None
-    clause_of = clauses(said)
-    ergative = not ERGATIVE.isdisjoint(said)
-    kept = set(wrote)
-    pairs = [
-        (i, other)
-        for op, start, end, written_start, written_end in opcodes
-        if op == "replace"
-        for i in range(start, end)
-        for other in wrote[written_start:written_end]
-    ]
-    for i, other in pairs:
-        one = said[i]
-        to = gender(other)
-        plural = other.removesuffix("ं")[-1:] in ("e", "े", "ए")
-        if plural or one in POSSESSIVE_GENDER or not related(one, other) or {gender(one), to} != {"m", "f"}:
-            continue
-        before = [word for word, at in zip(said[:i], clause_of, strict=False) if at == clause_of[i]]
-        first_person = not ergative and not FIRST_PERSON.isdisjoint(before)
-        if first_person and not set(said) & GENDER_SAID[str(to)]:
-            return other
-        owner = [POSSESSIVE_GENDER[word] for word in before[-OWNER_NEAR:] if word in POSSESSIVE_GENDER and word in kept]
-        if not first_person and owner and owner[-1] == gender(one):
-            return other
-    return None
-
-
-# A possessive this close before a verb may be its subject's ("meri gaadi kharab ho gayi").
-OWNER_NEAR = 4
-
-
-# A Hindi future ends in a vowel, maybe nasal, then ga, gi or ge ("भेजेगा", "भेजूंगा", "होंगे", "आएगा"); never "लगा"
-# or "मांगा".
-HINDI_FUTURES = tuple(vowel + nasal + "ग" + end for vowel in "ूेोऊएओ" for nasal in ("", "ं") for end in "ाीे")
-
-
-# A Roman Hindi future ("karenge", "aaunga", "jaoge"); never "omega" or "doge".
-ROMAN_FUTURES = ("ega", "egi", "enge", "engi", "unga", "ungi", "oge")
-ROMAN_FUTURE = re.compile(r"^[a-z]{2,}(?:ega|egi|enge|engi|unga|ungi|oge)$")
-
-
-# Every future ends in one of these; words with none are counted with one search.
-FUTURE_HINT = re.compile(r"(?:will|shall|'ll|ग[ाीे]|ega|egi|enge|engi|unga|ungi|oge)(?:\s|$)")
-
-
 def futures(found: list[str]) -> int:
-    """How often the words promise something: "will", "shall", "'ll" or a Hindi future in either script."""
-    if FUTURE_HINT.search(" ".join(found)) is None:
-        return 0
-    promised = [
-        word
-        for word in found
-        if word in ("will", "shall")
-        or word.endswith("'ll")
-        or (word[-1:] in "ाीे" and word.endswith(HINDI_FUTURES))
-        or (word.endswith(ROMAN_FUTURES) and len(word) > 4 and ROMAN_FUTURE.match(word) is not None)
-    ]
+    """How often the words promise something: "will", "shall" or "'ll"."""
+    promised = [word for word in found if word in ("will", "shall") or word.endswith("'ll")]
     return len(promised)
 
 
@@ -566,6 +386,35 @@ BASES = {
 }
 OBJECT_CASE = {"me": "i", "him": "he", "her": "she", "us": "we", "them": "they"}
 SUBJECT_CASE = {"i", "he", "she", "we", "they"}
+OBJECT_OF = {subject: pronoun for pronoun, subject in OBJECT_CASE.items()}
+# Who each pronoun names, in every case: a fix may change its case ("him is" he is), never whom it names. "it" and
+# "they" both name things, so a fix may agree one with a plural noun ("the worksheets was ... it is" were ... they are).
+PERSONS = {
+    word: person
+    for person, group in enumerate(
+        (
+            "i me my mine myself",
+            "we us our ours ourselves",
+            "you your yours yourself yourselves",
+            "he him his himself",
+            "she her hers herself",
+            "they them their theirs themselves it its itself",
+        )
+    )
+    for word in group.split()
+}
+
+
+def person(word: str) -> int | None:
+    """Whom a pronoun names, also inside a contraction ("they're"); None for any other word."""
+    return PERSONS.get(word.split("'")[0])
+
+
+# Verbs a pronoun opening a clause is the subject of ("him is" he is, "us need" we need), and that keep one after a
+# preposition its subject ("for he is tired").
+SUBJECT_VERBS = (
+    "am|is|are|was|were|will|would|can|could|should|has|have|had|do|does|did|must|may|might|need|needs|want|wants"
+)
 CLAUSE_OPEN = r"(?:^|(?<=[.!?,;]\s)|(?<=[.!?,;]))"
 
 
@@ -617,6 +466,18 @@ USAGE = [
         r"\1 \2 any",
     ),
     (re.compile(r"\b(return|revert|repeat) back\b"), r"\1"),
+    # A past regularized where it is written as its base ("readed" read, "putted" put).
+    (re.compile(r"\b(read|put|cut|set|let|hit|hurt|shut|spread|split)[td]?ed\b"), r"\1"),
+    (
+        re.compile(CLAUSE_OPEN + r"(me|him|her|us|them) (?=(?:" + SUBJECT_VERBS + r")\b)"),
+        lambda found: f"{OBJECT_CASE[found.group(1)]} ",
+    ),
+    (
+        re.compile(
+            r"\b(to|for|with|from|about|at|by|of|without|behind) (he|she|we|they)\b(?! (?:" + SUBJECT_VERBS + r")\b)"
+        ),
+        lambda found: f"{found.group(1)} {OBJECT_OF[found.group(2)]}",
+    ),
 ]
 # Slips with more than one right fix.
 USAGE_CHOICES = [

@@ -3,7 +3,7 @@
 `uv run scripts/replay.py [SMALL BIG]` (default openai:gpt-5.6-luna openai:gpt-6-luna). Two hours of dictation
 are drawn from the corpus utterances (fixed seed), each cut into chunks the way the app's ChunkGate cuts speech,
 and each chunk is sent with the words before it as `prior`, like the app. Tokens are estimated from UTF-8 bytes
-(4 per token), which overestimates Devanagari. Runs offline: no keys needed.
+(4 per token). Runs offline: no keys needed.
 """
 
 import json
@@ -59,25 +59,24 @@ def chunks(said: str) -> list[tuple[str, str]]:
     return cut
 
 
-def utterances() -> list[tuple[str, str]]:
-    """(said, language) per corpus row, read the way the bench reads it, without the generated suite-growth rows."""
-    return [(item.text, item.language) for item in load() if not item.prior and item.slice != "suite-growth"]
+def utterances() -> list[str]:
+    """What each corpus row says, read the way the bench reads it, without the generated suite-growth rows."""
+    return [item.text for item in load() if not item.prior and item.slice != "suite-growth"]
 
 
-def month(pool: list[tuple[str, str]], forced_language: str | None, small: str, big: str) -> dict[str, float]:
+def month(pool: list[str], small: str, big: str) -> dict[str, float]:
     rng = random.Random(7)
     totals = {"requests": 0, "big": 0, "input": 0, "output": 0, "small $": 0.0, "big $": 0.0}
     cached_tokens = round(CACHE_HIT * STATIC)
     words = 0
     while words < SECONDS * WORDS_PER_SECOND:
-        said, language = rng.choice(pool)
+        said = rng.choice(pool)
         words += len(said.split())
         for prior, text in chunks(said):
-            spoken = forced_language or language
-            request = {"text": text, "prior": prior, "terms": [], "app": "", "style": "chat", "language": spoken}
+            request = {"text": text, "prior": prior, "terms": [], "app": "", "style": "chat"}
             input_tokens = STATIC + estimate(message(request))
             answer = estimate(json.dumps({"revision": None, "text": text}, ensure_ascii=False))
-            chosen = tier(text, spoken)
+            chosen = tier(text)
             output_tokens = answer + (REASONED_TOKENS if chosen == "big" else 0)
             totals["requests"] += 1
             totals["input"] += input_tokens
@@ -99,16 +98,15 @@ def main() -> int:
         f"A heavy month: {SECONDS // 3600} h of dictation, small {small}, big {big}, retry share {RETRY_SHARE:.0%}, "
         f"prompt cache {CACHE_HIT:.0%}"
     )
-    for name, language in [("corpus language mix", None), ("all Hinglish (every chunk big)", "hinglish")]:
-        totals = month(pool, language, small, big)
-        dollars = totals["small $"] + totals["big $"]
-        passes = dollars <= TARGET
-        print(
-            f"  {name}: {totals['requests']:.0f} requests, {100 * totals['big'] / totals['requests']:.1f} % big, "
-            f"{totals['input'] / 1e6:.2f} M in + {totals['output'] / 1e6:.3f} M out tokens, "
-            f"${totals['small $']:.3f} small + ${totals['big $']:.3f} big = ${dollars:.3f} "
-            f"{'within' if passes else 'OVER'} ${TARGET:.2f}"
-        )
+    totals = month(pool, small, big)
+    dollars = totals["small $"] + totals["big $"]
+    passes = dollars <= TARGET
+    print(
+        f"  corpus: {totals['requests']:.0f} requests, {100 * totals['big'] / totals['requests']:.1f} % big, "
+        f"{totals['input'] / 1e6:.2f} M in + {totals['output'] / 1e6:.3f} M out tokens, "
+        f"${totals['small $']:.3f} small + ${totals['big $']:.3f} big = ${dollars:.3f} "
+        f"{'within' if passes else 'OVER'} ${TARGET:.2f}"
+    )
     return 0
 
 

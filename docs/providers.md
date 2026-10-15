@@ -9,8 +9,8 @@ text, usage = await provider.complete(turns, max_tokens, timeout, reason)
 `usage` is `Usage(input, output, cached, retries)`: tokens, and the times a
 `429` or `5xx` answer was asked again. `reason` (default `False`) asks for a
 little reasoning, as below. `turns` are `(role, content)` pairs: the system
-prompt, the worked examples, then the request.
-`make_provider("provider:model", keys)` builds one from the registry in
+prompt, the worked examples, then the request. `make_provider("provider:model",
+keys)` builds one from the registry in
 `src/snapbak_backend/ai/providers/factory.py`; each provider has its own module
 beside it. Each keeps one pooled HTTP/2 client for the life of the server, and
 its idle connections for 5 minutes. `/healthz` warms each tier's connection and
@@ -46,11 +46,12 @@ newest refuse temperature 0, so they get only the effort:
 | `gpt-6-astra`, `gpt-6.1-sol`                                      | `reasoning_effort: low`                    |
 
 Each row is the lowest effort the API accepted on 10 Oct 2026, and temperature 0
-only where it was accepted. A call that reasons (a big-tier chunk, see
-`escalation.md`) sends only its route's effort from `routing.EFFORTS` (today
-`medium` on every route) to every model that has a `reasoning_effort` row (`low`
-until round b3, which all 15 accepted on 10 Oct 2026). The other models ignore
-it. OpenAI reports the reasoning tokens inside the output
+only where it was accepted. A call that reasons (every polish chunk, on either
+tier, see `escalation.md`) sends only its route's effort from `routing.EFFORTS`
+(today `medium` on every route) to every model that has a `reasoning_effort` row
+(`low` until round b3, which all 15 accepted on 10 Oct 2026; `minimal` is
+refused by `gpt-5.6-luna` and `gpt-6-luna`, 14 Oct 2026). The other models
+ignore it. OpenAI reports the reasoning tokens inside the output
 (`completion_tokens_details`), and `Usage.reasoning` carries them. The
 OpenAI-style and Gemini requests ask for a JSON answer. Gemini turns thinking
 off (`thinkingBudget: 0`). Anthropic sends `anthropic-version: 2023-06-01`, as
@@ -72,26 +73,34 @@ unknown.
 
 Every OpenAI call asks for priority processing (`service_tier: "priority"`) and
 sends a `prompt_cache_key` made from the system prompt's hash, so every request
-of one prompt version lands where its long fixed prefix is cached (founder,
-13 Oct 2026: faster at the same accuracy). gpt-5.6-luna answers with
-`service_tier: "priority"` and gpt-6-luna with `"fast"`. Groq gets neither. The
-priority price was not readable from OpenAI's pages, so `billed` in
-`config/pricing.py` counts an OpenAI call at twice the list price, an estimate
-on the safe side for the bench ledger and the replay.
+of one prompt version lands where its long fixed prefix is cached (founder, 13
+Oct 2026: faster at the same accuracy). gpt-5.6-luna answers with `service_tier:
+"priority"` and gpt-6-luna with `"fast"`. Groq gets neither. The priority price
+was not readable from OpenAI's pages, so `billed` in `config/pricing.py` counts
+an OpenAI call at twice the list price, an estimate on the safe side for the
+bench ledger and the replay.
+
+An Anthropic call marks two cache breakpoints, each an ephemeral
+`cache_control`: the system prompt, and the last worked example, the last
+assistant turn before the request. So the rules and the examples are read from
+the cache, and a retry after a refusal still reads them. `Usage.input` counts
+the tokens Anthropic reports apart (`cache_read_input_tokens` and
+`cache_creation_input_tokens`), and `Usage.cached` the ones read. Gemini caches
+a repeated prefix on its own, with nothing to send.
 
 ## The fake provider
 
 For the app's end-to-end tests, `fake:<mode>` answers without a model. A
 correction reaches the model with the prior's last sentence in front of it (see
 `api.md`), so `edit` swaps that sentence's last word and the server hands the
-rest of the prior back as the revision:
+rest of the prior back as the revision. Words that end with a cue or a "no" are
+no sentence to put right, so "no wait make it friday" gets the bang:
 
 | Mode    | Polish                                                                  | Command                   |
 | ------- | ----------------------------------------------------------------------- | ------------------------- |
 | `echo`  | `text` unchanged                                                        | the selection             |
 | `edit`  | `text` with its last `.`, `?` or `!` turned into `!`, or `!` added      | the selection in capitals |
-| `edit`  | for `<sentence> no wait <word>` (a comma may follow "no", and a comma or "!" may follow "wait"): the sentence, last word swapped | the same as above         |
-| `edit`  | for `<sentence> nahi nahi <word>`, or its Hindi: first day word swapped | the same as above         |
+| `edit`  | for `<sentence> <cue> <word>`, any cue of `routing.CUES` ("no wait", "scratch that", "I mean", "delete that", "no, don't do this"), a "no" before or after it ("wait, no") and a comma, full stop or "!" after each of its words: the sentence, last word swapped | the same as above         |
 | `fail`  | a provider error, so a 502                                              | the same                  |
 | `slow`  | waits 5 s, then echoes, so a short deadline gives a 502                 | the same                  |
 | `reply` | "Sure, " and the text, which the guardrail rejects                      | the selection             |
@@ -121,23 +130,24 @@ same on every call, so they are what gets cached. The bench measured:
 
 Every OpenAI model the key lists was screened on `--per-slice 10`, and the
 leaders were run on `--per-slice 40` (440 items, each model as both tiers). Mean
-is the mean of the seven accuracy gates (false rejects left out). "Small items"
-is the 112 items the escalation leaves on the small tier (English, no cue):
-words right, then punctuation and capitals. Latency is server time at 16 in
-flight. $/1k is per 1,000 dictations at the measured cache share.
+is the mean of the seven accuracy gates (false rejects left out); a column that
+scored other languages left with them. "Small items" is the 112 items the
+escalation leaves on the small tier (English, no cue): words right, then
+punctuation and capitals. Latency is server time at 16 in flight. $/1k is per
+1,000 dictations at the measured cache share.
 
-| Model          | Mean | Back | Hindi, Hinglish | Small items        | p50 ms | p95 ms | $/1k  |
-| -------------- | ---- | ---- | --------------- | ------------------ | ------ | ------ | ----- |
-| `gpt-4.1-nano` | 65.1 | 13.1 | 53.0            | 72.3 / 86.3 / 91.4 | 952    | 1503   | 0.065 |
-| `gpt-4.1-mini` | 78.1 | 59.9 | 64.9            | 92.9 / 96.0 / 97.2 | 886    | 1224   | 0.247 |
-| `gpt-4.1`      | 81.7 | 78.1 | 70.9            | 98.2 / 95.1 / 99.3 | 907    | 1245   | 1.324 |
-| `gpt-5.4-nano` | 71.7 | 37.2 | 58.2            | 91.1 / 91.1 / 97.2 | 1074   | 1469   | 0.361 |
-| `gpt-5.6-luna` | 83.7 | 77.4 | 71.3            | 94.6 / 95.0 / 95.0 | 1551   | 2134   | 0.282 |
-| `gpt-6-luna`   | 83.1 | 73.7 | 70.9            | 94.6 / 96.1 / 98.6 | 1670   | 2380   | 0.139 |
-| `gpt-5.2`      | 83.6 | 77.4 | 72.1            | 92.9 / 94.2 / 95.7 | 1498   | 2252   | 3.221 |
-| `gpt-5.5`      | 87.9 | 87.6 | 78.9            | 96.4 / 96.1 / 98.6 | 1663   | 2616   | 8.880 |
-| `gpt-5.6-sol`  | 89.6 | 88.3 | 80.9            | 96.4 / 98.1 / 99.3 | 1442   | 2267   | 5.520 |
-| `gpt-6-sol`    | 87.8 | 84.7 | 80.1            | 99.1 / 98.1 / 98.6 | 1407   | 1969   | 2.762 |
+| Model          | Mean | Back | Small items        | p50 ms | p95 ms | $/1k  |
+| -------------- | ---- | ---- | ------------------ | ------ | ------ | ----- |
+| `gpt-4.1-nano` | 65.1 | 13.1 | 72.3 / 86.3 / 91.4 | 952    | 1503   | 0.065 |
+| `gpt-4.1-mini` | 78.1 | 59.9 | 92.9 / 96.0 / 97.2 | 886    | 1224   | 0.247 |
+| `gpt-4.1`      | 81.7 | 78.1 | 98.2 / 95.1 / 99.3 | 907    | 1245   | 1.324 |
+| `gpt-5.4-nano` | 71.7 | 37.2 | 91.1 / 91.1 / 97.2 | 1074   | 1469   | 0.361 |
+| `gpt-5.6-luna` | 83.7 | 77.4 | 94.6 / 95.0 / 95.0 | 1551   | 2134   | 0.282 |
+| `gpt-6-luna`   | 83.1 | 73.7 | 94.6 / 96.1 / 98.6 | 1670   | 2380   | 0.139 |
+| `gpt-5.2`      | 83.6 | 77.4 | 92.9 / 94.2 / 95.7 | 1498   | 2252   | 3.221 |
+| `gpt-5.5`      | 87.9 | 87.6 | 96.4 / 96.1 / 98.6 | 1663   | 2616   | 8.880 |
+| `gpt-5.6-sol`  | 89.6 | 88.3 | 96.4 / 98.1 / 99.3 | 1442   | 2267   | 5.520 |
+| `gpt-6-sol`    | 87.8 | 84.7 | 99.1 / 98.1 / 98.6 | 1407   | 1969   | 2.762 |
 
 On the 10-per-slice screen `gpt-5-nano` (mean 61.9) and `gpt-5-mini` (68.2)
 trailed. `gpt-5.1` (78.2), `gpt-5.4-mini` (79.6) and `gpt-5.4` (82.1) scored
@@ -157,13 +167,14 @@ round b1's A/B (364 rows: every founder row, 150 dev rows the round missed and
 150 random dev rows, scratchpad `acc2/fix-b1`), `gpt-6-luna` without reasoning
 as the small tier got 12 English rows right that `gpt-5.6-luna` missed and
 missed 4 it got (103 of 135 English rows against 95), at p50 2036 ms and p95
-5814 ms against 2114 and 8724 ms. The small tier still runs without reasoning,
-and the big tier with it. Both tiers are near the best accuracy within budget;
-the trade is about twice the p95 of the `gpt-4.1` models. Every model below is
-in `SAMPLING`, `PRICES` and `CACHED`, so switching the pair takes only
+5814 ms against 2114 and 8724 ms. Since 14 Oct both tiers reason at medium
+(`escalation.md`). Both tiers are near the best accuracy within budget; the
+trade is about twice the p95 of the `gpt-4.1` models. Every model below is in
+`SAMPLING`, `PRICES` and `CACHED`, so switching the pair takes only
 `SNAPBAK_SMALL` and `SNAPBAK_BIG` in `.env`, no code. A heavy month (`just
-replay`) on today's prompt, at a 50 % and a 90 % cache share (corpus mix / all
-Hinglish):
+replay`) on the 11 Oct prompt, at a 50 % and a 90 % cache share (corpus mix /
+the same month with every chunk on the big tier, measured before English only;
+Hindi and Hinglish were dropped on 14 Oct 2026, and `replay.md` has today's):
 
 | Small, big                     | Small items | p95 ms       | 50 % cached     | 90 % cached     |
 | ------------------------------ | ----------- | ------------ | --------------- | --------------- |

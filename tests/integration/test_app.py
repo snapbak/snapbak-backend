@@ -91,7 +91,6 @@ def test_polish_answers_the_contract_request(monkeypatch: pytest.MonkeyPatch) ->
     [
         ("Hi team. Okay so we ship it today!", "No wait, Friday.", "Hi team.", "Okay so we ship it Friday!"),
         ("Okay so we ship it today!", "no wait friday", "", "Okay so we ship it friday!"),
-        ("रिपोर्ट तैयार है। मीटिंग सोमवार।", "no wait मंगलवार", "रिपोर्ट तैयार है।", "मीटिंग मंगलवार।"),
     ],
 )
 def test_fake_edit_corrects_the_last_word_of_the_prior_after_no_wait(
@@ -103,20 +102,32 @@ def test_fake_edit_corrects_the_last_word_of_the_prior_after_no_wait(
     assert (body.text, body.revision, body.rejected) == (expected, revision, False)
 
 
+# 14 Oct 2026: a last chunk that opens with any natural cue revises the prior's last word through the server, as the
+# app's E2E dictation does.
 @pytest.mark.parametrize(
-    ("text", "language", "expected", "tier"),
+    "text",
     [
-        ("ship the build tonight", "en", "ship the build tonight!", "small"),
-        ("aaj build ship karte hain", "hinglish", "aaj build ship karte hain!", "big"),
-        ("आज बिल्ड भेजते हैं।", "hi", "आज बिल्ड भेजते हैं!", "big"),
+        "No, don't do this. Friday.",
+        "Scratch that, Friday.",
+        "Actually, Friday.",
+        "I mean Friday.",
+        "Wait, no, Friday.",
+        "Delete that, Friday.",
+        "Make that Friday.",
+        "Sorry, Friday.",
     ],
 )
-def test_polish_routes_each_language_to_its_tier(
-    monkeypatch: pytest.MonkeyPatch, text: str, language: str, expected: str, tier: str
-) -> None:
+def test_fake_edit_corrects_the_prior_after_any_natural_cue(monkeypatch: pytest.MonkeyPatch, text: str) -> None:
     with serve(monkeypatch) as client:
-        response = client.post("/v1/polish", json=chunk(text, language=language), headers=AUTH)
-    assert (response.json()["text"], response.json()["tier"]) == (expected, tier)
+        response = client.post("/v1/polish", json=chunk(text, prior="Hi team. We ship it today."), headers=AUTH)
+    body = PolishResponse.model_validate(response.json())
+    assert (body.text, body.revision, body.rejected, body.tier) == ("We ship it Friday.", "Hi team.", False, "big")
+
+
+def test_polish_answers_a_plain_chunk_on_the_small_tier(monkeypatch: pytest.MonkeyPatch) -> None:
+    with serve(monkeypatch) as client:
+        response = client.post("/v1/polish", json=chunk("ship the build tonight"), headers=AUTH)
+    assert (response.json()["text"], response.json()["tier"]) == ("ship the build tonight!", "small")
 
 
 def test_command_answers_the_contract_request_on_the_big_tier(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -125,6 +136,15 @@ def test_command_answers_the_contract_request_on_the_big_tier(monkeypatch: pytes
     assert response.status_code == 200
     body = CommandResponse.model_validate(response.json())
     assert (body.text, body.engine) == ("HEY CAN U SEND THE DECK BY EOD", "fake:edit")
+
+
+@pytest.mark.parametrize(("path", "body"), [("/v1/polish", POLISH), ("/v1/command", COMMAND)])
+def test_an_older_apps_language_field_is_ignored(monkeypatch: pytest.MonkeyPatch, path: str, body: dict) -> None:
+    with serve(monkeypatch) as client:
+        current = client.post(path, json=body, headers=AUTH)
+        older = client.post(path, json={**body, "language": "hi"}, headers=AUTH)
+    assert older.status_code == 200
+    assert {**older.json(), "ms": 0} == {**current.json(), "ms": 0}
 
 
 @pytest.mark.parametrize(

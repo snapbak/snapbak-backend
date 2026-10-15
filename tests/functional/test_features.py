@@ -20,7 +20,6 @@ def polish(
     text: str,
     prior: str = "",
     terms: tuple[str, ...] = (),
-    language: str = "en",
     continues: bool = False,
 ) -> tuple[dict, list[dict]]:
     """The response, and every request body the models got."""
@@ -48,7 +47,6 @@ def polish(
         "terms": list(terms),
         "app": "Slack",
         "style": "chat",
-        "language": language,
         "continues": continues,
         "deadline_ms": 2000,
     }
@@ -68,81 +66,50 @@ def models(asked: list[dict]) -> list[str]:
 
 
 BACKTRACKING = [
-    ("no wait make it thursday", "Let's meet on Friday at noon.", "en", "Let's meet on Thursday at noon.", ""),
-    ("deploy on tuesday actually wednesday", "", "en", "Deploy on Wednesday.", None),
-    ("Send this to Jam Co. No, send this to GMMCO.", "", "en", "Send this to GMMCO.", None),
-    ("kal milte hain nahi nahi parso milte hain", "", "hinglish", "Parso milte hain.", None),
-    ("nahi nahi parso rakhte hain", "Kal meeting rakhte hain.", "hinglish", "Parso meeting rakhte hain.", ""),
-    ("कल मिलते हैं नहीं नहीं परसों मिलते हैं", "", "hi", "परसों मिलते हैं।", None),
-    ("नहीं नहीं परसों", "कल मीटिंग रखते हैं।", "hi", "परसों मीटिंग रखते हैं।", ""),
+    ("no wait make it thursday", "Let's meet on Friday at noon.", "Let's meet on Thursday at noon.", ""),
+    ("deploy on tuesday actually wednesday", "", "Deploy on Wednesday.", None),
+    ("Send this to Jam Co. No, send this to GMMCO.", "", "Send this to GMMCO.", None),
     (
         "We should send this to the frontend team. No, don't send it yet.",
         "",
-        "en",
         "Don't send it yet.",
         None,
     ),
-    ("No, don't send it yet.", "We should send this to the frontend team.", "en", "Don't send it yet.", ""),
-    ("client ko bhejo. nahi, abhi mat bhejo", "", "hinglish", "Abhi mat bhejo.", None),
-    ("nahi, abhi mat bhejo", "Client ko bhejo.", "hinglish", "Abhi mat bhejo.", ""),
-    ("क्लाइंट को भेजो। नहीं, अभी मत भेजो", "", "hi", "अभी मत भेजो।", None),
-    ("नहीं, अभी मत भेजो", "क्लाइंट को भेजो।", "hi", "अभी मत भेजो।", ""),
-    ("book the flight to delhi scratch that call priya", "", "en", "Call Priya.", None),
-    ("send it to sam i mean ravi", "", "en", "Send it to Ravi.", None),
-    ("book five seats make that six", "", "en", "Book 6 seats.", None),
-    ("मीटिंग सोमवार को है बल्कि मंगलवार को है", "", "hi", "मीटिंग मंगलवार को है।", None),
-    ("meeting monday ko hai balki tuesday ko hai", "", "hinglish", "Meeting Tuesday ko hai.", None),
-    ("scratch that", "Ship it today team. Also loop in Priya on the budget doc.", "en", "", "Ship it today team."),
-    ("मेल राहुल को भेजो सॉरी रोहित को", "", "hi", "मेल रोहित को भेजो।", None),
-    ("nahi nahi tum next friday nahi sunday aao", "", "hinglish", "Tum next Sunday aao.", None),
-    ("नहीं नहीं तुम अगले फ्राइडे नहीं संडे आओ", "", "hi", "तुम अगले संडे आओ।", None),
-    ("pod delete karo matlab rehne do", "", "hinglish", "Rehne do.", None),
-    ("पॉड डिलीट करो मतलब रहने दो", "", "hi", "रहने दो।", None),
-    ("main kal nahi parso aaunga", "", "hinglish", "Main parso aaunga.", None),
-    ("मैं कल नहीं परसों आऊंगा", "", "hi", "मैं परसों आऊंगा।", None),
-    ("don't send it, no wait, send it", "", "en", "Send it.", None),
-    ("no wait send it", "Don't send it.", "en", "", "Send it."),
-    ("mat bhejo, nahi nahi, bhejo", "", "hinglish", "Bhejo.", None),
-    ("मत भेजो नहीं नहीं भेजो", "", "hi", "भेजो।", None),
-    ("mujhe 3 tickets nahi 4 chahiye", "", "hinglish", "Mujhe 4 tickets chahiye.", None),
-    ("मुझे तीन टिकट नहीं चार चाहिए", "", "hi", "मुझे चार टिकट चाहिए।", None),
+    ("No, don't send it yet.", "We should send this to the frontend team.", "Don't send it yet.", ""),
+    ("book the flight to delhi scratch that call priya", "", "Call Priya.", None),
+    ("send it to sam i mean ravi", "", "Send it to Ravi.", None),
+    ("book five seats make that six", "", "Book 6 seats.", None),
+    ("scratch that", "Ship it today team. Also loop in Priya on the budget doc.", "", "Ship it today team."),
+    ("don't send it, no wait, send it", "", "Send it.", None),
+    ("no wait send it", "Don't send it.", "", "Send it."),
 ]
 
 
-@pytest.mark.parametrize(("text", "prior", "language", "output", "revision"), BACKTRACKING)
+@pytest.mark.parametrize(("text", "prior", "output", "revision"), BACKTRACKING)
 def test_backtracking_drops_the_retracted_words_on_the_big_model(
-    monkeypatch: pytest.MonkeyPatch, text: str, prior: str, language: str, output: str, revision: str | None
+    monkeypatch: pytest.MonkeyPatch, text: str, prior: str, output: str, revision: str | None
 ) -> None:
-    body, asked = polish(monkeypatch, {BIG: said(output, revision)}, text, prior=prior, language=language)
+    body, asked = polish(monkeypatch, {BIG: said(output, revision)}, text, prior=prior)
     assert (body["text"], body["revision"], body["rejected"], body["tier"]) == (output, revision, False, "big")
     assert models(asked) == [BIG]
 
 
 @pytest.mark.parametrize(
-    ("text", "prior", "language", "output", "revision"),
+    ("text", "prior", "output", "revision"),
     [
         (
             "no wait make it thursday",
             "We need a list. Let's meet on Friday at noon.",
-            "en",
             "Let's meet on Thursday at noon.",
             "We need a list.",
         ),
-        ("no wait make it thursday", "Let's meet on Friday at noon.", "en", "Let's meet on Thursday at noon.", ""),
-        (
-            "nahi nahi parso",
-            "Report ready hai. Kal meeting hai.",
-            "hinglish",
-            "Parso meeting hai.",
-            "Report ready hai.",
-        ),
-        ("नहीं नहीं परसों", "रिपोर्ट तैयार है। कल मीटिंग है।", "hi", "परसों मीटिंग है।", "रिपोर्ट तैयार है।"),
+        ("no wait make it thursday", "Let's meet on Friday at noon.", "Let's meet on Thursday at noon.", ""),
     ],
 )
 def test_a_correction_is_asked_with_the_last_sentence_and_answered_as_text_and_revision(
-    monkeypatch: pytest.MonkeyPatch, text: str, prior: str, language: str, output: str, revision: str
+    monkeypatch: pytest.MonkeyPatch, text: str, prior: str, output: str, revision: str
 ) -> None:
-    body, asked = polish(monkeypatch, {BIG: said(output)}, text, prior=prior, language=language)
+    body, asked = polish(monkeypatch, {BIG: said(output)}, text, prior=prior)
     last_turn = json.loads(asked[0]["messages"][-1]["content"])
     assert (last_turn.get("prior", ""), last_turn["text"].removesuffix(f" {text}")) == (
         revision,
@@ -167,79 +134,54 @@ def test_an_ordinary_no_stays_and_stays_on_the_small_model(
 
 
 @pytest.mark.parametrize(
-    ("text", "language", "output"),
+    ("text", "output"),
     [
-        ("mujhe nahi pata kya hua", "hinglish", "Mujhe nahi pata kya hua."),
-        ("मुझे नहीं पता क्या हुआ", "hi", "मुझे नहीं पता क्या हुआ।"),
-        ("it actually works now", "en", "It actually works now."),
-        ("iska matlab hai ki hum ready hain", "hinglish", "Iska matlab hai ki hum ready hain."),
+        ("it actually works now", "It actually works now."),
     ],
 )
-def test_an_ordinary_cue_word_stays_in_each_language(
-    monkeypatch: pytest.MonkeyPatch, text: str, language: str, output: str
-) -> None:
-    body, asked = polish(monkeypatch, {BIG: said(output)}, text, language=language)
+def test_an_ordinary_cue_word_stays(monkeypatch: pytest.MonkeyPatch, text: str, output: str) -> None:
+    body, asked = polish(monkeypatch, {BIG: said(output)}, text)
     assert (body["text"], body["rejected"], body["tier"]) == (output, False, "big")
     assert models(asked) == [BIG]
 
 
 @pytest.mark.parametrize(
-    ("text", "prior", "language", "output", "revision"),
+    ("text", "prior", "output", "revision"),
     [
-        ("deploy on tuesday then wednesday", "", "en", "Deploy on Wednesday.", None),
-        ("no wait thursday", "Let's meet on Friday at noon.", "en", "", "Let's meet on Thursday for lunch."),
-        ("nahi nahi parso", "Kal meeting hai.", "hinglish", "", "The meeting is the day after tomorrow."),
-        ("नहीं नहीं परसों", "कल मीटिंग है।", "hi", "", "parso meeting hai."),
-        ("No, don't send it yet.", "We should send this to the frontend team.", "en", "", ""),
-        ("no, don't send it yet", "", "en", "No.", None),
-        ("nahi, abhi mat bhejo", "Client ko bhejo.", "hinglish", "", "Client ko bhejo."),
-        ("नहीं, अभी मत भेजो", "क्लाइंट को भेजो।", "hi", "", ""),
-        ("actually", "Hi team, the launch moved to Monday and legal signed off.", "en", "", ""),
-        ("is shabd ka matlab kya hai", "", "hinglish", "Kya hai?", None),
-        ("इस शब्द का मतलब क्या है", "", "hi", "क्या है?", None),
-        ("ravi said sorry about the delay", "", "en", "About the delay.", None),
-        ("main friday nahi aaunga", "", "hinglish", "Main friday aaunga.", None),
-        ("file delete mat karo", "", "hinglish", "File delete karo.", None),
-        ("मैं फ्राइडे नहीं आऊंगा", "", "hi", "मैं फ्राइडे आऊंगा।", None),
-        ("main friday nahi aaunga", "", "hinglish", "Main aaunga.", None),
-        ("मैं कल नहीं आऊंगा", "", "hi", "मैं आऊंगा।", None),
-        ("tell the vendor no pickup after six pm", "", "en", "Tell the pickup after 6 pm.", None),
-        ("aur report bhejo", "Main Friday nahi aaunga.", "hinglish", "Aur report bhejo.", "Main aaunga."),
-        ("pod delete karo matlab report bhejo", "", "hinglish", "Report bhejo.", None),
-        ("send it no wait send it", "", "en", "Don't send it.", None),
-        ("i have 2 no kids", "", "en", "I have 2 kids.", None),
-        ("main 2 din nahi aaunga", "", "hinglish", "Main aaunga.", None),
-        ("मैं दो दिन नहीं आऊंगा", "", "hi", "मैं आऊंगा।", None),
+        ("deploy on tuesday then wednesday", "", "Deploy on Wednesday.", None),
+        ("no wait thursday", "Let's meet on Friday at noon.", "", "Let's meet on Thursday for lunch."),
+        ("No, don't send it yet.", "We should send this to the frontend team.", "", ""),
+        ("no, don't send it yet", "", "No.", None),
+        ("actually", "Hi team, the launch moved to Monday and legal signed off.", "", ""),
+        ("ravi said sorry about the delay", "", "About the delay.", None),
+        ("tell the vendor no pickup after six pm", "", "Tell the pickup after 6 pm.", None),
+        ("send it no wait send it", "", "Don't send it.", None),
+        ("i have 2 no kids", "", "I have 2 kids.", None),
     ],
 )
 def test_a_correction_that_drops_or_invents_words_is_rejected(
-    monkeypatch: pytest.MonkeyPatch, text: str, prior: str, language: str, output: str, revision: str | None
+    monkeypatch: pytest.MonkeyPatch, text: str, prior: str, output: str, revision: str | None
 ) -> None:
     replies = {SMALL: said(output, revision), BIG: said(output, revision)}
-    body, _ = polish(monkeypatch, replies, text, prior=prior, language=language)
+    body, _ = polish(monkeypatch, replies, text, prior=prior)
     assert (body["text"], body["revision"], body["rejected"]) == (text, None, True)
 
 
 FORMATTING = [
     (
         "we need three things first the api second the ui third the docs",
-        "en",
         "We need three things:\n1. The API\n2. The UI\n3. The docs",
     ),
-    ("for the trip bullet towels bullet a charger", "en", "For the trip:\n- Towels\n- A charger"),
-    ("it costs twenty five dollars mail john at procol dot in", "en", "It costs $25. Mail john@procol.in."),
-    ("we ship on march third at nine am", "en", "We ship on March 3 at 9 am."),
-    ("hey team comma ship it full stop", "en", "Hey team, ship it."),
-    ("kal teen baje meeting hai", "hinglish", "Kal 3 baje meeting hai."),
-    ("कल तीन बजे मीटिंग है", "hi", "कल 3 बजे मीटिंग है।"),
+    ("for the trip bullet towels bullet a charger", "For the trip:\n- Towels\n- A charger"),
+    ("it costs twenty five dollars mail john at procol dot in", "It costs $25. Mail john@procol.in."),
+    ("we ship on march third at nine am", "We ship on March 3 at 9 am."),
+    ("hey team comma ship it full stop", "Hey team, ship it."),
 ]
 
 
-@pytest.mark.parametrize(("text", "language", "output"), FORMATTING)
-def test_formatting_comes_back_as_the_model_wrote_it(
-    monkeypatch: pytest.MonkeyPatch, text: str, language: str, output: str
-) -> None:
-    body, _ = polish(monkeypatch, {SMALL: said(output), BIG: said(output)}, text, language=language)
+@pytest.mark.parametrize(("text", "output"), FORMATTING)
+def test_formatting_comes_back_as_the_model_wrote_it(monkeypatch: pytest.MonkeyPatch, text: str, output: str) -> None:
+    body, _ = polish(monkeypatch, {SMALL: said(output), BIG: said(output)}, text)
     # The request comes from a chat app, which gets round bullets (founder, 12 Oct).
     assert (body["text"], body["rejected"]) == (output.replace("\n- ", "\n• "), False)
 
@@ -253,35 +195,18 @@ def test_markdown_from_the_small_model_is_retried_on_the_big_one(monkeypatch: py
 
 
 @pytest.mark.parametrize(
-    ("text", "language", "output"),
+    ("text", "output"),
     [
-        ("kal client ko call karna hai", "hinglish", "Call the client tomorrow."),
-        ("कल क्लाइंट को कॉल करना है", "hi", "Call the client tomorrow."),
-        ("कल क्लाइंट को कॉल करना है", "hi", "kal client ko call karna hai."),
+        ("she don't know that the files was moved", "She doesn't know that the files were moved."),
+        ("I has already send the document", "I had already sent the document."),
+        ("we need to discuss about the budget", "We need to discuss the budget."),
+        ("this is better then that", "This is better than that."),
+        ("he has went home", "He has gone home."),
+        ("it almost work", "It almost works."),
     ],
 )
-def test_a_translation_or_transliteration_is_rejected(
-    monkeypatch: pytest.MonkeyPatch, text: str, language: str, output: str
-) -> None:
-    body, _ = polish(monkeypatch, {BIG: said(output)}, text, language=language)
-    assert (body["text"], body["rejected"]) == (text, True)
-
-
-@pytest.mark.parametrize(
-    ("text", "language", "output"),
-    [
-        ("she don't know that the files was moved", "en", "She doesn't know that the files were moved."),
-        ("I has already send the document", "en", "I had already sent the document."),
-        ("we need to discuss about the budget", "en", "We need to discuss the budget."),
-        ("usne report bheja tha", "hinglish", "Usne report bheji thi."),
-        ("वह कल आएगी और रिपोर्ट भेजेगा", "hi", "वह कल आएगी और रिपोर्ट भेजेगी।"),
-        ("this is better then that", "en", "This is better than that."),
-        ("he has went home", "en", "He has gone home."),
-        ("it almost work", "en", "It almost works."),
-    ],
-)
-def test_a_small_grammar_fix_is_kept(monkeypatch: pytest.MonkeyPatch, text: str, language: str, output: str) -> None:
-    body, _ = polish(monkeypatch, {SMALL: said(output), BIG: said(output)}, text, language=language)
+def test_a_small_grammar_fix_is_kept(monkeypatch: pytest.MonkeyPatch, text: str, output: str) -> None:
+    body, _ = polish(monkeypatch, {SMALL: said(output), BIG: said(output)}, text)
     assert (body["text"], body["rejected"]) == (output, False)
 
 
@@ -307,74 +232,22 @@ def test_a_rewrite_or_an_answer_is_rejected(monkeypatch: pytest.MonkeyPatch, tex
 
 
 @pytest.mark.parametrize(
-    ("text", "language", "output"),
+    ("text", "terms", "output", "expected"),
     [
-        ("kal client ko call karna hai", "hinglish", "Kal client ko phone karna hai."),
-        ("कल क्लाइंट को कॉल करना है", "hi", "कल क्लाइंट को फ़ोन करना है।"),
-        ("kal meeting hai", "hinglish", "Kal ka meeting ki hai ke tha."),
-        ("कल मीटिंग है", "hi", "कल का मीटिंग की है के था।"),
-        ("kal meeting hai", "hinglish", "Kal meeting thi."),
-        ("मैं कल रिपोर्ट भेजूंगा", "hi", "मैं कल रिपोर्ट भेजता हूं।"),
-        ("build lagbhag ready hai", "hinglish", "Build ready hai."),
-        ("बिल्ड अक्सर फेल होता है", "hi", "बिल्ड फेल होता है।"),
-        ("humein ek se do din chahiye", "hinglish", "Humein:\n1. Se\n2. Din chahiye"),
-        ("हमें एक से दो दिन चाहिए", "hi", "हमें:\n1. से\n2. दिन चाहिए"),
-        (
-            "mera pehla draft weak tha mera doosra draft strong tha",
-            "hinglish",
-            "1. Draft weak tha\n2. Draft strong tha",
-        ),
-        ("मेरा पहला ड्राफ्ट कमज़ोर था मेरा दूसरा ड्राफ्ट अच्छा था", "hi", "1. ड्राफ्ट कमज़ोर था\n2. ड्राफ्ट अच्छा था"),
-    ],
-)
-def test_a_hinglish_or_hindi_rewrite_is_rejected_on_the_big_model(
-    monkeypatch: pytest.MonkeyPatch, text: str, language: str, output: str
-) -> None:
-    body, asked = polish(monkeypatch, {BIG: said(output)}, text, language=language)
-    assert (body["text"], body["rejected"]) == (text, True)
-    assert models(asked) == [BIG, BIG], "a rejected big answer is asked again once"
-
-
-@pytest.mark.parametrize(
-    ("text", "terms", "language", "output", "expected"),
-    [
-        ("ship it to gmmco", ("GMMCO",), "en", "Ship it to Gmmco.", "Ship it to GMMCO."),
-        ("send it to jamko", ("GMMCO",), "en", "Send it to GMMCO.", "Send it to GMMCO."),
-        ("iphone build for priya", ("iPhone", "Priya"), "en", "IPhone build for Priya.", "iPhone build for Priya."),
+        ("ship it to gmmco", ("GMMCO",), "Ship it to Gmmco.", "Ship it to GMMCO."),
+        ("send it to jamko", ("GMMCO",), "Send it to GMMCO.", "Send it to GMMCO."),
+        ("iphone build for priya", ("iPhone", "Priya"), "IPhone build for Priya.", "iPhone build for Priya."),
         # A plain word the model kept plain stays plain, though a term is spelled like it (round 3, 11 Oct).
-        ("cut me some slack please", ("Slack",), "en", "Cut me some slack, please.", "Cut me some slack, please."),
-        ("gmmco ko invoice bhejo", ("GMMCO",), "hinglish", "Gmmco ko invoice bhejo.", "GMMCO ko invoice bhejo."),
-        ("प्रिया को रिपोर्ट भेजो", ("प्रिया",), "hi", "प्रिया को रिपोर्ट भेजो।", "प्रिया को रिपोर्ट भेजो।"),
+        ("cut me some slack please", ("Slack",), "Cut me some slack, please.", "Cut me some slack, please."),
     ],
 )
 def test_terms_reach_the_model_and_keep_their_spelling(
-    monkeypatch: pytest.MonkeyPatch, text: str, terms: tuple[str, ...], language: str, output: str, expected: str
+    monkeypatch: pytest.MonkeyPatch, text: str, terms: tuple[str, ...], output: str, expected: str
 ) -> None:
-    body, asked = polish(monkeypatch, {SMALL: said(output), BIG: said(output)}, text, terms=terms, language=language)
+    body, asked = polish(monkeypatch, {SMALL: said(output), BIG: said(output)}, text, terms=terms)
     assert (body["text"], body["rejected"]) == (expected, False)
     last_turn = json.loads(asked[0]["messages"][-1]["content"])
     assert last_turn["terms"] == list(terms)
-
-
-@pytest.mark.parametrize(
-    ("text", "language", "terms", "output"),
-    [
-        (
-            "main kal office aaunga bahut kaam hai",
-            "hinglish",
-            ("main", "kal", "aaunga", "bahut", "hai"),
-            "Main kal office aaunga. Bahut kaam hai.",
-        ),
-        ("accha theek hai", "hinglish", ("accha", "theek", "hai"), "Accha, theek hai."),
-        ("बहुत काम है", "hi", ("बहुत",), "बहुत काम है।"),
-        ("npm install karo", "hinglish", ("npm", "karo"), "npm install karo."),
-    ],
-)
-def test_hinglish_lexicon_terms_keep_the_sentence_start_capital(
-    monkeypatch: pytest.MonkeyPatch, text: str, language: str, terms: tuple[str, ...], output: str
-) -> None:
-    body, _ = polish(monkeypatch, {SMALL: said(output), BIG: said(output)}, text, terms=terms, language=language)
-    assert (body["text"], body["rejected"]) == (output, False)
 
 
 def test_a_term_the_user_did_not_list_is_an_unheard_word(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -383,25 +256,24 @@ def test_a_term_the_user_did_not_list_is_an_unheard_word(monkeypatch: pytest.Mon
     assert (body["text"], body["rejected"]) == ("send it to jamko", True)
 
 
-def test_the_app_style_and_language_reach_the_model(monkeypatch: pytest.MonkeyPatch) -> None:
-    _, asked = polish(monkeypatch, {BIG: said("Kal milte hain.")}, "kal milte hain", language="hinglish")
+def test_the_app_and_style_reach_the_model_with_no_language(monkeypatch: pytest.MonkeyPatch) -> None:
+    _, asked = polish(monkeypatch, {SMALL: said("See you tomorrow.")}, "see you tomorrow")
     last_turn = json.loads(asked[0]["messages"][-1]["content"])
-    assert (last_turn["app"], last_turn["style"], last_turn["language"]) == ("Slack", "chat", "hinglish")
+    assert (last_turn["app"], last_turn["style"]) == ("Slack", "chat")
     assert "deadline_ms" not in last_turn
+    assert "language" not in last_turn
 
 
 @pytest.mark.parametrize(
-    ("text", "language", "output"),
+    ("text", "output"),
     [
-        ("sam ship it", "en", "Sam, ship it."),
-        ("ship it today", "en", "ship it today."),
-        ("rahul kal aayega", "hinglish", "Rahul kal aayega."),
-        ("राहुल कल आएगा", "hi", "राहुल कल आएगा।"),
+        ("sam ship it", "Sam, ship it."),
+        ("ship it today", "ship it today."),
     ],
 )
 def test_a_first_chunk_mid_sentence_tells_the_model_it_continues(
-    monkeypatch: pytest.MonkeyPatch, text: str, language: str, output: str
+    monkeypatch: pytest.MonkeyPatch, text: str, output: str
 ) -> None:
-    body, asked = polish(monkeypatch, {SMALL: said(output), BIG: said(output)}, text, language=language, continues=True)
+    body, asked = polish(monkeypatch, {SMALL: said(output), BIG: said(output)}, text, continues=True)
     assert (body["text"], body["rejected"]) == (output, False)
     assert json.loads(asked[0]["messages"][-1]["content"])["continues"] is True

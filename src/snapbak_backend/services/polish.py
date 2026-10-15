@@ -13,9 +13,8 @@ from snapbak_backend.transformers.polish import correction_turn, fold, polish_tu
 # items, 11 Oct 2026), or it mostly times out and only delays the rules text. A refused big answer is corrected too:
 # gpt-6-luna sometimes repairs a garbled phrase with an unheard word, and told which word, takes it out (D1).
 MIN_RETRY_S = 1.5
-# A big-tier chunk is polished with reasoning at its route's effort (`routing.EFFORTS`); its reasoning tokens count
-# against the output budget, so they get room of their own: 1,000 cut off some answers at medium effort and left them
-# empty.
+# Every chunk is polished with reasoning at its route's effort (`routing.EFFORTS`); its reasoning tokens count against
+# the output budget, so they get room of their own: 1,000 cut off some answers at medium effort and left them empty.
 REASONING_TOKENS = 4000
 # A correction starts late, often 10 s into a long dictation, and the big tier reasoning over it can run past the
 # deadline before `HEDGE_S`; the fallback joins it once this share of the time left has gone (round b5: 4 of 8 long
@@ -57,21 +56,18 @@ async def polished_chunk(request: PolishRequest, tiers: Tiers) -> tuple[PolishRe
     request = request.model_copy(update={"prior": plain_bullets(request.prior)})
     asked = fold(request)
     turns = polish_turns(asked)
-    tier = routing.tier(request.text, request.language)
-    reason = routing.effort(request.text, request.language) if tier == "big" else ""
-    max_tokens = len(request.text) + len(request.prior) + 100 + (REASONING_TOKENS if reason else 0)
+    tier = routing.tier(request.text)
+    reason = routing.effort(request.text)
+    max_tokens = len(request.text) + len(request.prior) + 100 + REASONING_TOKENS
     calls: list[Call] = []
     first = tiers.chain(tier)
-    output = await ask(
-        first, turns, max_tokens, deadline, calls, reason, chain.HEDGE_S if reason else chain.FAST_HEDGE_S
-    )
+    output = await ask(first, turns, max_tokens, deadline, calls, reason)
     polished = read(request, asked, output)
     calls[-1].verdict = polished.rejected or "ok"
     if polished.rejected and polished.reason and deadline - time.monotonic() >= MIN_RETRY_S:
         # One correction: the refused answer and why, so the model fixes what the guardrail named (D1). Refused again,
         # the text goes in as said.
         corrected = [*turns, ("assistant", output), correction_turn(asked, polished.reason)]
-        max_tokens += 0 if reason else REASONING_TOKENS
         hedge_s = min(chain.HEDGE_S, (deadline - time.monotonic()) * RETRY_HEDGE_SHARE)
         try:
             effort = routing.EFFORTS["correction"]

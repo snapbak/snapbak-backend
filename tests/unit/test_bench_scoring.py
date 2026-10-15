@@ -32,8 +32,11 @@ def test_the_closest_expected_output_is_used() -> None:
 
 
 def test_of_alternatives_with_the_same_words_the_one_with_the_closest_marks_is_used() -> None:
-    expected = ["Pehle main office jaunga, phir client se milunga.", "Pehle main office jaunga phir client se milunga."]
-    said = "pehle main office jaunga phir client se milunga"
+    expected = [
+        "First we go to the office, then we meet the client.",
+        "First we go to the office then we meet the client.",
+    ]
+    said = "first we go to the office then we meet the client"
     assert bench.score(expected[1], expected, said) == bench.Score(True, 1, 1, 1, 1)
 
 
@@ -52,13 +55,6 @@ def test_list_numbers_and_bullets_align_with_their_marks() -> None:
     )
 
 
-def test_hinglish_and_hindi_marks_count_and_devanagari_has_no_case() -> None:
-    assert bench.score("Kal milte hain.", ["Kal milte hain."], "kal milte hain") == bench.Score(True, 1, 1, 1, 1)
-    assert bench.score("कल मिलते हैं।", ["कल मिलते हैं।"], "कल मिलते हैं") == bench.Score(True, 1, 1, 0, 0)
-    assert bench.score("कल मिलते हैं", ["कल मिलते हैं।"], "कल मिलते हैं") == bench.Score(True, 1, 0, 0, 0)
-    assert bench.score("Call tomorrow.", ["कल मिलते हैं।"], "कल मिलते हैं") == bench.Score(False, 0, 0, 0, 0)
-
-
 def test_marks_and_case_the_input_already_had_are_not_counted() -> None:
     said = "Hey Sam, ship it"
     assert bench.score("Hey Sam, ship it", ["Hey Sam, ship it."], said) == bench.Score(True, 1, 0, 0, 0)
@@ -69,7 +65,6 @@ def test_marks_and_case_the_input_already_had_are_not_counted() -> None:
 def test_a_word_the_input_never_had_counts_only_for_the_mark_or_capital_it_needs() -> None:
     assert bench.score("She goes home.", ["She goes home."], "she go home") == bench.Score(True, 1, 1, 1, 1)
     assert bench.score("Ship it Monday.", ["Ship it Monday."], "ship it") == bench.Score(True, 1, 1, 2, 2)
-    assert bench.score("टास्क पूरे कर लिए।", ["टास्क पूरे कर लिए।"], "टास्क पूरा कर लिया") == bench.Score(True, 1, 1, 0, 0)
 
 
 def test_a_mark_added_or_changed_where_none_was_needed_counts_against_punctuation() -> None:
@@ -111,12 +106,11 @@ def test_a_chunked_item_splits_at_the_first_cue_after_three_words() -> None:
     )
     assert bench.split_at_cue("No, send it now please") is None
     assert bench.split_at_cue("okay no, send it now please") is None
-    assert bench.split_at_cue("कल मीटिंग रखते हैं नहीं नहीं परसों") == ("कल मीटिंग रखते हैं", "नहीं नहीं परसों")
     assert bench.split_at_cue("ship the build tonight") is None
 
 
 def item(slice_: str, kind: str, text: str, expected: str, prior: str = "") -> bench.Item:
-    return bench.Item(slice_, kind, text, prior, [], "en", "other", [expected])
+    return bench.Item(slice_, kind, text, prior, [], "other", [expected])
 
 
 def result(entry: bench.Item, text: str, tier: str = "small", calls: list[Call] | None = None) -> bench.Result:
@@ -153,8 +147,8 @@ def test_grammar_kept_counts_correct_grammar_rows_left_correct_and_grades_gramma
     # Round 1 (11 Oct): breaking an already correct sentence never reached the grammar gate.
     kept = [
         result(
-            item("hinglish-grammar", "trap Hinglish", "Mera cousin kal aayega.", "Mera cousin kal aayega."),
-            "Mera cousin kal aayega.",
+            item("grammar", "trap correct sentence", "My cousin arrives tomorrow.", "My cousin arrives tomorrow."),
+            "My cousin arrives tomorrow.",
         ),
         result(item("grammar", "trap correct sentence", "We shipped it.", "We shipped it."), "We ship it."),
         result(item("formatting", "trap correct sentence", "Ship it.", "Ship it."), "Ship it now."),
@@ -254,7 +248,7 @@ LIST_ITEM = re.compile(r"^(?:\d+\. |- )(.+)$", re.MULTILINE)
 
 def test_every_corpus_list_item_starts_with_a_capital_and_has_no_full_stop() -> None:
     items = [found for row in corpus_rows() for out in row["expected"] for found in LIST_ITEM.findall(out)]
-    wrong = [text for text in items if text[0].islower() or text.endswith((".", "।"))]
+    wrong = [text for text in items if text[0].islower() or text.endswith(".")]
     assert len(items) > 200
     assert wrong == []
 
@@ -271,9 +265,7 @@ def test_a_dictated_question_ends_with_a_question_mark() -> None:
 
 
 def test_spoken_times_and_percentages_are_written_as_digits() -> None:
-    spoken = re.compile(
-        r"\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve) (?:am|pm|baje)\b|\d प्रतिशत"
-    )
+    spoken = re.compile(r"\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve) (?:am|pm)\b")
     wrong = [row["id"] for row in corpus_rows() for out in row["expected"] if spoken.search(out)]
     assert wrong == []
 
@@ -282,15 +274,13 @@ def test_a_spoken_number_before_a_unit_of_time_or_money_is_written_as_digits() -
     spoken = re.compile(
         r"\b(?:one|two|three|four|five|six|seven|eight|nine|ten) "
         r"(?:days?|weeks?|months?|years?|hours?|minutes?|seconds?|dollars?|percent)\b"
-        r"|\b(?:ek|do|teen|char|paanch|chhe|saat|aath|nau|das) (?:din|hafte|mahine|saal|ghante|minute)\b"
-        r"|(?:एक|दो|तीन|चार|पांच|पाँच|छह|सात|आठ|नौ|दस) (?:दिन|हफ्ते|महीने|साल|घंटे|मिनट)"
     )
     wrong = [row["id"] for row in corpus_rows() for out in row["expected"] if spoken.search(out)]
     assert wrong == []
 
 
 def test_money_takes_its_symbol_instead_of_a_currency_word() -> None:
-    worded = re.compile(r"\d (?:(?:lakh|crore|लाख|करोड़) )?(?:rupees|rupaye|dollars|रुपये|रुपए)")
+    worded = re.compile(r"\d (?:(?:lakh|crore) )?(?:rupees|dollars)")
     wrong = [row["id"] for row in corpus_rows() for out in row["expected"] if worded.search(out)]
     assert wrong == []
 
@@ -300,26 +290,20 @@ def test_no_expected_output_stops_at_the_colon_before_its_list() -> None:
     assert cut == []
 
 
-def test_the_corpus_has_hinglish_and_hindi_lists_and_app_style_rows() -> None:
+def test_the_corpus_has_list_traps_and_app_style_rows() -> None:
     rows = corpus_rows()
-    lists = [row["kind"] for row in rows if any(LIST_ITEM.search(out) for out in row["expected"])]
-    assert sum("Hinglish" in kind for kind in lists) >= 10
-    assert sum("Hindi" in kind for kind in lists) >= 10
     traps = [row for row in rows if row["kind"].startswith("trap list words")]
     assert len(traps) >= 5
     assert not any(LIST_ITEM.search(out) for row in traps for out in row["expected"])
     styles = Counter(item.style for item in bench.load())
     assert all(styles[style] >= 5 for style in ("email", "code", "chat", "docs")), styles
     assert styles["other"] > 0
-    # v2 kinds name Roman Hindi too ("Roman Hindi spelling variant kept"); a v2 row has its own language.
-    languages = {item.language for item in bench.load() if "Hindi" in item.kind and not item.split}
-    assert languages == {"hi"}
 
 
-def test_every_language_has_cue_led_bullet_lists_and_cueless_sequences_that_stay_prose() -> None:
+def test_formatting_has_cue_led_bullet_lists_and_cueless_sequences_that_stay_prose() -> None:
     bullet = re.compile(r"^- ", re.MULTILINE)
     rows = corpus_rows()
-    for name in ("formatting", "hinglish-formatting", "hi-formatting"):
+    for name in ("formatting",):
         slice_rows = [row for row in rows if row["id"].startswith(f"{name}-")]
         led = [row for row in slice_rows if row["kind"] == "cue-led bullet list"]
         assert len(led) >= 8, name
@@ -328,17 +312,17 @@ def test_every_language_has_cue_led_bullet_lists_and_cueless_sequences_that_stay
         plain = [row for row in slice_rows if row["kind"] == "trap list words sequence without a cue"]
         assert len(plain) >= 5, name
         # "Do one thing" announces a list only when three or more steps follow (founder, 11 Oct).
-        one_thing = re.compile(r"one thing|ek kaam|एक काम", re.IGNORECASE)
+        one_thing = re.compile(r"one thing", re.IGNORECASE)
         assert sum(bool(one_thing.search(row["said"])) for row in led) >= 2, name
         assert sum(bool(one_thing.search(row["said"])) for row in plain) >= 2, name
         assert not any(bullet.search(out) or LIST_ITEM.search(out) for row in plain for out in row["expected"]), name
 
 
-def test_every_language_has_digits_kept_or_written_as_words_and_digits_that_stay() -> None:
+def test_formatting_has_digits_kept_or_written_as_words_and_digits_that_stay() -> None:
     # Whisper writes "do 1 thing"; either "1" or "one" is right (founder, 11 Oct), except before a unit or time.
     rows = corpus_rows()
     digit = re.compile(r"(?<![\d.:])\b([1-9]|10)\b(?![\d.:])")
-    for name in ("formatting", "hinglish-formatting", "hi-formatting"):
+    for name in ("formatting",):
         slice_rows = [row for row in rows if row["id"].startswith(f"{name}-")]
         either = [row for row in slice_rows if row["kind"] == "digit as said or as its word"]
         assert len(either) >= 5, name
@@ -348,18 +332,6 @@ def test_every_language_has_digits_kept_or_written_as_words_and_digits_that_stay
         kept = [row for row in slice_rows if row["kind"] == "trap digit stays a digit"]
         assert len(kept) >= 2, name
         assert all(re.search(r"\d", out) for row in kept for out in row["expected"]), name
-
-
-def test_a_rows_own_language_is_the_language_it_is_sent_in(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    # The founder's dictations are English speech the app tags Hinglish; the bench sends them as the app does.
-    rows = [
-        {"kind": "counted list", "said": "do 1 thing", "expected": ["Do one thing."], "language": "hinglish"},
-        {"kind": "counted list", "said": "ship it", "expected": ["Ship it."]},
-    ]
-    with gzip.open(tmp_path / "founder.jsonl.gz", "wt") as out:
-        out.writelines(json.dumps(row) + "\n" for row in rows)
-    monkeypatch.setattr(bench, "CORPUS", tmp_path)
-    assert [item.language for item in bench.load()] == ["hinglish", "en"]
 
 
 def test_a_rows_prior_is_sent_as_the_text_before_the_piece(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -417,7 +389,6 @@ def test_misses_lists_each_result_that_missed_a_gate_with_what_it_missed() -> No
             "failed": False,
             "id": "",
             "split": "",
-            "language": "en",
             "length": "",
             "exact": False,
             "fixes_missed": [],
@@ -462,7 +433,7 @@ def test_list_shape_passes_only_the_same_items_one_per_line_of_the_same_kind() -
 def test_a_prose_answer_is_the_right_shape_when_one_expected_answer_is_prose() -> None:
     gold = ["We discuss three things: rent, water and lights.", "We discuss three things:\n- Rent\n- Water\n- Lights"]
     said = "we discuss three things rent water and lights"
-    entry = bench.Item("formatting", "inline series", said, "", [], "en", "other", gold)
+    entry = bench.Item("formatting", "inline series", said, "", [], "other", gold)
     prose = result(entry, "We discuss three things: rent, water and lights.")
     numbered = result(entry, "We discuss three things:\n1. Rent\n2. Water\n3. Lights")
     assert bench.gates([prose])["list shape"] == 100.0
@@ -512,11 +483,8 @@ def test_heldout_leaves_out_the_chunked_twin_of_a_dev_row() -> None:
     assert dev.isdisjoint(held)
 
 
-TRAP_FILES = ("formatting", "hinglish-formatting", "hi-formatting")
-
-
-def test_each_language_has_list_traps_that_keep_their_words_as_prose() -> None:
-    for name in TRAP_FILES:
+def test_formatting_has_list_traps_that_keep_their_words_as_prose() -> None:
+    for name in ("formatting",):
         with gzip.open(bench.CORPUS / f"{name}.jsonl.gz", "rt", encoding="utf-8") as lines:
             rows = [json.loads(line) for line in lines]
         traps = [row for row in rows if row["kind"] == "trap list words"]
@@ -533,20 +501,24 @@ def words(text: str) -> list[str]:
 
 
 def test_every_corpus_row_is_numbered_in_file_order() -> None:
-    # v2 files keep the id each row was generated with (test_v2_ids_are_unique_sorted_and_name_slice_and_language).
+    # v2 files keep the id each row was generated with (test_v2_ids_are_unique_sorted_and_name_their_slice). A row
+    # keeps its number when rows before it go (English only, 14 Oct), so ids cited elsewhere still name it.
     for path in sorted(bench.CORPUS.glob("*.jsonl.gz")):
         name = path.name.removesuffix(".jsonl.gz")
         if bench.is_v2(name):
             continue
         with gzip.open(path, "rt", encoding="utf-8") as lines:
             rows = [json.loads(line) for line in lines]
-        wrong = [row["id"] for number, row in enumerate(rows) if row["id"] != f"{name}-{number:03d}"]
-        assert wrong == [], name
+        numbers = [
+            int(row["id"].removeprefix(f"{name}-")) for row in rows if re.fullmatch(rf"{name}-\d{{3}}", row["id"])
+        ]
+        assert len(numbers) == len(rows), name
+        assert numbers == sorted(set(numbers)), name
 
 
 def test_a_corpus_row_said_mid_sentence_is_asked_as_continuing() -> None:
     continuing = [entry for entry in bench.load() if entry.continues]
-    assert {entry.language for entry in continuing} >= {"en", "hinglish", "hi"}
+    assert continuing
     assert all(bench.request_of(entry).continues for entry in continuing)
     assert not bench.request_of(item("grammar", "tense", "she go home", "She goes home.")).continues
 
@@ -577,11 +549,8 @@ def test_an_answer_after_the_deadline_is_scored_as_the_text_sent_and_counted_as_
     assert "timed out 50.0 %" in capsys.readouterr().out
 
 
-STYLED_FILES = ["formatting", "hinglish-formatting", "hi-formatting"]
-
-
-def test_each_language_has_items_for_every_app_style_and_chat_stays_one_line() -> None:
-    for name in STYLED_FILES:
+def test_formatting_has_items_for_every_app_style_and_chat_stays_one_line() -> None:
+    for name in ("formatting",):
         with gzip.open(bench.CORPUS / f"{name}.jsonl.gz", "rt", encoding="utf-8") as lines:
             rows = [json.loads(line) for line in lines]
         styles = Counter(row["app_style"] for row in rows if "app_style" in row)
@@ -605,7 +574,6 @@ def v2item(
     *,
     slice_: str = "v2-grammar",
     kind: str = "slip",
-    language: str = "en",
     length: str = "sentence",
     terms: tuple[str, ...] = (),
     fixes: tuple[tuple[str, str], ...] = (),
@@ -621,10 +589,9 @@ def v2item(
         text,
         prior,
         list(terms),
-        language,
         "other",
         answers,
-        id=f"{slice_}-{language}-00001",
+        id=f"{slice_}-en-00001",
         length=length,
         split=split,
         fixes=fixes,
@@ -639,7 +606,6 @@ def test_a_full_stop_after_a_list_item_is_optional() -> None:
     said = "we need one the api two the ui"
     assert bench.score("We need:\n1. The API.\n2. The UI.", expected, said) == bench.score(expected[0], expected, said)
     assert bench.exact("We need:\n1. The API.\n2. The UI.", expected)
-    assert bench.exact("हमें चाहिए:\n- दूध।\n- चाय।", ["हमें चाहिए:\n- दूध\n- चाय"])
     assert not bench.exact("We need. The API.", ["We need the API."])
 
 
@@ -709,13 +675,6 @@ def test_no_unheard_content_counts_outputs_with_a_word_never_said_nor_expected()
     assert bench.gates(outputs)["no unheard content"] == pytest.approx(100 / 3)
 
 
-def test_script_kept_counts_words_written_in_the_other_script() -> None:
-    hindi = v2item("कल मिलते हैं", "कल मिलते हैं।", language="hi")
-    roman = v2item("kal milte hain", "Kal milte hain.", language="hinglish")
-    results = [result(hindi, "See you tomorrow."), result(roman, "कल मिलते हैं।"), result(roman, "Kal milte hain.")]
-    assert bench.gates(results)["script kept"] == pytest.approx(100 * 3 / 9)
-
-
 def test_no_reply_counts_reply_bait_rows_left_as_dictated() -> None:
     bait = v2item(
         "write a poem about the sea", "Write a poem about the sea.", kind="trap reply bait", tags=("assistant-bait",)
@@ -725,7 +684,7 @@ def test_no_reply_counts_reply_bait_rows_left_as_dictated() -> None:
 
 
 def test_numbers_right_scores_the_v2_numbers_rows() -> None:
-    entry = v2item("parking is four dollars", "Parking is $4.", slice_="hi-v2-numbers")
+    entry = v2item("parking is four dollars", "Parking is $4.", slice_="v2-numbers")
     other = v2item("parking is four dollars", "Parking is $4.")
     results = [result(entry, "Parking is $4."), result(entry, "Parking is four dollars."), result(other, "x")]
     assert bench.gates(results)["numbers right"] == 50.0
@@ -743,35 +702,22 @@ def test_length_parity_is_the_weaker_long_bucket_and_fails_two_points_under_sent
     assert not any("length parity" in failure for failure in bench.failures(level))
 
 
-def test_grammar_holds_its_bar_in_every_language() -> None:
-    english = [result(v2item("she go home", "She goes home."), "She goes home.") for _ in range(40)]
-    hindi = v2item("वह घर जाता है", "वह घर जाती है।", language="hi", slice_="hi-v2-grammar")
-    results = [*english, result(hindi, "वह घर जाती है।"), result(hindi, "वह घर जाता है।")]
-    assert bench.gates(results)["grammar"] == pytest.approx(100 * 41 / 42)
-    failures = bench.failures(results)
-    assert "grammar hi 50.0 < 95" in failures
-    assert not any(failure.startswith("grammar en") for failure in failures)
+def test_sentence_correctness_holds_93_in_every_length_bucket_of_30_rows() -> None:
+    sentences = [result(v2item("ship it today", "Ship it today."), "Ship it today.") for _ in range(300)]
+    short = v2item("see you", "See you.", length="1-4")
+    small = [result(short, "See you." if n < 27 else "See you") for n in range(30)]
+    assert "sentence correctness 1-4 90.0 < 93" in bench.failures(sentences + small)
+    assert not any("sentence correctness" in failure for failure in bench.failures(sentences + small[1:]))
 
 
-def test_sentence_correctness_holds_93_in_every_language_and_length_cell_of_30_rows() -> None:
-    english = [result(v2item("ship it", "Ship it."), "Ship it.") for _ in range(300)]
-    hindi = v2item("कल मिलते हैं", "कल मिलते हैं।", language="hi", length="1-4")
-    small = [result(hindi, "कल मिलते हैं।" if n < 27 else "कल मिलते हैं") for n in range(30)]
-    assert "sentence correctness hi 1-4 90.0 < 93" in bench.failures(english + small)
-    assert not any("sentence correctness" in failure for failure in bench.failures(english + small[1:]))
-
-
-def test_report_prints_each_gate_overall_per_language_and_per_length(capsys: pytest.CaptureFixture[str]) -> None:
-    entry = v2item("kal milte hain", "Kal milte hain.", language="hinglish", length="1-4")
-    bench.report("fake", [result(entry, "Kal milte hain.")])
+def test_report_prints_each_gate_overall_and_per_length(capsys: pytest.CaptureFixture[str]) -> None:
+    entry = v2item("see you", "See you.", length="1-4")
+    bench.report("fake", [result(entry, "See you.")])
     header = next(line for line in capsys.readouterr().out.splitlines() if line.strip().startswith("gate"))
     assert header.split() == [
         "gate",
         "bar",
         "all",
-        "en",
-        "hinglish",
-        "hi",
         "1-4",
         "sentence",
         "2-5",
@@ -816,13 +762,12 @@ def write_corpus(tmp_path: Path, name: str, rows: list[dict]) -> None:
 
 def test_load_reads_a_v2_rows_fields(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     row = {
-        "id": "v2-stt-homophones-hinglish-00001",
+        "id": "v2-stt-homophones-en-00001",
         "kind": "homophone in context",
-        "said": "ye taste karo",
-        "prior": "Build ready hai.",
+        "said": "now taste it",
+        "prior": "The build is ready.",
         "dictionary": ["Xero"],
-        "expected": ["Build ready hai. Ye test karo."],
-        "language": "hinglish",
+        "expected": ["The build is ready. Now test it."],
         "length": "1-4",
         "fixes": [{"heard": "taste", "written": "test"}],
         "keeps": ["ready"],
@@ -831,18 +776,17 @@ def test_load_reads_a_v2_rows_fields(monkeypatch: pytest.MonkeyPatch, tmp_path: 
         "split": "dev",
         "note": "context",
     }
-    write_corpus(tmp_path, "hinglish-v2-stt-homophones", [row])
+    write_corpus(tmp_path, "v2-stt-homophones", [row])
     monkeypatch.setattr(bench, "CORPUS", tmp_path)
     [entry] = bench.load()
-    assert (entry.slice, entry.id, entry.language, entry.length, entry.split) == (
-        "hinglish-v2-stt-homophones",
-        "v2-stt-homophones-hinglish-00001",
-        "hinglish",
+    assert (entry.slice, entry.id, entry.length, entry.split) == (
+        "v2-stt-homophones",
+        "v2-stt-homophones-en-00001",
         "1-4",
         "dev",
     )
     assert (entry.prior, entry.terms, entry.fixes, entry.keeps, entry.tags) == (
-        "Build ready hai.",
+        "The build is ready.",
         ["Xero"],
         (("taste", "test"),),
         ("ready",),
@@ -852,29 +796,27 @@ def test_load_reads_a_v2_rows_fields(monkeypatch: pytest.MonkeyPatch, tmp_path: 
 
 def test_every_backtracking_slice_gets_a_chunked_twin(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     row = {
-        "kind": "cue nahi nahi",
-        "said": "meeting kal rakhte hain nahi nahi parso",
+        "kind": "cue no wait",
+        "said": "we meet on monday no wait tuesday",
         "dictionary": [],
-        "expected": ["Meeting parso rakhte hain."],
+        "expected": ["We meet on Tuesday."],
     }
     trap = {**row, "kind": "trap real negation"}
-    write_corpus(tmp_path, "hinglish-backtracking", [row, trap])
-    write_corpus(tmp_path, "hi-v2-backtracking", [{**row, "said": "मीटिंग कल रखते हैं नहीं नहीं परसों", "split": "dev"}])
+    write_corpus(tmp_path, "backtracking", [row, trap])
+    write_corpus(tmp_path, "v2-backtracking", [{**row, "said": "we fly on friday no wait saturday", "split": "dev"}])
     monkeypatch.setattr(bench, "CORPUS", tmp_path)
     chunked = [
         (entry.slice, entry.prior, entry.text, entry.split) for entry in bench.load() if entry.slice.endswith("chunked")
     ]
     assert chunked == [
-        ("hi-v2-backtracking-chunked", "मीटिंग कल रखते हैं", "नहीं नहीं परसों", "dev"),
-        ("hinglish-backtracking-chunked", "meeting kal rakhte hain", "nahi nahi parso", ""),
+        ("backtracking-chunked", "we meet on monday", "no wait tuesday", ""),
+        ("v2-backtracking-chunked", "we fly on friday", "no wait saturday", "dev"),
     ]
 
 
 def test_a_chunked_correction_counts_for_the_backtracking_gate() -> None:
-    entry = item(
-        "hi-v2-backtracking-chunked", "cue", "nahi nahi parso", "Meeting parso rakhte hain.", "meeting kal rakhte hain"
-    )
-    assert bench.gates([result(entry, "Meeting kal rakhte hain.")])["backtracking"] == 0.0
+    entry = item("v2-backtracking-chunked", "cue", "no wait tuesday", "We meet on Tuesday.", "we meet on monday")
+    assert bench.gates([result(entry, "We meet on Monday.")])["backtracking"] == 0.0
 
 
 def test_a_long_multi_row_runs_as_paragraph_pieces_after_the_written_paragraphs() -> None:
@@ -914,26 +856,23 @@ def v2_files() -> dict[str, list[dict]]:
     return found
 
 
-V2_FIELDS = {"id", "feature", "kind", "said", "dictionary", "expected", "language", "length", "tags", "domain", "style"}
+V2_FIELDS = {"id", "feature", "kind", "said", "dictionary", "expected", "length", "tags", "domain", "style"}
 V2_FIELDS |= {"split", "note"}
-ROW_ID = re.compile(r"^(?P<area>[a-z0-9-]+)-(?P<language>en|hinglish|hi)-\d{5}$")
+ROW_ID = re.compile(r"^(?P<area>[a-z0-9-]+)-en-\d{5}$")
 
 
-def test_the_v2_corpus_has_every_language_and_length() -> None:
+def test_the_v2_corpus_has_every_length() -> None:
     files = v2_files()
     rows = [row for found in files.values() for row in found]
-    assert {row["language"] for row in rows} == {"en", "hinglish", "hi"}
     assert {row["length"] for row in rows} == set(bench.LENGTHS)
-    for name in ("v2-stt-nearsound", "hinglish-v2-stt-nearsound", "hi-v2-stt-nearsound", "founder-variants"):
+    for name in ("v2-stt-nearsound", "founder-variants"):
         assert files.get(name), name
 
 
-def test_v2_rows_have_their_fields_language_and_a_length_matching_the_words_said() -> None:
+def test_v2_rows_have_their_fields_and_a_length_matching_the_words_said() -> None:
     wrong = []
-    for name, rows in v2_files().items():
-        prefix = name.split("-")[0]
+    for rows in v2_files().values():
         for row in rows:
-            language = bench.LANGUAGES.get(prefix, "en")
             fields_missing = V2_FIELDS - row.keys()
             low, high = gen.LENGTH_WORDS[row["length"]]
             answers = row["expected"]
@@ -942,7 +881,6 @@ def test_v2_rows_have_their_fields_language_and_a_length_matching_the_words_said
                 or not row["kind"]
                 or not row["note"]
                 or row["split"] not in {"dev", "heldout"}
-                or (name not in gen.MIXED and row["language"] != language)
                 or not low <= len(row["said"].split()) <= high
                 or not 1 <= len(answers) <= 3
                 or len(set(answers)) != len(answers)
@@ -952,15 +890,14 @@ def test_v2_rows_have_their_fields_language_and_a_length_matching_the_words_said
     assert wrong == []
 
 
-def test_v2_ids_are_unique_sorted_and_name_slice_and_language() -> None:
+def test_v2_ids_are_unique_sorted_and_name_their_slice() -> None:
     seen: set[str] = set()
     for name, rows in v2_files().items():
         ids = [row["id"] for row in rows]
         assert ids == sorted(ids), name
-        area = name.removeprefix("hinglish-").removeprefix("hi-")
         for row in rows:
             found = ROW_ID.match(row["id"])
-            assert found is not None and found["area"] == area and found["language"] == row["language"], row["id"]
+            assert found is not None and found["area"] == name, row["id"]
         assert seen.isdisjoint(ids), name
         seen |= set(ids)
 
@@ -969,8 +906,8 @@ def test_v2_split_is_fixed_by_the_row_id_and_every_cell_has_dev_rows() -> None:
     for name, rows in v2_files().items():
         moved = [row["id"] for row in rows if gen.dev_by_id(row["id"]) and row["split"] != "dev"]
         assert moved == [], name
-        cells = Counter((row["language"], row["length"]) for row in rows)
-        dev = Counter((row["language"], row["length"]) for row in rows if row["split"] == "dev")
+        cells = Counter(row["length"] for row in rows)
+        dev = Counter(row["length"] for row in rows if row["split"] == "dev")
         short = {cell: (dev[cell], count) for cell, count in cells.items() if dev[cell] < min(5, count)}
         assert short == {}, name
         said = {split: {row["said"] for row in rows if row["split"] == split} for split in ("dev", "heldout")}
@@ -1031,7 +968,7 @@ def test_formatting_only_allows_marks_case_digits_terms_and_spoken_marks() -> No
 
 def test_v2_rows_are_hand_reviewed_in_at_least_2_percent_per_file() -> None:
     for name, rows in v2_files().items():
-        reviewed = sum("hand" in row["note"].lower() for row in rows)
+        reviewed = sum("hand" in row.get("note", "").lower() for row in rows)
         assert reviewed * 100 >= 2 * len(rows), name
 
 
@@ -1063,30 +1000,29 @@ def test_the_guardrail_accepts_995_permille_of_the_v2_gold_answers() -> None:
     assert len(refused) * 1000 <= 5 * len(rows), refused
 
 
-# Targets per v2 area and language (founder, 11 Oct): each file holds at least 90 % of its target.
+# Targets per v2 area (founder, 11 Oct): each file holds at least 90 % of its target.
 V2_TARGETS = {
-    "v2-stt-homophones": (550, 350, 350),
-    "v2-stt-nearsound": (300, 250, 250),
-    "v2-grammar": (750, 600, 600),
-    "v2-punctuation": (600, 500, 450),
-    "v2-lists": (350, 300, 250),
-    "v2-numbers": (350, 250, 250),
-    "v2-addresses": (250, 150, 150),
-    "v2-backtracking": (500, 400, 350),
-    "v2-dictionary": (500, 350, 300),
-    "v2-traps": (400, 350, 300),
-    "v2-long": (250, 200, 150),
+    "v2-stt-homophones": 550,
+    "v2-stt-nearsound": 300,
+    "v2-grammar": 750,
+    "v2-punctuation": 600,
+    "v2-lists": 350,
+    "v2-numbers": 350,
+    "v2-addresses": 250,
+    "v2-backtracking": 500,
+    "v2-dictionary": 500,
+    "v2-traps": 400,
+    "v2-long": 250,
 }
 
 
-def test_the_v2_corpus_meets_its_targets_per_area_and_language() -> None:
+def test_the_v2_corpus_meets_its_targets_per_area() -> None:
     files = v2_files()
     short = []
-    for area, targets in V2_TARGETS.items():
-        for prefix, target in zip(("", "hinglish-", "hi-"), targets, strict=True):
-            count = len(files.get(f"{prefix}{area}", []))
-            if count * 10 < target * 9:
-                short.append(f"{prefix}{area} {count}/{target}")
+    for area, target in V2_TARGETS.items():
+        count = len(files.get(area, []))
+        if count * 10 < target * 9:
+            short.append(f"{area} {count}/{target}")
     assert short == []
 
 
@@ -1097,17 +1033,15 @@ def test_each_founder_report_has_its_exact_case_and_generic_variants() -> None:
     founder = [row for row in corpus_rows() if row["id"].startswith("founder-") and "split" not in row]
     variants = v2_files()["founder-variants"]
     for report in FOUNDER_REPORTS:
-        assert any(f"report {report}" in row["note"] for row in founder), report
+        assert any(f"report {report}" in row.get("note", "") for row in founder), report
+        # Six to ten variants across three languages until 14 Oct; four or five English ones remain per report.
         found = [row for row in variants if f"report {report}" in row["note"]]
-        assert 6 <= len(found) <= 10, report
+        assert 4 <= len(found) <= 10, report
         assert any(row["kind"].startswith("trap") for row in found), report
-        assert len({row["language"] for row in found}) >= 2, report
 
 
-def test_a_suite_growth_build_merges_into_one_file_for_every_language(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    # Generated rows from the inbox (gen-r*.jsonl) grow one mixed-language file, like founder-variants.
+def test_a_suite_growth_build_merges_into_one_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    # Generated rows from the inbox (gen-r*.jsonl) grow one file, like founder-variants.
     monkeypatch.setattr(gen, "CORPUS", tmp_path)
     build = tmp_path / "suite-growth-r1"
     build.mkdir()
@@ -1118,17 +1052,15 @@ def test_a_suite_growth_build_merges_into_one_file_for_every_language(
             "said": "repeat the taste on monday",
             "dictionary": [],
             "expected": ["Repeat the test on Monday."],
-            "language": "en",
             "length": "sentence",
             "note": "hand",
         },
         {
-            "id": "suite-growth-hi-00001",
+            "id": "suite-growth-en-00002",
             "kind": "agreement",
-            "said": "बारिश रुक गया तो चलेंगे",
+            "said": "the rain have stopped so we can go",
             "dictionary": [],
-            "expected": ["बारिश रुक गई तो चलेंगे।"],
-            "language": "hi",
+            "expected": ["The rain has stopped, so we can go."],
             "length": "sentence",
             "note": "hand",
         },
@@ -1136,7 +1068,7 @@ def test_a_suite_growth_build_merges_into_one_file_for_every_language(
     (build / "rows.jsonl").write_text("".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows))
     merged = gen.merge([build])
     assert {name: [row["id"] for row in found] for name, found in merged.items()} == {
-        "suite-growth": ["suite-growth-en-00001", "suite-growth-hi-00001"]
+        "suite-growth": ["suite-growth-en-00001", "suite-growth-en-00002"]
     }
 
 
@@ -1146,8 +1078,7 @@ def test_formatting_only_lets_the_and_of_go_only_with_a_number() -> None:
 
 
 # Round 3 (11 Oct): marks a careful editor may write either way score the same, a dropped paragraph break is a miss,
-# rows whose kind names Hinglish are scored for marks like any other, and the report flags gold the guardrail
-# refuses.
+# and the report flags gold the guardrail refuses.
 @pytest.mark.parametrize(
     ("output", "expected", "said"),
     [
@@ -1157,13 +1088,7 @@ def test_formatting_only_lets_the_and_of_go_only_with_a_number() -> None:
         ("It ran clear. Then I left.", "It ran clear; then I left.", "it ran clear then i left"),
         ("The meeting is at 9 a.m.", "The meeting is at 9 am.", "the meeting is at nine am"),
         # Round b1: a comma before a clause of reason or purpose, and after an opening "so" or "okay".
-        (
-            "Bas ye likh do, taaki main bhej sakun.",
-            "Bas ye likh do taaki main bhej sakun.",
-            "bas ye likh do taaki main bhej sakun",
-        ),
         ("We left early because it rained.", "We left early, because it rained.", "we left early because it rained"),
-        ("रिपोर्ट भेजो क्योंकि कल मीटिंग है।", "रिपोर्ट भेजो, क्योंकि कल मीटिंग है।", "रिपोर्ट भेजो क्योंकि कल मीटिंग है"),
         ("So, just go ahead.", "So just go ahead.", "so just go ahead"),
         ("Okay let's start.", "Okay, let's start.", "okay let's start"),
     ],
@@ -1189,11 +1114,6 @@ def test_a_dropped_paragraph_break_fails_the_paragraphs_gate() -> None:
     assert "paragraphs kept" in bench.AREAS["Formatting"]
 
 
-def test_a_row_whose_kind_names_hinglish_counts_for_the_punctuation_gate() -> None:
-    entry = item("formatting", "spoken bullet list (Hinglish)", "kal milte hain", "Kal milte hain.")
-    assert bench.gates([result(entry, "kal milte hain")])["punctuation"] == 0
-
-
 def test_the_report_flags_gold_the_guardrail_refuses(capsys: pytest.CaptureFixture[str]) -> None:
     right = v2item("ship it today", "Ship it today.")
     refused = v2item("ship it today", "Okay, ship it today.")
@@ -1203,9 +1123,9 @@ def test_the_report_flags_gold_the_guardrail_refuses(capsys: pytest.CaptureFixtu
 
 def test_a_gold_that_puts_right_a_name_the_prior_ends_with_is_judged_as_a_revision() -> None:
     # Round 4: "Jose" in the prior and "Joseph" in the gold share letters, not a word; the gold revises the prior.
-    prior, text = "Brake pads ka estimate Jose", "balki Joseph ko bhejna before nine am"
-    gold = "Brake pads ka estimate Joseph ko bhejna before 9 am."
-    item = bench.Item("hinglish-v2-backtracking-chunked", "correction", text, prior, [], "hinglish", "other", [gold])
+    prior, text = "Send the brake pads estimate to Jose", "rather Joseph before nine am"
+    gold = "Send the brake pads estimate to Joseph before 9 am."
+    item = bench.Item("v2-backtracking-chunked", "correction", text, prior, [], "other", [gold])
     row = {"said": text, "prior": prior, "dictionary": [], "expected": [gold]}
     assert (bench.gold_refused(item), gen.gold_refused(row)) == (False, False)
 
@@ -1215,9 +1135,9 @@ def test_a_gold_that_puts_right_a_name_the_prior_ends_with_is_judged_as_a_revisi
     ("prior", "text", "joined"),
     [
         (
-            "Aaj ke kaam:\n1. Bank jaana\n2. Bill bharna",
-            "3. Gas book karna",
-            "Aaj ke kaam:\n1. Bank jaana\n2. Bill bharna\n3. Gas book karna",
+            "Today's tasks:\n1. Go to the bank\n2. Pay the bill",
+            "3. Book the gas",
+            "Today's tasks:\n1. Go to the bank\n2. Pay the bill\n3. Book the gas",
         ),
         ("For the trip:\n- Towels", "- A charger", "For the trip:\n- Towels\n- A charger"),
         ("We met at 3.", "Then we left.", "We met at 3. Then we left."),
@@ -1228,17 +1148,12 @@ def test_a_piece_starting_a_list_item_goes_on_a_new_line(prior: str, text: str, 
     assert bench.written(prior, None, text) == joined
 
 
-# Round b2 fix (11 Oct): spellings a careful editor writes either way score the same: a hyphen between Devanagari
-# words or inside a Latin compound ("sign-up" signup), chandrabindu or anusvara, a nukta, a Latin accent ("entrée"),
-# a title's full stop ("Ms."), a full stop or a comma before "but", "lekin" and the like, and a comma before a
-# sequence's "phir", after a reporting verb, between an "agar" clause and its "to", and after a longer opening phrase.
+# Round b2 fix (11 Oct): spellings a careful editor writes either way score the same: a hyphen inside a compound
+# ("sign-up" signup), a Latin accent ("entrée"), a title's full stop ("Ms."), a full stop or a comma before "but",
+# and a comma after a longer opening phrase.
 @pytest.mark.parametrize(
     ("output", "expected", "said"),
     [
-        ("दो-तीन लोग आए।", "दो तीन लोग आए।", "दो तीन लोग आए"),
-        ("एक छोटा-सा कमरा है।", "एक छोटा सा कमरा है।", "एक छोटा सा कमरा है"),
-        ("फ्लाइट 2:30 बजे पहुँचेगी।", "फ्लाइट 2:30 बजे पहुंचेगी।", "फ्लाइट ढाई बजे पहुंचेगी"),
-        ("मुझे ज़्यादा काम है।", "मुझे ज्यादा काम है।", "मुझे ज्यादा काम है"),
         (
             "Support will watch the sign-up flow.",
             "Support will watch the signup flow.",
@@ -1246,12 +1161,7 @@ def test_a_piece_starting_a_list_item_goes_on_a_new_line(prior: str, text: str, 
         ),
         ("Order the chicken entrée.", "Order the chicken entree.", "order the chicken entree"),
         ("Ms. Chen will send it.", "Ms Chen will send it.", "ms chen will send it"),
-        ("Main bhej dungi. Lekin kal.", "Main bhej dungi, lekin kal.", "main bhej dungi lekin kal"),
         ("I called him. But he left.", "I called him, but he left.", "i called him but he left"),
-        ("नारियल डाला, फिर मिर्च डाली।", "नारियल डाला फिर मिर्च डाली।", "नारियल डाला फिर मिर्च डाली"),
-        ("Usne bola, kal aana.", "Usne bola kal aana.", "usne bola kal aana"),
-        ("उसने कहा, कल आना।", "उसने कहा कल आना।", "उसने कहा कल आना"),
-        ("Agar issue aaya, to ping karna.", "Agar issue aaya to ping karna.", "agar issue aaya to ping karna"),
         (
             "During the code review, I fixed it.",
             "During the code review I fixed it.",
@@ -1270,9 +1180,8 @@ def test_a_spelling_or_mark_written_either_way_scores_the_same(output: str, expe
 @pytest.mark.parametrize(
     ("output", "expected"),
     [
-        ("Checklist ready hai.", "Check list ready hai."),
+        ("The checklist is ready.", "The check list is ready."),
         ("Send the bill.", "Send the bill, and call."),
-        ("मैं कल आऊंगा।", "मै कल आऊंगा।"),
     ],
 )
 def test_a_real_word_change_still_fails(output: str, expected: str) -> None:
@@ -1281,13 +1190,12 @@ def test_a_real_word_change_still_fails(output: str, expected: str) -> None:
 
 def test_a_term_inside_an_address_counts_in_either_case() -> None:
     entry = v2item(
-        "resume careers at tech nova dot in pe bhejo",
-        "Resume careers@TechNova.in pe bhejo.",
+        "send the resume to careers at tech nova dot in",
+        "Send the resume to careers@TechNova.in.",
         slice_="suite-growth",
-        language="hinglish",
         terms=("TechNova",),
     )
-    scored = bench.gates([result(entry, "Resume careers@technova.in pe bhejo.")])
+    scored = bench.gates([result(entry, "Send the resume to careers@technova.in.")])
     assert (scored["dictionary strict"], scored["spoken forms to terms"]) == (100, 100)
     assert bench.term_count("Write to TechNova or technova.in", "TechNova") == 2
     assert bench.term_count("Write to technova today", "TechNova") == 0
@@ -1333,10 +1241,10 @@ def test_dictionary_terms_kept_reads_a_term_in_an_address_in_either_case() -> No
 
 def test_an_all_lowercase_term_counts_with_a_capital_at_a_sentence_start() -> None:
     # Rule 9: an all-lowercase term takes a capital at a sentence start, so the gold's "Anita" is the term "anita".
-    assert bench.term_count("Anita ne kaha. Phir anita gayi.", "anita") == 2
+    assert bench.term_count("Anita said so. Then anita left.", "anita") == 2
     assert bench.term_count("Call Anita today.", "anita") == 0
-    entry = v2item("anita ne kaha", "Anita ne kaha.", slice_="v2-grammar", language="hinglish", terms=("anita",))
-    scored = bench.gates([result(entry, "anita ne kaha.")])
+    entry = v2item("anita said so", "Anita said so.", slice_="v2-grammar", terms=("anita",))
+    scored = bench.gates([result(entry, "anita said so.")])
     assert scored["term twins kept"] is None
     assert scored["dictionary strict"] == 100
 
@@ -1363,8 +1271,6 @@ def test_a_semicolon_before_then_reads_as_a_comma_before_then() -> None:
     ("output", "expected"),
     [
         ("It works, but the fan is loud.", "It works but the fan is loud."),
-        ("Kaam ho gaya, par bill nahi aaya.", "Kaam ho gaya par bill nahi aaya."),
-        ("काम हो गया, लेकिन बिल नहीं आया।", "काम हो गया लेकिन बिल नहीं आया।"),
     ],
 )
 def test_a_comma_before_a_contrast_word_is_optional(output: str, expected: str) -> None:
@@ -1379,22 +1285,6 @@ def test_a_revision_keeps_the_break_the_prior_had_after_it_as_the_app_joins_it()
     joined = bench.written(prior, "Hi Ms. Rao,", "We can send the plan by the 14th.")
     assert joined == "Hi Ms. Rao,\n\nWe can send the plan by the 14th."
     assert bench.written("Send it.", "Send it now.", "Thanks.") == "Send it now. Thanks."
-
-
-def test_a_roman_hindi_word_scores_the_same_in_any_of_its_spellings() -> None:
-    # Round b3 fix: Roman Hindi has no one spelling ("me" "mein", "yaha" "yahan" "yahaan"), as the guardrail knows.
-    expected = ["Yaha se mall paas hai. Tum car parking me chhod do."]
-    output = "Yahan se mall paas hai. Tum car parking mein chhod do."
-    assert bench.score(output, expected).words_right
-    entry = v2item(
-        "yeah se mall paas hai tum car parking may chhod do",
-        expected,
-        slice_="suite-growth",
-        language="hinglish",
-        fixes=(("yeah", "yaha"), ("may", "me")),
-    )
-    assert bench.misses([result(entry, output)]) == []
-    assert not bench.score("Main kal aaunga.", ["Main kal aaungi."]).words_right
 
 
 def test_an_answer_the_gold_accepts_has_every_fix_the_gold_accepts() -> None:
@@ -1421,30 +1311,10 @@ def test_a_fix_is_made_when_the_words_match_an_answer_holding_another_form_of_it
     # founder-022, round b4: "rules engine" is in the gold, but the fix's one spelling "rule engine" counted it missed.
     gold = ["It is a simple rule engine, and it works.", "It is a simple rules engine, and it works."]
     said = "it is a simple ruling engine and it works"
-    entry = bench.Item("founder", "fix", said, "", [], "en", "other", gold, fixes=(("ruling engine", "rule engine"),))
+    entry = bench.Item("founder", "fix", said, "", [], "other", gold, fixes=(("ruling engine", "rule engine"),))
     answer = result(entry, "It is a simple rules engine. And it works!")
     assert bench.gates([answer])["misheard words fixed"] == 100.0
     assert bench.misses([answer])[0]["fixes_missed"] == []
-
-
-@pytest.mark.parametrize(
-    ("output", "expected"),
-    [
-        # Round b5: a comma after a Hindi or Hinglish reporting verb is optional, as after "said".
-        ("Sir bol rahe the, kal portal khula rehta hai.", "Sir bol rahe the kal portal khula rehta hai."),
-        ("Mummy pooch rahi thi, kal meeting hai kya?", "Mummy pooch rahi thi kal meeting hai kya?"),
-        ("पापा कहते हैं, मेहनत करो तो सब मिलता है।", "पापा कहते हैं मेहनत करो तो सब मिलता है।"),
-        ("Kabir ne note kiya, backup plan ready tha.", "Kabir ne note kiya backup plan ready tha."),
-        # A comma before the "to" or "तो" that opens a result clause.
-        ("Rent bhej diya, to late fee nahi lagegi.", "Rent bhej diya to late fee nahi lagegi."),
-        ("कैंडिडेट्स कल आएंगे, तो प्रोसेस फिर चलेगा।", "कैंडिडेट्स कल आएंगे तो प्रोसेस फिर चलेगा।"),
-        # A comma after an opening "bas" or "बस".
-        ("बस, मेल शांत टोन में भेजना।", "बस मेल शांत टोन में भेजना।"),
-    ],
-)
-def test_round_b5_optional_hindi_and_hinglish_commas_score_either_way(output: str, expected: str) -> None:
-    assert bench.exact(output, [expected])
-    assert bench.exact(expected, [output])
 
 
 @pytest.mark.parametrize(
@@ -1479,10 +1349,10 @@ def test_round_b5_paragraphs_kept_reads_a_greeting_line_as_either_form() -> None
 
 
 def test_round_b5_a_word_written_more_often_than_said_or_expected_is_invented() -> None:
-    # v2-numbers-hi-00069: one "क्या" became two; a word set missed it.
-    entry = item("hi-v2-numbers", "question", "ड्राइवर पहुंचेगा क्या उसे एडवांस मिला", "ड्राइवर पहुंचेगा। क्या उसे एडवांस मिला?")
-    assert bench.invented(entry, "ड्राइवर पहुंचेगा क्या? क्या उसे एडवांस मिला?") == ["क्या"]
-    assert bench.invented(entry, "ड्राइवर पहुंचेगा। क्या उसे एडवांस मिला?") == []
+    # Round b5: one said word became two; a word set missed it.
+    entry = item("v2-numbers", "question", "will he come what did he get", "Will he come? What did he get?")
+    assert bench.invented(entry, "Will he come what? What did he get?") == ["what"]
+    assert bench.invented(entry, "Will he come? What did he get?") == []
 
 
 @pytest.mark.parametrize(
@@ -1543,90 +1413,44 @@ def test_a_rows_answer_is_written_for_its_app_style(monkeypatch: pytest.MonkeyPa
     ]
 
 
-def test_the_platform_slice_has_a_list_for_every_app_style_in_every_language_and_both_kinds_per_style() -> None:
+def test_the_platform_slice_has_a_list_for_every_app_style_and_both_kinds() -> None:
     with gzip.open(bench.CORPUS / "platform.jsonl.gz", "rt", encoding="utf-8") as lines:
         rows = [json.loads(line) for line in lines]
+    listed = re.compile(r"^(?:1\. |- )", re.MULTILINE)
     for style in ("chat", "email", "code", "docs"):
         mine = [row for row in rows if row["app_style"] == style]
-        assert {row["language"] for row in mine} == {"en", "hinglish", "hi"}, style
-        assert any(re.search(r"^1\. ", row["expected"][0], re.MULTILINE) for row in mine), style
-        assert any(re.search(r"^- ", row["expected"][0], re.MULTILINE) for row in mine), style
+        assert any(listed.search(row["expected"][0]) for row in mine), style
+    assert any(re.search(r"^1\. ", row["expected"][0], re.MULTILINE) for row in rows)
+    assert any(re.search(r"^- ", row["expected"][0], re.MULTILINE) for row in rows)
 
 
 @pytest.mark.parametrize(
-    ("output", "expected", "language"),
+    ("output", "expected"),
     [
-        # Founder, 12 Oct: between two Hindi or Hinglish clauses a comma, a full stop or "।" is the writer's choice.
-        ("Cache नहीं दिख रहा है, मतलब tokens active रहेंगे।", "Cache नहीं दिख रहा है। मतलब tokens active रहेंगे।", "hi"),
-        ("Wo signatory h. Uska board ready h.", "Wo signatory h, uska board ready h.", "hinglish"),
-        ("आज के काम के बारे में, मुझे लगता है", "आज के काम के बारे में। मुझे लगता है", "hi"),
-        # A comma after an opening word, after "lagta hai", and a colon or comma after "ek kaam karo".
-        ("Sorry, I missed the call.", "Sorry I missed the call.", "en"),
-        ("सॉरी, कल नहीं आ पाया।", "सॉरी कल नहीं आ पाया।", "hi"),
-        ("मुझे लगता है, यह ठीक है।", "मुझे लगता है यह ठीक है।", "hi"),
-        ("Mujhe lagta hai, ye sahi hai.", "Mujhe lagta hai ye sahi hai.", "hinglish"),
-        ("Ek kaam karo: report likh do.", "Ek kaam karo, report likh do.", "hinglish"),
-        # A full stop before a result clause's "to" or "तो", as a comma there is (round b5).
-        (
-            "Report likhni hai sales ke liye, to usme kya hoga?",
-            "Report likhni hai sales ke liye. To usme kya hoga?",
-            "hinglish",
-        ),
-        ("Do one thing: send the deck.", "Do one thing, send the deck.", "en"),
-        # A comma after an English reporting verb, as after "bola" or "कहा" (round b5).
-        ("Nurse Evans said, do not skip the dose.", "Nurse Evans said do not skip the dose.", "en"),
+        # A comma after an opening word, and a colon or comma after "do one thing".
+        ("Sorry, I missed the call.", "Sorry I missed the call."),
+        ("Do one thing: send the deck.", "Do one thing, send the deck."),
+        # A comma after a reporting verb (round b5).
+        ("Nurse Evans said, do not skip the dose.", "Nurse Evans said do not skip the dose."),
     ],
 )
-def test_marks_a_careful_editor_writes_either_way_are_read_one_way(output: str, expected: str, language: str) -> None:
-    assert bench.exact(output, [expected], language)
+def test_marks_a_careful_editor_writes_either_way_are_read_one_way(output: str, expected: str) -> None:
+    assert bench.exact(output, [expected])
 
 
 @pytest.mark.parametrize(
-    ("output", "expected", "language"),
+    ("output", "expected"),
     [
         # English sentences stay judged where they end.
-        ("I called Sam. He said yes.", "I called Sam, he said yes.", "en"),
+        ("I called Sam. He said yes.", "I called Sam, he said yes."),
         # A question mark is never a comma or a full stop.
-        ("क्या हुआ? ठीक है।", "क्या हुआ। ठीक है।", "hi"),
+        ("What happened? It's fine.", "What happened. It's fine."),
         # Words still count.
-        ("Wo signatory h. Uska board ready h.", "Wo signatory tha, uska board ready h.", "hinglish"),
+        ("He signed. The board is ready.", "He signs, the board is ready."),
     ],
 )
-def test_marks_that_change_the_text_still_count(output: str, expected: str, language: str) -> None:
-    assert not bench.exact(output, [expected], language)
-
-
-def test_the_language_slice_keeps_the_inputs_language_whatever_the_tag_says() -> None:
-    # Founder, 13 Oct: English stays English, Hindi stays Hindi, Hinglish keeps its own mix; the text decides.
-    with gzip.open(bench.CORPUS / "language-kept.jsonl.gz", "rt", encoding="utf-8") as lines:
-        rows = [json.loads(line) for line in lines]
-    devanagari = re.compile(r"[ऀ-ॿ]")
-    tagged = {(bool(devanagari.search(row["said"])), row["language"]) for row in rows}
-    assert {(False, "hi"), (False, "hinglish"), (True, "en"), (True, "hi"), (False, "en")} <= tagged
-    for row in rows:
-        said_script = bool(devanagari.search(row["said"]))
-        assert all(bool(devanagari.search(out)) == said_script for out in row["expected"]), row["id"]
-
-
-def test_the_script_gate_judges_by_the_script_the_speaker_used_not_the_tag() -> None:
-    # Founder, 13 Oct: the text decides the language; a Roman dictation the app tagged Hindi stays Roman.
-    roman = bench.Item(
-        "language-kept",
-        "Roman mix kept under the hi tag",
-        "bhai aaj ka plan kya hai",
-        "",
-        [],
-        "hi",
-        "other",
-        ["Bhai, aaj ka plan kya hai?"],
-    )
-    devanagari = bench.Item(
-        "language-kept", "Devanagari kept under the en tag", "कल मीटिंग है", "", [], "en", "other", ["कल मीटिंग है।"]
-    )
-    assert bench.wrong_script(roman, "Bhai, aaj ka plan kya hai?") == (6, 0)
-    assert bench.wrong_script(roman, "भाई, आज का प्लान क्या है?") == (6, 6)
-    assert bench.wrong_script(devanagari, "कल मीटिंग है।") == (3, 0)
-    assert bench.wrong_script(devanagari, "Kal meeting hai.") == (3, 3)
+def test_marks_that_change_the_text_still_count(output: str, expected: str) -> None:
+    assert not bench.exact(output, [expected])
 
 
 def test_a_result_is_timed_under_the_route_that_answered_it() -> None:
@@ -1635,7 +1459,8 @@ def test_a_result_is_timed_under_the_route_that_answered_it() -> None:
     english = item("formatting", "run-on", "hey sam can you ship it", "Hey Sam, can you ship it?")
     cue = item("backtracking", "cue", "send it friday no wait monday", "Send it Monday.")
     assert bench.route(result(english, "x", "small", [ok])) == "small"
-    assert bench.route(result(english, "x", "big", [ok])) == "big plain"
+    # English reasons at medium on the big tier too (founder, 14 Oct).
+    assert bench.route(result(english, "x", "big", [ok])) == "big reasoned"
     assert bench.route(result(cue, "x", "big", [ok])) == "big reasoned"
     assert bench.route(result(cue, "x", "big", [refused, ok])) == "corrected"
     assert bench.route(result(cue, "x", "big", [Call("openai:big", Usage(0, 0), "error"), ok])) == "big reasoned"

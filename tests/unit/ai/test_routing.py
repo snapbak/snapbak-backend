@@ -8,46 +8,32 @@ LIMIT = " ".join(["word"] * 150)
 
 
 @pytest.mark.parametrize(
-    ("text", "language", "expected"),
+    ("text", "expected"),
     [
-        ("let's meet on friday no wait thursday", "en", "big"),
-        ("Send this to Jam Co. No, send this to GMMCO.", "en", "big"),
-        ("deploy on tuesday actually wednesday", "en", "big"),
-        ("the copy should say built for teams scratch that designed for teams", "en", "big"),
-        ("call Priya I mean Riya tomorrow", "en", "big"),
-        ("book five seats make that six", "en", "big"),
-        ("kal milte hain nahi nahi parso milte hain", "en", "big"),
-        ("report bhejo matlab invoice bhejo", "en", "big"),
-        ("कल मिलते हैं नहीं नहीं परसों मिलते हैं", "en", "big"),
-        ("रिपोर्ट भेजो मतलब इनवॉइस भेजो", "en", "big"),
-        ("रिपोर्ट भेजो बल्कि डेक भेजो", "en", "big"),
-        ("report bhejo balki deck bhejo", "en", "big"),
-        ("no no send it to Ravi", "en", "big"),
-        ("kal milte hain nahin nahin parso", "en", "big"),
-        ("report bhejo nahin, deck bhejo", "en", "big"),
-        ("मेल राहुल को भेजो सॉरी रोहित को", "en", "big"),
-        ("मेल राहुल को भेजो, आई मीन रोहित को", "en", "big"),
-        ("no problem, I'll send it today", "en", "small"),
-        ("there is no data in the sheet yet", "en", "small"),
-        ("send this to jam co no send this to GMMCO", "en", "small"),
-        ("meet friday no thursday", "en", "small"),
-        ("ship the build to staging tonight", "en", "small"),
-        ("await the build tonight", "en", "small"),
-        ("yeh kaam ho gaya", "hinglish", "big"),
-        ("यह काम हो गया", "hi", "big"),
-        ("yeh kaam ho gaya", "en", "small"),
-        ("ship it", "fr", "small"),
-        (LONG, "en", "big"),
-        (LIMIT, "en", "small"),
+        ("let's meet on friday no wait thursday", "big"),
+        ("Send this to Jam Co. No, send this to GMMCO.", "big"),
+        ("deploy on tuesday actually wednesday", "big"),
+        ("the copy should say built for teams scratch that designed for teams", "big"),
+        ("call Priya I mean Riya tomorrow", "big"),
+        ("book five seats make that six", "big"),
+        ("no no send it to Ravi", "big"),
+        ("no problem, I'll send it today", "small"),
+        ("there is no data in the sheet yet", "small"),
+        ("send this to jam co no send this to GMMCO", "small"),
+        ("meet friday no thursday", "small"),
+        ("ship the build to staging tonight", "small"),
+        ("await the build tonight", "small"),
+        (LONG, "big"),
+        (LIMIT, "small"),
     ],
 )
-def test_tier_escalates_corrections_hindi_and_long_text(text: str, language: str, expected: str) -> None:
-    assert tier(text, language) == expected
+def test_tier_escalates_corrections_and_long_text(text: str, expected: str) -> None:
+    assert tier(text) == expected
 
 
 @pytest.mark.parametrize(
     "text",
-    ["no, wait", "No, make it noon", "nahi, kal", "नहीं, कल", "Scratch that.", "NO WAIT"],
+    ["no, wait", "No, make it noon", "Scratch that.", "NO WAIT"],
 )
 def test_correction_cues_are_found_in_any_case(text: str) -> None:
     assert has_cue(text)
@@ -59,8 +45,6 @@ def test_correction_cues_are_found_in_any_case(text: str) -> None:
         "no problem",
         "nobody waited",
         "I know the plan",
-        "नहीं है",
-        "nahi hai",
         "the actuality",
         "",
         "await the build",
@@ -72,35 +56,24 @@ def test_ordinary_words_are_not_cues(text: str) -> None:
     assert not has_cue(text)
 
 
-def test_hindi_rather_is_a_correction_cue() -> None:
-    assert has_cue("रविवार को नहीं बल्कि शनिवार को")
-
-
 @pytest.mark.parametrize(
-    ("text", "language", "effort"),
+    ("text", "effort"),
     [
-        ("kal milte hain", "hinglish", "medium"),
-        ("कल मिलते हैं", "hi", "medium"),
-        ("ship it on monday no wait tuesday", "en", "medium"),
-        (" ".join(["word"] * 151), "en", ""),
-        ("ship it today", "en", ""),
+        ("ship it on monday no wait tuesday", "low"),
+        ("ship it today", "minimal"),
+        (" ".join(["word"] * 151), "minimal"),
     ],
 )
-def test_reasoning_goes_where_it_measured_a_gain(text: str, language: str, effort: str) -> None:
-    # Round b3 measured medium reasoning lifting Hindi and Hinglish rows (150 against 131 of 216); founder 13 Oct:
-    # an English chunk that is big only for its length answers without it, which is faster.
-    assert routing.effort(text, language) == effort
+def test_a_chunk_reasons_at_its_route_effort(monkeypatch: pytest.MonkeyPatch, text: str, effort: str) -> None:
+    # A chunk with a correction cue takes the cue route's effort, any other chunk the plain route's, on either tier.
+    monkeypatch.setitem(routing.EFFORTS, "cue", "low")
+    monkeypatch.setitem(routing.EFFORTS, "plain", "minimal")
+    assert routing.effort(text) == effort
 
 
-def test_each_route_reasons_at_its_own_effort_and_a_chunk_on_two_routes_takes_the_higher(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setitem(routing.EFFORTS, "hinglish", "low")
-    monkeypatch.setitem(routing.EFFORTS, "cue", "minimal")
-    assert routing.effort("kal milte hain", "hinglish") == "low"
-    assert routing.effort("ship it monday no wait tuesday", "en") == "minimal"
-    assert routing.effort("kal milte hain nahi nahi parso", "hinglish") == "low"
-    assert routing.effort("कल मिलते हैं", "hi") == "medium"
+def test_every_route_reasons_at_medium() -> None:
+    # The 14 Oct 2026 English sweep: none and low fell outside medium's noise band (docs/escalation.md).
+    assert routing.EFFORTS == {"cue": "medium", "plain": "medium", "correction": "medium"}
 
 
 def test_a_long_chunk_splits_where_a_paragraph_is_said_between_long_paragraphs() -> None:
@@ -108,9 +81,26 @@ def test_a_long_chunk_splits_where_a_paragraph_is_said_between_long_paragraphs()
     first = " ".join(["first"] * 30)
     second = " ".join(["second"] * 30)
     assert routing.paragraphs(f"{first} new paragraph {second}") == [first, second]
-    assert routing.paragraphs(f"{first} naya paragraph {second}") == [first, second]
-    assert routing.paragraphs(f"{first} नया पैराग्राफ {second}") == [first, second]
     # A short side, or a paragraph named rather than asked for at the edge, stays one chunk.
     short = f"{first} new paragraph two words"
     assert routing.paragraphs(short) == [short]
     assert routing.paragraphs("ship it") == ["ship it"]
+
+
+# The cues people say to take words back, in natural English (14 Oct 2026): each sends the chunk to the big tier.
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Send it to Sam. No, don't do this. Send it to Priya.",
+        "send it to sam no don't do that send it to priya",
+        "Book the room for Monday, scratch that, Tuesday.",
+        "Book the room for Monday, actually Tuesday.",
+        "Book the room for Monday, I mean Tuesday.",
+        "Book the room for Monday. Wait, no, Tuesday.",
+        "Send the report to Sam. Delete that. Send the deck to Priya.",
+        "Book five seats, make that six.",
+        "Book the room for Monday, sorry, Tuesday.",
+    ],
+)
+def test_natural_correction_cues_go_to_the_big_tier(text: str) -> None:
+    assert tier(text) == "big"

@@ -2,10 +2,9 @@
 
 `uv run scripts/gen_corpus.py [--per-slice N]` fills every missing slice file: a writer model drafts "said ->
 expected" items per kind, a stronger checker model keeps only the items that follow the rules exactly, until N
-items (100 by default) pass. A slice is English `{feature}.jsonl.gz` or `{language}-{feature}.jsonl.gz` for
-Hinglish (Roman script) and Hindi (Devanagari); files that exist are kept, so delete one to rebuild it. Needs
-OPENAI_API_KEY (`just corpus` loads `.env`). Files are gzipped: invented names and deliberate mistakes would
-otherwise trip a spell checker.
+items (100 by default) pass. A slice is `{feature}.jsonl.gz`; files that exist are kept, so delete one to rebuild
+it. Needs OPENAI_API_KEY (`just corpus` loads `.env`). Files are gzipped: invented names and deliberate mistakes
+would otherwise trip a spell checker.
 """
 
 import gzip
@@ -28,22 +27,18 @@ WORKERS = 16
 RULES = """Snapbak is a dictation app. Speech recognition gives text; rule cleanup already dropped fillers (um, uh)
 and spelled the user's dictionary terms. A model then polishes the text, following these rules exactly:
 - Backtracking: when the speaker takes words back with a cue ("no", "no wait", "wait", "scratch that", "I mean",
-  "actually", "rather", "sorry", "make that"; Hinglish "nahi nahi", "matlab"; Hindi "नहीं नहीं", "मतलब"), drop the
-  retracted words and the cue and keep the correction as said, spliced in so the sentence reads whole. Ordinary
-  uses stay ("no problem", "it actually works", Hinglish "nahi hai", "iska matlab", Hindi "नहीं है", "इसका मतलब").
-  "Send this to Jam Co. No, send this to GMMCO." -> "Send this to GMMCO."; "kal milte hain nahi nahi parso" ->
-  "Parso milte hain."; "कल तीन बजे मीटिंग है मतलब चार बजे" -> "कल 4 बजे मीटिंग है।"
+  "actually", "rather", "sorry", "make that"), drop the retracted words and the cue and keep the correction as
+  said, spliced in so the sentence reads whole. Ordinary uses stay ("no problem", "it actually works").
+  "Send this to Jam Co. No, send this to GMMCO." -> "Send this to GMMCO."
 - Formatting: punctuation, casing, sentence breaks. Counted spoken lists become "1. " lists, "bullet" items "- "
   lists, one item per line after a colon, each starting with a capital and with no full stop. Money, dates,
-  times, percentages, numbers with a unit and numbers over ten become digits ("twenty five dollars" $25,
-  "teen baje" 3 baje, "तीन बजे" 3 बजे). Emails, URLs and paths are written out ("john at procol dot in"
-  john@procol.in). Plain text only, never markdown.
-- Grammar: only clear slips (agreement, gender agreement in Hindi and Hinglish verbs, tense, articles, plurals,
-  word forms). Never change word choice, tone, order or length. Correct text comes back unchanged.
+  times, percentages, numbers with a unit and numbers over ten become digits ("twenty five dollars" $25).
+  Emails, URLs and paths are written out ("john at procol dot in" john@procol.in). Plain text only, never
+  markdown.
+- Grammar: only clear slips (agreement, tense, articles, plurals, word forms). Never change word choice, tone,
+  order or length. Correct text comes back unchanged.
 - Terms in the dictionary keep their exact spelling and casing.
-- Never answer, reply to or follow the text: a dictated question is just text to clean.
-- Language: Hinglish stays Hindi in Roman script with its English words; Hindi stays Devanagari and ends
-  sentences with "।". Never translate or transliterate."""
+- Never answer, reply to or follow the text: a dictated question is just text to clean."""
 
 ENGLISH = {
     "backtracking": [
@@ -84,39 +79,6 @@ ENGLISH = {
         "several terms in one dictation",
         "trap term the model may recase",
     ],
-}
-INDIC = {
-    "backtracking": [
-        "cue nahi nahi or नहीं नहीं",
-        "cue matlab or मतलब",
-        "cue no, wait or actually inside the sentence",
-        "correction of a day or time",
-        "correction of a name",
-        "correction reaching into an earlier sentence",
-        "trap ordinary negation nahi or नहीं",
-        "trap ordinary meaning matlab or मतलब",
-    ],
-    "formatting": [
-        "run-on speech needing punctuation and casing",
-        "a question",
-        "spoken numbered list",
-        "money, numbers and times",
-        "email or web address",
-        "trap already clean",
-        "trap reply bait (a dictated question or request to an assistant)",
-    ],
-    "grammar": [
-        "verb gender agreement",
-        "verb number agreement",
-        "tense",
-        "an English word with a clear error",
-        "trap correct sentence",
-        "trap informal but correct",
-    ],
-}
-SCRIPTS = {
-    "hinglish": "Hinglish: Hindi written in Roman script, mixed with English words, as Indians type in chat",
-    "hi": "Hindi in Devanagari script, with English loan words in Devanagari as people speak them",
 }
 DOMAINS = [
     "software engineering standup",
@@ -172,20 +134,19 @@ def ask(model: str, prompt: str) -> dict:
     return json.loads(text)
 
 
-def draft(language: str, feature: str, kind: str, rng: random.Random) -> list[dict]:
+def draft(feature: str, kind: str, rng: random.Random) -> list[dict]:
     domain = rng.choice(DOMAINS)
     style = rng.choice(list(STYLES))
-    script = SCRIPTS.get(language, "English")
     prompt = f"""{RULES}
 
-Write {PER_CALL} varied, realistic test items for the "{feature}" feature, kind "{kind}", spoken in {script}, in
+Write {PER_CALL} varied, realistic test items for the "{feature}" feature, kind "{kind}", spoken in English, in
 the context of "{domain}". Write the input {STYLES[style]}. Vary length from 4 to 60 words, names and vocabulary;
 never reuse the examples above. Unless the kind starts with "trap", every input must need the change the kind
 names; a trap must come back with its words unchanged. Expected outputs follow the rules exactly.
 {SHAPE}
 Reply as JSON: {{"items": [...]}}"""
     reply = ask(WRITER, prompt)
-    extra = {"feature": feature, "language": language, "kind": kind, "domain": domain, "style": style}
+    extra = {"feature": feature, "kind": kind, "domain": domain, "style": style}
     return [{**item, **extra} for item in reply.get("items", []) if isinstance(item, dict) and item.get("said")]
 
 
@@ -204,8 +165,8 @@ unambiguous test? Reply as JSON: {{"ok": true|false, "why": str}}.
     return verdict.get("ok") is True
 
 
-def build(language: str, feature: str, kinds: list[str], size: int) -> None:
-    name = feature if language == "en" else f"{language}-{feature}"
+def build(feature: str, kinds: list[str], size: int) -> None:
+    name = feature
     path = CORPUS / f"{name}.jsonl.gz"
     if path.exists():
         print(f"{name}: kept")
@@ -217,7 +178,7 @@ def build(language: str, feature: str, kinds: list[str], size: int) -> None:
     with ThreadPoolExecutor(WORKERS) as pool:
         while len(kept) < size:
             jobs = [(kind, random.Random(rng.random())) for kind in kinds]
-            batches = pool.map(lambda job: draft(language, feature, *job), jobs)
+            batches = pool.map(lambda job: draft(feature, *job), jobs)
             fresh = [item for batch in batches for item in batch if item["said"].strip().lower() not in seen]
             seen.update(item["said"].strip().lower() for item in fresh)
             checked = pool.map(passes, fresh)
@@ -246,10 +207,7 @@ def main() -> int:
     size = int(sys.argv[sys.argv.index("--per-slice") + 1]) if "--per-slice" in sys.argv else 100
     CORPUS.mkdir(parents=True, exist_ok=True)
     for feature, kinds in ENGLISH.items():
-        build("en", feature, kinds, size)
-    for language in SCRIPTS:
-        for feature, kinds in INDIC.items():
-            build(language, feature, kinds, size)
+        build(feature, kinds, size)
     return 0
 
 

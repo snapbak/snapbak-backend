@@ -1,4 +1,4 @@
-"""Numbers and lists: every number the words say, in order, and list items counted off ("first", "pehla")."""
+"""Numbers and lists: every number the words say, in order, and list items counted off ("first", "second")."""
 
 import re
 
@@ -10,167 +10,69 @@ from snapbak_backend.ai.guardrail.tokens import word_set, words
 LONGEST_NUMBER = 12
 
 
-BULLETS = word_set("bullet बुलेट")
+BULLETS = word_set("bullet")
 # A count after "and" ("one red and two green") or an ordinal before an unmarked "in" ("first in line") is prose,
 # not a list marker.
-CONNECTORS = word_set("and aur और")
-# A count next to one of these is a choice ("one or two fixes", "ek ya do"), and one between two counts a range
-# ("one to two days", "ek se do"): never a list's numbering.
-CHOICES = word_set("or ya या")
-RANGES = word_set("to se से")
-ORDINALS = word_set(
-    "first firstly second secondly third thirdly fourth fourthly fifth fifthly pehla pehli pehle doosra doosri "
-    "doosre dusra dusri teesra teesri tisra chautha chauthi पहला पहली पहले दूसरा दूसरी दूसरे तीसरा तीसरी तीसरे चौथा चौथी चौथे"
-)
+CONNECTORS = word_set("and")
+# A count next to one of these is a choice ("one or two fixes"), and one between two counts a range ("one to two
+# days"): never a list's numbering.
+CHOICES = word_set("or")
+RANGES = word_set("to")
+ORDINALS = word_set("first firstly second secondly third thirdly fourth fourthly fifth fifthly")
 PREPOSITIONS = word_set("in of on at")
-# An ordinal after one of these modifies a noun ("the first build", "mera pehla draft"), never counts items off.
-DETERMINERS = word_set(
-    "the my our your his her their this that its mera meri mere hamara hamari tera teri uska uski unka unki मेरा मेरी "
-    "मेरे हमारा हमारी उसका उसकी उनका उनकी"
-)
+# An ordinal after one of these modifies a noun ("the first build", "my first draft"), never counts items off.
+DETERMINERS = word_set("the my our your his her their this that its")
 LIST_ITEM = re.compile(r"\s*\d+\.")
 ANY_LIST_ITEM = re.compile(r"^\s*\d+\.", re.MULTILINE)
 DIGIT_RUN = re.compile(r"\d+")
 
 
-# Spoken number word -> value: English, Roman Hindi and Devanagari, counting and ordinal. Hindi says 11 to 99 each
-# as its own word. "half" and "quarter" are the minutes of a time ("half past three" 3:30, "साढ़े दस" 10:30).
+# Spoken number word -> value, counting and ordinal. "half" and "quarter" are the minutes of a time ("half past
+# three" 3:30).
 NUMBER_NAMES = {
-    0: "zero oh shunya शून्य ज़ीरो जीरो",
-    1: "one first firstly ek pehla pehli pehle एक पहला पहली पहले",
-    2: "two second secondly do doosra doosri doosre dusra dusri दो दूसरा दूसरी दूसरे टू",
-    3: "three third thirdly teen teesra teesri tisra तीन तीसरा तीसरी तीसरे थ्री",
-    4: "four fourth fourthly char chaar chautha chauthi चार चौथा चौथी चौथे फोर",
-    5: "five fifth fifthly paanch panch पांच पाँच फाइव",
-    6: "six sixth chhe che छह सिक्स",
-    7: "seven seventh saat सात सेवन",
-    8: "eight eighth aath आठ",
-    9: "nine ninth nau नौ नाइन",
-    10: "ten tenth das dus दस टेन",
-    11: "eleven eleventh gyarah gyaarah ग्यारह इलेवन",
-    12: "twelve twelfth barah baarah बारह ट्वेल्व",
-    13: "thirteen thirteenth terah तेरह थर्टीन",
-    14: "fourteen fourteenth chaudah चौदह फोर्टीन",
-    15: "fifteen fifteenth quarter pandrah पंद्रह फिफ्टीन",
-    16: "sixteen sixteenth solah sola सोलह सिक्सटीन",
-    17: "seventeen seventeenth satrah सत्रह सेवनटीन",
-    18: "eighteen eighteenth atharah athaarah अठारह एटीन",
-    19: "nineteen nineteenth unnis unnees उन्नीस नाइनटीन",
-    20: "twenty twentieth bees बीस ट्वेंटी",
-    21: "ikkis ikkees इक्कीस",
-    22: "bais baees बाईस",
-    23: "teis तेईस",
-    24: "chaubis chaubees चौबीस",
-    25: "pachis pachees pachchis पच्चीस",
-    26: "chhabbis chabbis छब्बीस",
-    27: "sattais सत्ताईस",
-    28: "athais atthais अट्ठाईस अठाईस",
-    29: "untis untees उनतीस",
-    30: "thirty thirtieth half tees sadhe तीस साढ़े थर्टी",
-    31: "iktis ikattees इकतीस",
-    32: "battis battees बत्तीस",
-    33: "taintis तैंतीस",
-    34: "chauntis चौंतीस",
-    35: "paintis पैंतीस",
-    36: "chhattis chhattees chattees छत्तीस",
-    37: "saintis सैंतीस",
-    38: "adtis अड़तीस",
-    39: "untalis उनतालीस",
-    40: "forty chalis chaalis chaalees चालीस फोर्टी",
-    41: "iktalis इकतालीस",
-    42: "bayalis bayaalees बयालीस",
-    43: "taintalis तैंतालीस",
-    44: "chavalis चवालीस",
-    45: "paintalis paitalis पैंतालीस",
-    46: "chhiyalis छियालीस",
-    47: "saintalis सैंतालीस",
-    48: "adtalis अड़तालीस",
-    49: "unchas उनचास",
-    50: "fifty pachas pachaas पचास फिफ्टी",
-    51: "ikyavan इक्यावन",
-    52: "bavan baavan बावन",
-    53: "tirpan तिरपन",
-    54: "chauvan चौवन",
-    55: "pachpan पचपन",
-    56: "chhappan chappan छप्पन",
-    57: "sattavan सत्तावन",
-    58: "atthavan अट्ठावन",
-    59: "unsath उनसठ",
-    60: "sixty साठ सिक्सटी",
-    61: "iksath इकसठ",
-    62: "basath बासठ",
-    63: "tirsath तिरसठ",
-    64: "chaunsath चौंसठ",
-    65: "painsath पैंसठ",
-    66: "chhiyasath छियासठ",
-    67: "sadsath सड़सठ",
-    68: "adsath अड़सठ",
-    69: "unhattar उनहत्तर",
-    70: "seventy sattar सत्तर सेवेंटी सेवनटी",
-    71: "ikhattar इकहत्तर",
-    72: "bahattar बहत्तर",
-    73: "tihattar तिहत्तर",
-    74: "chauhattar चौहत्तर",
-    75: "pachhattar पचहत्तर",
-    76: "chhihattar छिहत्तर",
-    77: "sathattar सतहत्तर",
-    78: "athhattar अठहत्तर",
-    79: "unyasi उन्यासी",
-    80: "eighty assi अस्सी एटी",
-    81: "ikyasi इक्यासी",
-    82: "bayasi बयासी",
-    83: "tirasi तिरासी",
-    84: "chaurasi चौरासी",
-    85: "pachasi पचासी",
-    86: "chhiyasi छियासी",
-    87: "sattasi सत्तासी",
-    88: "atthasi अट्ठासी",
-    89: "navasi नवासी",
-    90: "ninety nabbe नब्बे नाइंटी",
-    91: "ikyanve इक्यानवे",
-    92: "banve बानवे",
-    93: "tiranve तिरानवे",
-    94: "chauranve चौरानवे",
-    95: "pachanve पचानवे पंचानवे",
-    96: "chhiyanve छियानवे",
-    97: "sattanve सत्तानवे",
-    98: "atthanve अट्ठानवे अट्ठानबे",
-    99: "ninyanve निन्यानवे",
+    0: "zero oh",
+    1: "one first firstly",
+    2: "two second secondly",
+    3: "three third thirdly",
+    4: "four fourth fourthly",
+    5: "five fifth fifthly",
+    6: "six sixth",
+    7: "seven seventh",
+    8: "eight eighth",
+    9: "nine ninth",
+    10: "ten tenth",
+    11: "eleven eleventh",
+    12: "twelve twelfth",
+    13: "thirteen thirteenth",
+    14: "fourteen fourteenth",
+    15: "fifteen fifteenth quarter",
+    16: "sixteen sixteenth",
+    17: "seventeen seventeenth",
+    18: "eighteen eighteenth",
+    19: "nineteen nineteenth",
+    20: "twenty twentieth",
+    30: "thirty thirtieth half",
+    40: "forty",
+    50: "fifty",
+    60: "sixty",
+    70: "seventy",
+    80: "eighty",
+    90: "ninety",
 }
 VALUES = {word: value for value, names in NUMBER_NAMES.items() for word in words(names)}
-# Spelling variants a recognizer writes: Roman "ees" for "is" ("chhabbees", "sattaees"), Devanagari "इ" for "ई"
-# ("बाइस").
-ROMAN_IS = re.compile(r"(a?)is$")
-VALUES |= {
-    ROMAN_IS.sub(r"\1ees", word): value
-    for word, value in VALUES.items()
-    if word.endswith("is") and not tokens.DEVANAGARI.search(word)
-}
-VALUES |= {
-    word.replace("ई", "इ").replace("ी", "ि"): value for word, value in VALUES.items() if tokens.DEVANAGARI.search(word)
-}
-# Hindi ordinals past the fourth: the number and -वां, -वीं or -वें ("बारहवीं" 12वीं), and छठा.
-HINDI_ORDINALS = {
-    f"{name}{end}": value
-    for value, names in NUMBER_NAMES.items()
-    if value >= 5
-    for name in words(names)
-    if tokens.DEVANAGARI.search(name)
-    for end in words("वां वीं वें")
-}
-VALUES |= HINDI_ORDINALS | dict.fromkeys(words("छठा छठी छठे"), 6)
 # The counting words for a digit up to ten, never an ordinal: the prompt writes these numbers as words, so a digit
-# Whisper wrote ("do 1 thing") may come back as one ("do one thing", "ek kaam", "एक काम").
+# Whisper wrote ("do 1 thing") may come back as one ("do one thing").
 SPELLED = {
     str(value): {word for word in words(NUMBER_NAMES[value]) if word not in ORDINALS and not word.endswith("th")}
     for value in range(1, 11)
 }
+# Lakh and crore are English words in India too ("fifty two lakh rupees" ₹52 lakh).
 SCALE_NAMES = {
-    100: "hundred sau सौ हंड्रेड",
-    1_000: "thousand hazaar hazar हज़ार हजार थाउज़ेंड थाउजेंड",
-    100_000: "lakh लाख",
+    100: "hundred",
+    1_000: "thousand",
+    100_000: "lakh",
     1_000_000: "million",
-    10_000_000: "crore करोड़",
+    10_000_000: "crore",
     1_000_000_000: "billion",
 }
 SCALES = {word: value for value, names in SCALE_NAMES.items() for word in words(names)}
@@ -252,8 +154,6 @@ def spoken_numbers(said: list[str]) -> list[tuple[Place, str]]:
     "twenty twenty" 2020), never across an "and" ("five and six")."""
     if not DOUBLES.isdisjoint(said):
         said = doubled(said)
-    if "saath" in said:
-        said = sixties(said)
     found = [((position, 0), str(VALUES[word])) for position, word in enumerate(said) if word in VALUES]
     if DIGIT_RUN.search(" ".join(said)):
         found += [
@@ -286,7 +186,7 @@ def spoken_numbers(said: list[str]) -> list[tuple[Place, str]]:
 
 
 # Minutes said before an hour ("ten to nine" 8:50), unless a range leads them.
-RANGE_LEADS = word_set("from past between point half quarter se")
+RANGE_LEADS = word_set("from past between point half quarter")
 MINUTES_TO = {5, 10, 20, 25}
 INDIAN_SCALES = {word: value for word, value in SCALES.items() if value in (100_000, 10_000_000)}
 
@@ -311,8 +211,8 @@ def points_and_minutes(said: list[str], found: list[tuple[Place, str]]) -> list[
 
 
 def decimal_scales(said: list[str], found: list[tuple[Place, str]]) -> list[tuple[Place, str]]:
-    """An amount of lakhs or crores written as a decimal of its scale ("one lakh fifty thousand" ₹1.5 lakh, "ek
-    crore bees lakh" ₹1.2 crore): the whole and the decimals of each amount the words say."""
+    """An amount of lakhs or crores written as a decimal of its scale ("one lakh fifty thousand" ₹1.5 lakh, "one
+    crore twenty lakh" ₹1.2 crore): the whole and the decimals of each amount the words say."""
     decimals: list[tuple[Place, str]] = []
     for place, value in found:
         amount = int(value)
@@ -324,7 +224,7 @@ def decimal_scales(said: list[str], found: list[tuple[Place, str]]) -> list[tupl
     return decimals
 
 
-POINT_WORDS = word_set("point पॉइंट प्वाइंट दशमलव")
+POINT_WORDS = word_set("point")
 
 
 def point_scales(said: list[str]) -> list[tuple[Place, str]]:
@@ -345,7 +245,7 @@ def point_scales(said: list[str]) -> list[tuple[Place, str]]:
     return found
 
 
-DOUBLES = word_set("double डबल")
+DOUBLES = word_set("double")
 
 
 def doubled(said: list[str]) -> list[str]:
@@ -354,22 +254,6 @@ def doubled(said: list[str]) -> list[str]:
     for index, word in enumerate(said[:-1]):
         if word in DOUBLES and said[index + 1] in VALUES:
             out[index] = said[index + 1]
-    return out
-
-
-# Words after which "saath" is sixty, not "with": a number before it or a unit after it ("teen sau saath", "saath
-# pratishat").
-UNITS = word_set("percent pratishat pratisat rupaye rupees rupay dollar dollars minute minutes saal din ghante kilo")
-
-
-def sixties(said: list[str]) -> list[str]:
-    """Roman Hindi "saath" read as sixty where it counts something."""
-    out = list(said)
-    for index, word in enumerate(said):
-        before = said[index - 1] if index else ""
-        after = said[index + 1] if index + 1 < len(said) else ""
-        if word == "saath" and (before in VALUES or before in SCALES or after in UNITS):
-            out[index] = "sixty"
     return out
 
 
@@ -395,8 +279,8 @@ def counts_before_scales(offset: int, run: list[str]) -> list[tuple[Place, str]]
 
 
 def shared_scales(said: list[str]) -> list[tuple[Place, str]]:
-    """A range or choice of amounts said with one scale ("बीस से पच्चीस हजार" 20,000 to 25,000, "nine or ten
-    thousand"): the first takes the scale too."""
+    """A range or choice of amounts said with one scale ("twenty to twenty five thousand" 20,000 to 25,000, "nine
+    or ten thousand"): the first takes the scale too."""
     found: list[tuple[Place, str]] = []
     for index in range(1, len(said) - 2):
         if said[index] not in RANGES | CHOICES | CONNECTORS or said[index - 1] not in VALUES:
@@ -407,24 +291,15 @@ def shared_scales(said: list[str]) -> list[tuple[Place, str]]:
     return found
 
 
-# Fractions: "saade teen" 3.5 or 3:30 and "sava paanch" 5.25 or 5:15 move the number after them up, "paune chhe"
-# 5.75 or 5:45 and "quarter to six" 5:45 take it back, and on their own "sava" is 1.25, "dedh" 1.5 and "dhai" 2.5.
-# Each is (its whole on its own, the decimals it writes, the minutes it writes).
-PLUS = {
-    **dict.fromkeys(words("sava savaa सवा"), (1, "25", "15")),
-    **dict.fromkeys(words("saade saadhe sadhe sade साढ़े"), (None, "5", "30")),
-    **dict.fromkeys(words("dedh derh डेढ़"), (1, "5", "30")),
-    **dict.fromkeys(words("dhai dhaai adhai ढाई अढ़ाई"), (2, "5", "30")),
-}
-MINUS = word_set("paune pone पौने")
-FRACTION_WORDS = set(PLUS) | MINUS | {"quarter"}
-SHARE = {"25": 0.25, "5": 0.5, "75": 0.75}
-# The decimals and minutes go after every other number said at the same word ("साढ़े तीन" 3, then .5).
+# "quarter to six" 5:45 takes the number after it back by a quarter.
+FRACTION_WORDS = word_set("quarter")
+# The decimals and minutes go after every other number said at the same word ("quarter to four" 3, then 45).
 LATE = 9
 
 
 def number_after(said: list[str], at: int) -> tuple[int, int] | None:
-    """The number said from `at` on and the largest scale in it ("पंद्रह हजार" 15000, 1000), if one starts there."""
+    """The number said from `at` on and the largest scale in it ("fifteen thousand" 15000, 1000), if one starts
+    there."""
     run: list[str] = []
     while at + len(run) < len(said) and is_number(said[at + len(run)]) and len(run) < LONGEST_NUMBER:
         run.append(said[at + len(run)])
@@ -436,34 +311,23 @@ def number_after(said: list[str], at: int) -> tuple[int, int] | None:
 
 
 def fractions(said: list[str], found: list[tuple[Place, str]]) -> list[tuple[Place, str]]:
-    """`found` with what each fraction says: the number it moves, its decimals and minutes after that number, and
-    the whole amount before a scale ("साढ़े पंद्रह हजार" 15500, "ढाई हज़ार" 2500, "paune do lakh" 1.75 or 175000).
-    A number taken back by one is no longer said as itself ("quarter to six" is never 6:45)."""
+    """`found` with what each "quarter to" says: the number it takes back, its decimals and minutes after that
+    number, and the whole amount before a scale. A number taken back is no longer said as itself ("quarter to six"
+    is never 6:45)."""
     for position, word in enumerate(said):
-        minus = word in MINUS or (word == "quarter" and said[position + 1 : position + 2] == ["to"])
-        if not minus and word not in PLUS:
+        if word != "quarter" or said[position + 1 : position + 2] != ["to"]:
             continue
-        alone, decimals, minutes = (None, "75", "45") if minus else PLUS[word]
-        at = position + 2 if word == "quarter" else position + 1
+        at = position + 2
         after = None if said[at : at + 1] and said[at] in SCALES else number_after(said, at)
         if after is None:
-            if alone is None:
-                continue
-            after, at = (alone, 0), position
-            scale = SCALES.get(said[position + 1], 0) if position + 1 < len(said) else 0
-            whole, total = alone, alone * scale + scale * SHARE[decimals]
-        else:
-            value, scale = after
-            whole = value // scale if scale else value
-            share = -0.25 if minus else SHARE[decimals]
-            total = value + scale * share
-        if minus:
-            taken = {str(whole), str(after[0])}
-            found = [entry for entry in found if not (entry[0][0] == at and entry[1] in taken)]
-            if word == "quarter":
-                found = [entry for entry in found if entry != ((position, 0), "15")]
-            whole -= 1
-        found += [((at, 0), str(whole)), ((at, LATE), decimals), ((at, LATE), minutes)]
+            continue
+        value, scale = after
+        whole = value // scale if scale else value
+        total = value - scale * 0.25
+        taken = {str(whole), str(value)}
+        found = [entry for entry in found if not (entry[0][0] == at and entry[1] in taken)]
+        found = [entry for entry in found if entry != ((position, 0), "15")]
+        found += [((at, 0), str(whole - 1)), ((at, LATE), "75"), ((at, LATE), "45")]
         if scale:
             found.append(((at, 0), str(int(total))))
     return found
@@ -480,7 +344,7 @@ def out_of_order(spoken: list[tuple[Place, str]], wrote_text: str) -> str | None
     for time in TIME.findall(tokens.DIGIT_GROUP.sub("", wrote_text)):
         places: list[Place] = []
         for part, value in enumerate(time.split(":")):
-            # A time's hour is a number said, never the decimals or minutes a fraction adds ("साढ़े चार" 4:30).
+            # A time's hour is a number said, never the decimals or minutes a fraction adds ("quarter to four" 3:45).
             found = [
                 place
                 for place, said in spoken

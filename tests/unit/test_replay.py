@@ -23,35 +23,21 @@ def test_a_short_hold_is_one_chunk() -> None:
 
 def test_a_month_of_english_retries_a_share_on_the_big_tier(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(replay, "CACHE_HIT", 0)
-    totals = replay.month([("ship it", "en")], None, "openai:gpt-4.1-nano", "openai:gpt-4.1")
-    # The fixed prompt is 13,070 tokens since round b6 added the "checker" field, rules for a cue opening a piece,
-    # Hindi "ने" agreement, a compound's head noun, aspect kept, Roman Hindi spellings, nouns that fit their verb and
-    # "<name> here", and five examples (12 Oct; it was 12,356 since round b5, 11,444 since round b4, 10,081 since round
-    # b3, 6,807 since round b2 and 4,667 since round b1). The founder put accuracy over cost (D8):
-    # the month is a report, so the prompt may grow.
-    assert (totals["requests"], totals["big"], totals["input"], totals["output"]) == (9000, 0, 117_756_000, 90_000)
-    assert totals["small $"] == pytest.approx(23.6232)
-    assert totals["big $"] == pytest.approx(24.183)
-
-
-def test_a_month_of_hinglish_sends_every_chunk_to_the_big_tier(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(replay, "CACHE_HIT", 0)
-    totals = replay.month([("ship it", "en")], "hinglish", "openai:gpt-4.1-nano", "openai:gpt-4.1")
-    assert (totals["requests"], totals["big"], totals["small $"], totals["input"]) == (9000, 9000, 0, 117_774_000)
-    assert totals["big $"] == pytest.approx(503.3466)
-
-
-def test_utterances_take_their_language_the_way_the_bench_does() -> None:
-    languages = {language for _, language in replay.utterances()}
-    loaded = {item.language for item in replay.load()}
-    assert languages == loaded
+    totals = replay.month(["ship it"], "openai:gpt-4.1-nano", "openai:gpt-4.1")
+    # The fixed prompt is 10,201 tokens since 14 Oct made Snapbak English only and swapped the other languages' rules
+    # and examples for English ones (it was 13,619 before, 13,070 since round b6, 12,356 since round b5, 11,444 since
+    # round b4, 10,081 since round b3, 6,807 since round b2 and 4,667 since round b1). The founder put accuracy over
+    # cost (D8): the month is a report, so the prompt may grow.
+    assert (totals["requests"], totals["big"], totals["input"], totals["output"]) == (9000, 0, 91_899_000, 90_000)
+    assert totals["small $"] == pytest.approx(18.4518)
+    assert totals["big $"] == pytest.approx(19.0116)
 
 
 def test_utterances_leave_out_the_generated_suite_growth_rows() -> None:
     # The month models a user's speech; suite-growth holds generated eval rows from the inbox, so its share of the
     # corpus would move the month with every intake (11 Oct).
     pool = set(replay.utterances())
-    growth = {(item.text, item.language) for item in replay.load() if item.slice == "suite-growth"}
+    growth = {item.text for item in replay.load() if item.slice == "suite-growth"}
     assert growth
     assert pool.isdisjoint(growth)
 
@@ -59,27 +45,22 @@ def test_utterances_leave_out_the_generated_suite_growth_rows() -> None:
 def test_the_cached_share_of_the_fixed_prompt_is_billed_at_the_cached_price(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(replay, "CACHE_HIT", 1.0)
     monkeypatch.setattr(replay, "RETRY_SHARE", 0)
-    totals = replay.month([("ship it", "en")], None, "openai:gpt-4.1-nano", "openai:gpt-4.1")
-    assert totals["small $"] == pytest.approx(5.9787)
+    totals = replay.month(["ship it"], "openai:gpt-4.1-nano", "openai:gpt-4.1")
+    assert totals["small $"] == pytest.approx(4.68045)
 
 
 def test_a_correction_chunk_bills_its_reasoning_tokens(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(replay, "CACHE_HIT", 0)
-    plain = replay.month([("ship it today", "en")], None, "openai:gpt-4.1-nano", "openai:gpt-4.1")
-    corrected = replay.month([("ship it actually today", "en")], None, "openai:gpt-4.1-nano", "openai:gpt-4.1")
+    plain = replay.month(["ship it today"], "openai:gpt-4.1-nano", "openai:gpt-4.1")
+    corrected = replay.month(["ship it actually today"], "openai:gpt-4.1-nano", "openai:gpt-4.1")
     assert plain["output"] == 6000 * 11
     assert corrected["output"] == 4500 * (14 + 46)
 
 
-def test_every_big_tier_chunk_bills_its_reasoning_tokens() -> None:
-    totals = replay.month([("ship it", "en")], "hinglish", "openai:gpt-4.1-nano", "openai:gpt-4.1")
-    assert totals["output"] == 9000 * (10 + 46)
-
-
 def test_half_the_fixed_prompt_is_billed_as_cached_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(replay, "RETRY_SHARE", 0)
-    totals = replay.month([("ship it", "en")], None, "openai:gpt-4.1-nano", "openai:gpt-4.1")
-    assert totals["small $"] == pytest.approx(14.80095)
+    totals = replay.month(["ship it"], "openai:gpt-4.1-nano", "openai:gpt-4.1")
+    assert totals["small $"] == pytest.approx(11.5668)
 
 
 def test_the_month_is_priced_for_the_founders_pair_and_reported_not_gated(
@@ -96,15 +77,11 @@ def test_a_refused_answer_on_either_tier_is_corrected_on_the_big_tier_with_its_a
 ) -> None:
     # D1: the correction asks the big tier again, with reasoning, sending the request, the refused answer and why.
     monkeypatch.setattr(replay, "CACHE_HIT", 0)
-    english = replay.month([("ship it", "en")], None, "openai:gpt-4.1-nano", "openai:gpt-4.1")
-    hinglish = replay.month([("ship it", "en")], "hinglish", "openai:gpt-4.1-nano", "openai:gpt-4.1")
+    english = replay.month(["ship it"], "openai:gpt-4.1-nano", "openai:gpt-4.1")
     request = replay.STATIC + replay.estimate(
-        replay.message({"text": "ship it", "prior": "", "terms": [], "app": "", "style": "chat", "language": "en"})
+        replay.message({"text": "ship it", "prior": "", "terms": [], "app": "", "style": "chat"})
     )
     answer = replay.estimate('{"revision": null, "text": "ship it"}')
     corrected = request + answer + replay.CORRECTION_TOKENS
     one = replay.billed("openai:gpt-4.1", corrected, answer + replay.REASONED_TOKENS, 0)
     assert english["big $"] == pytest.approx(9000 * replay.RETRY_SHARE * one)
-    # Every Hinglish chunk is a big call, and some of them are corrected on top.
-    big_call = replay.billed("openai:gpt-4.1", request, answer + replay.REASONED_TOKENS, 0)
-    assert hinglish["big $"] > 9000 * (big_call + replay.RETRY_SHARE * one)

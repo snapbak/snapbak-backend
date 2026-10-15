@@ -6,8 +6,8 @@ from snapbak_backend.ai.prompts.polish import message
 from snapbak_backend.ai.providers.base import Turn
 
 
-def example(text: str, prior: str = "", terms: tuple[str, ...] = (), style: str = "chat", language: str = "en") -> str:
-    request = {"text": text, "prior": prior, "terms": list(terms), "style": style, "language": language}
+def example(text: str, prior: str = "", terms: tuple[str, ...] = (), style: str = "chat") -> str:
+    request = {"text": text, "prior": prior, "terms": list(terms), "style": style}
     return message(request)
 
 
@@ -63,12 +63,8 @@ EXAMPLES: list[Turn] = [
         reply("The vendor wants the contract by Thursday. Can you check if the redlines are done?"),
     ),
     (
-        example("presentation ke baad sub log lunch karenge", language="hinglish"),
-        reply("Presentation ke baad sab log lunch karenge."),
-    ),
-    (
-        example("रिपोर्ट फोल्डर मैं रख दी है", language="hi"),
-        reply("रिपोर्ट फोल्डर में रख दी है।"),
+        example("after the presentation sum of us will grab lunch"),
+        reply("After the presentation, some of us will grab lunch."),
     ),
     (
         example("no wait make it thursday", prior="Let's meet on Friday at noon."),
@@ -95,35 +91,32 @@ EXAMPLES: list[Turn] = [
         reply("I booked the aisle seat for the flight."),
     ),
     (
-        example("staging pe deploy karo matlab rehne do abhi QA chal raha hai", language="hinglish"),
-        reply("Rehne do, abhi QA chal raha hai."),
+        example("deploy it to staging scratch that leave it qa is still running"),
+        reply("Leave it, QA is still running."),
     ),
     (
-        example(
-            "kal client ke saath meeting hai nahi nahi parso hai aur deck bhi ready karna hai",
-            language="hinglish",
-        ),
-        reply("Parso client ke saath meeting hai aur deck bhi ready karna hai."),
+        example("the client meeting is on monday no no on tuesday and the deck needs to be ready too"),
+        reply("The client meeting is on Tuesday and the deck needs to be ready too."),
     ),
     (
-        example("do cheezein chahiye pehla budget doosra hiring", style="docs", language="hinglish"),
-        reply("Do cheezein chahiye:\n1. Budget\n2. Hiring"),
+        example("we need two things first budget second hiring", style="docs"),
+        reply("We need two things:\n1. Budget\n2. Hiring"),
     ),
     (
-        example("कल तीन बजे मीटिंग है मतलब चार बजे", language="hi"),
-        reply("कल 4 बजे मीटिंग है।"),
+        example("the review is at three tomorrow make that four"),
+        reply("The review is at 4 tomorrow."),
     ),
     (
-        example("पहला, टिकट बुक करो। दूसरा, होटल देखो।", language="hi"),
-        reply("1. टिकट बुक करो\n2. होटल देखो"),
+        example("First, book the tickets. Second, check the hotel."),
+        reply("1. Book the tickets\n2. Check the hotel"),
     ),
     (
-        example("ek chai aur do samose lao aur bill bhi le aana", language="hinglish"),
-        reply("Ek chai aur do samose lao, aur bill bhi le aana."),
+        example("get one coffee and two muffins and bring the bill too"),
+        reply("Get one coffee and two muffins, and bring the bill too."),
     ),
     (
-        example("meera ka parcel aaj aaya kya warehouse wale ne kuch bola", language="hinglish"),
-        reply("Meera ka parcel aaj aaya kya? Warehouse wale ne kuch bola?"),
+        example("did meera's parcel come today did the warehouse say anything"),
+        reply("Did Meera's parcel come today? Did the warehouse say anything?"),
     ),
     (
         example("we packed the boxes then we called the movers"),
@@ -142,12 +135,8 @@ EXAMPLES: list[Turn] = [
         reply("Steel frame bikes."),
     ),
     (
-        example("joe log late aaye unka naam register may likho", language="hinglish"),
-        reply("Jo log late aaye, unka naam register mein likho."),
-    ),
-    (
-        example("मैंने किराने की दुकान से चीनी और दल खरीदी", language="hi"),
-        reply("मैंने किराने की दुकान से चीनी और दाल खरीदी।"),
+        example("i bought sugar and lentils at the grocer and some flower for the cake"),
+        reply("I bought sugar and lentils at the grocer and some flour for the cake."),
     ),
     (
         example("sorry i am late the cab actually came early but i missed it"),
@@ -186,10 +175,6 @@ EXAMPLES: list[Turn] = [
         reply("We built a simple state machine for the checkout."),
     ),
     (
-        example("किसान ने खेत में गेहूं के बीच बोए", language="hi"),
-        reply("किसान ने खेत में गेहूं के बीज बोए।"),
-    ),
-    (
         example("so what the agenda will be it will be a short review of the numbers"),
         reply("So, what will the agenda be? It will be a short review of the numbers."),
     ),
@@ -198,28 +183,16 @@ EXAMPLES: list[Turn] = [
         reply("She found a bug in the login screen."),
     ),
     (
-        example("garden me baith gaye kya mausam hai", language="hinglish"),
-        reply("Garden me baith gaye. Kya mausam hai!"),
+        example("we sat in the garden what a lovely evening"),
+        reply("We sat in the garden. What a lovely evening!"),
     ),
     (
-        example("when you will land mujhe call kar dena", language="hinglish"),
-        reply("When you land, mujhe call kar dena."),
+        example("when you will land call me"),
+        reply("When you land, call me."),
     ),
     (
-        example("mene kal uska msg dekha tha pr reply nhi kiya", language="hinglish"),
-        reply("Mene kal uska msg dekha tha pr reply nhi kiya."),
-    ),
-    (
-        example("मै कल रिपोर्ट भेजूंगा", language="hi"),
-        reply("मैं कल रिपोर्ट भेजूंगा।"),
-    ),
-    (
-        example("payment dhai lakh ka hai aur sava nau baje tak bhejna hai", language="hinglish"),
-        reply("Payment ₹2.5 lakh ka hai aur 9:15 baje tak bhejna hai."),
-    ),
-    (
-        example("इस हफ्ते किराया बिजली बिल और राशन का खर्च लिखो", language="hi"),
-        reply("इस हफ्ते किराया, बिजली बिल और राशन का खर्च लिखो।"),
+        example("write down the rent electricity bill and grocery costs for this week"),
+        reply("Write down the rent, electricity bill and grocery costs for this week."),
     ),
     (
         example("a few questions first is it ready second can we ship it today that's all"),
@@ -254,36 +227,16 @@ EXAMPLES: list[Turn] = [
         reply("Push each job onto a message queue first."),
     ),
     (
-        example("chai or biscuit dono le aao", language="hinglish"),
-        reply("Chai aur biscuit dono le aao."),
-    ),
-    (
-        example("amit buy ki shaadi agle mahine hai", language="hinglish"),
-        reply("Amit bhai ki shaadi agle mahine hai."),
-    ),
-    (
-        example("been a ticket entry nahi milegi", language="hinglish"),
-        reply("Bina ticket entry nahi milegi."),
-    ),
-    (
-        example("ऐप का पास वर्ड रीसेट करो", language="hi"),
-        reply("ऐप का पासवर्ड रीसेट करो।"),
+        example("reset the app pass word"),
+        reply("Reset the app password."),
     ),
     (
         example("tomorrow we submitted the form"),
         reply("Tomorrow we will submit the form."),
     ),
     (
-        example("agle mahine hum naye ghar me shift hue", language="hinglish"),
-        reply("Agle mahine hum naye ghar me shift honge."),
-    ),
-    (
-        example("अगले साल वो कॉलेज गया था", language="hi"),
-        reply("अगले साल वो कॉलेज जाएगा।"),
-    ),
-    (
-        example("didi kal delhi se aayega", language="hinglish"),
-        reply("Didi kal Delhi se aayegi."),
+        example("next month we moved to the new house"),
+        reply("Next month we will move to the new house."),
     ),
     (
         example("they were check the logs when it crashed"),
@@ -294,40 +247,32 @@ EXAMPLES: list[Turn] = [
         reply("Let's do one thing:\n- Water the plants\n- We'll lock the shed\n- We can leave for the station"),
     ),
     (
-        example("mujhe batao meeting kahan hogi?", language="hinglish"),
-        reply("Mujhe batao meeting kahan hogi."),
+        example("tell me where the meeting will be?"),
+        reply("Tell me where the meeting will be."),
     ),
     (
-        example("pehla point rent bharna doosra point gas book karni", style="docs", language="hinglish"),
-        reply("1. Rent bharna\n2. Gas book karni"),
-    ),
-    (
-        example("papa ne kaha nahi nahi gaadi mat lena", language="hinglish"),
-        reply("Papa ne kaha, nahi nahi, gaadi mat lena."),
-    ),
-    (
-        example("budget tight hai matlab abhi hiring nahi hogi", language="hinglish"),
-        reply("Budget tight hai, matlab abhi hiring nahi hogi."),
+        example("point one pay the rent point two book the gas", style="docs"),
+        reply("1. Pay the rent\n2. Book the gas"),
     ),
     (
         example("the food was very very good"),
         reply("The food was very very good."),
     ),
     (
-        example("dadi ke ghar ki chabi almari me hai nahi nahi drawer me hai", language="hinglish"),
-        reply("Dadi ke ghar ki chabi drawer me hai."),
+        example("grandma's house key is in the cupboard no no in the drawer"),
+        reply("Grandma's house key is in the drawer."),
     ),
     (
         example("give us a call when you land", terms=("US",)),
         reply("Give us a call when you land."),
     ),
     (
-        example("wah kitna sundar view hai", language="hinglish"),
-        reply("Wah, kitna sundar view hai!"),
+        example("wow what a beautiful view"),
+        reply("Wow, what a beautiful view!"),
     ),
     (
-        example("कबीर रिपोर्ट आज भेज दो", language="hi"),
-        reply("कबीर, रिपोर्ट आज भेज दो।"),
+        example("kabir send the report today"),
+        reply("Kabir, send the report today."),
     ),
     (
         example("pack these for the beach towels sunscreen two hats the bus leaves at nine"),
@@ -346,8 +291,8 @@ EXAMPLES: list[Turn] = [
         reply("Once the parcel arrives, we can leave."),
     ),
     (
-        example("nisha meeting me aa rahi hai aur rohan notes bana raha hai", language="hinglish"),
-        reply("Nisha meeting me aa rahi hai aur Rohan notes bana raha hai."),
+        example("nisha is joining the meeting and rohan is taking notes"),
+        reply("Nisha is joining the meeting and Rohan is taking notes."),
     ),
     (
         example("the api is responding again now just a quick check to see if happy is rebounding"),
@@ -368,8 +313,8 @@ EXAMPLES: list[Turn] = [
         reply("Next month we move to Pune, and then we unpack."),
     ),
     (
-        example("माँ ने दाल को फ्रिज में रख दिया", language="hi"),
-        reply("माँ ने दाल को फ्रिज में रख दिया।"),
+        example("mom put the lentils in the fridge"),
+        reply("Mom put the lentils in the fridge."),
     ),
     (
         example("the baker wiped the pasture shelf and stacked the croissants"),
@@ -380,24 +325,24 @@ EXAMPLES: list[Turn] = [
         reply("Whole wheat bread."),
     ),
     (
-        example("cycle ka break dheela hai", language="hinglish"),
-        reply("Cycle ka brake dheela hai."),
+        example("the bike's break is loose"),
+        reply("The bike's brake is loose."),
     ),
     (
-        example("2 tickets confirm ho gaye kya", language="hinglish"),
-        reply("2 tickets confirm ho gaye kya?"),
+        example("are the 2 tickets confirmed"),
+        reply("Are the 2 tickets confirmed?"),
     ),
     (
-        example("kavya Figma file aaj bhej do", terms=("Figma",), language="hinglish"),
-        reply("Kavya, Figma file aaj bhej do."),
+        example("kavya send the Figma file today", terms=("Figma",)),
+        reply("Kavya, send the Figma file today."),
     ),
     (
         example("so what the menu will be it should have soup and rice"),
         reply("So, what will the menu be? It should have soup and rice."),
     ),
     (
-        example("photos ko phir se print karo nahi nahi share karo", language="hinglish"),
-        reply("Photos ko share karo."),
+        example("print the photos again no no share the photos"),
+        reply("Share the photos."),
     ),
     (
         example("sorry the baker that the cake is ready", prior="Text the florist"),
@@ -421,17 +366,8 @@ EXAMPLES: list[Turn] = [
         reply("", revision="The rehearsal starts on Thursday at 6:30 because the hall opens late."),
     ),
     (
-        example(
-            "matlab friday ko office party rakhte hain sab log saat baje aa jaana",
-            prior="Is hafte Thursday ko office party rakhte hain. Sab log 6 baje aa jaana.",
-            language="hinglish",
-        ),
-        reply("", revision="Is hafte Friday ko office party rakhte hain. Sab log 7 baje aa jaana."),
-    ),
-    # With "ने" and a "कि" clause the verb stays masculine, whoever speaks; a right sentence comes back as said.
-    (
-        example("प्रिया ने फाइल देखी और बोला कि सब ठीक है", language="hi"),
-        reply("प्रिया ने फाइल देखी और बोला कि सब ठीक है।"),
+        example("priya looked at the file and said everything is fine"),
+        reply("Priya looked at the file and said everything is fine."),
     ),
     # A noun that can't do what the words around it say is its sound-alike, also in a few words.
     (
@@ -441,5 +377,23 @@ EXAMPLES: list[Turn] = [
     (
         example("ravi here the build is green and the tests pass"),
         reply("Ravi here. The build is green and the tests pass."),
+    ),
+    # A lone subject the speech ends on starts nothing and drops; one that answers "who" stays.
+    (
+        example("They asked me Where do you see yourself, and what do you want to learn? You"),
+        reply("They asked me: Where do you see yourself, and what do you want to learn?"),
+    ),
+    (
+        example("who is presenting first? you"),
+        reply("Who is presenting first? You."),
+    ),
+    # A noun that names the items announces them: a bulleted list, a count of them counting nothing off.
+    (
+        example("my goals for this month are finishing the course. saving some money and then a trip home. that's all"),
+        reply("My goals for this month are:\n- Finishing the course\n- Saving some money\n- A trip home\nThat's all."),
+    ),
+    (
+        example("so basically two things are pending, like. the invoice then there is the contract we"),
+        reply("So basically two things are pending, like:\n- The invoice\n- There is the contract"),
     ),
 ]

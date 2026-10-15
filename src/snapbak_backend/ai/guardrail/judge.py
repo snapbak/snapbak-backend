@@ -2,9 +2,9 @@
 
 The model may punctuate, case, format lists and numbers, fix small grammar slips, put back a word the recognizer
 misheard with the one that sounds like it, and drop a retracted span after a correction cue. It may not add words the
-user never said, change over 30 % of their words, drop a sentence, flip a negation, a tense or the speaker's gender,
-drop a qualifier ("only", "maybe", "today"), lose a dictionary term or answer them. A rejected polish leaves the
-request text as it was, and its reason names the rule and the words, which the correction prompt quotes.
+user never said, change over 30 % of their words, drop a sentence, flip a negation or a tense, drop a qualifier
+("only", "maybe", "today"), lose a dictionary term or answer them. A rejected polish leaves the request text as it
+was, and its reason names the rule and the words, which the correction prompt quotes.
 """
 
 import re
@@ -36,15 +36,13 @@ from snapbak_backend.ai.guardrail.grammar import (
     FUNCTION_WORDS,
     INSERTABLE,
     MONTHS,
-    RETIMED,
-    ROMAN_HINDI_GRAMMAR,
+    PARTNERS,
     explained,
     form_fix,
     futures,
-    grammar_words,
     joins,
-    misgenders,
     past_form,
+    person,
     qualifiers,
     related,
     retensed,
@@ -73,15 +71,12 @@ from snapbak_backend.ai.guardrail.numbers import (
     read_numbers,
     spoken_numbers,
 )
-from snapbak_backend.ai.guardrail.respell import DANGLING, DANGLING_AFTER_STOP, as_heard, undangled
+from snapbak_backend.ai.guardrail.respell import as_heard, spoken, undangled
 from snapbak_backend.ai.guardrail.shape import NEVER_NAMES, shaped
 from snapbak_backend.ai.guardrail.tokens import (
-    DEVANAGARI,
-    LETTER_NAMES,
     Edit,
     align,
     heard_as,
-    in_latin,
     syllables,
     tokens,
     word_set,
@@ -97,13 +92,11 @@ class Reject(StrEnum):
     NEGATION = "negation"
     TENSE = "tense"
     QUALIFIER = "qualifier"
-    GENDER = "gender"
     REPLY = "reply"
     MALFORMED = "malformed"
     DROPPED_JOIN = "dropped_join"
     TERM = "term"
     DROPPED_ITEM = "dropped_item"
-    TRANSLATED = "translated"
     KEPT_CORRECTION = "kept_correction"
     QUESTION = "question"
     FALSE_LIST = "false_list"
@@ -140,11 +133,11 @@ LOST_RUN = 2
 LOST_TOTAL = 4
 # The words a piece cut at a pause may go on with the sentence before it by; dropped, the piece reads as a new
 # sentence glued to the last ("visually appealing How is it going…", founder, 11 Oct).
-JOINS = word_set("and then aur phir और फिर")
-SENTENCE_ENDS = ".?!।\n"
+JOINS = word_set("and then")
+SENTENCE_ENDS = ".?!\n"
 # A list item with nothing after its number.
 EMPTY_ITEM = re.compile(r"^\s*\d+\.\s*$", re.MULTILINE)
-SENTENCE_START = re.compile(r"(?:^|[.?!।\n]|\n\s*-)\s*$")
+SENTENCE_START = re.compile(r"(?:^|[.?!\n]|\n\s*-)\s*$")
 
 
 REPLY_OPENERS = [
@@ -157,13 +150,7 @@ REPLY_OPENERS = [
     "here are",
     "i can help",
     "i'd be happy",
-    "zaroor",
-    "bilkul",
-    "yeh raha",
     "done",
-    "ज़रूर",
-    "बिल्कुल",
-    "यह रहा",
 ]
 
 
@@ -171,11 +158,7 @@ OPENERS = [" ".join(words(opener)) for opener in REPLY_OPENERS]
 # Acknowledgements and sign-offs an assistant adds anywhere ("Noted:", "Done.", "Thanks!"): written more often than
 # said, they answer the user.
 ACKNOWLEDGEMENTS = [
-    tuple(words(phrase))
-    for phrase in (
-        "noted|got it|okay|ok|thanks|thank you|hope this helps|theek hai|shukriya|ji haan|ठीक है|धन्यवाद|शुक्रिया|जी हां|"
-        "done|sure|haan|ji|जी|हां"
-    ).split("|")
+    tuple(words(phrase)) for phrase in "noted|got it|okay|ok|thanks|thank you|hope this helps|done|sure".split("|")
 ]
 ACKNOWLEDGING = {phrase[0] for phrase in ACKNOWLEDGEMENTS}
 
@@ -185,35 +168,16 @@ OPENING = tuple(OPENERS)
 
 # Raw speech of this many words or more is never typed back unchanged: it needs its marks and capitals.
 RAW_WORDS = 4
-RAW_MARKS = re.compile(r"[.,?!।A-Z]")
-RAW_DEVANAGARI_MARKS = re.compile(r"[.,?!।:\n]")
+RAW_MARKS = re.compile(r"[.,?!A-Z]")
 
 
 def unpolished(said_text: str, wrote_text: str) -> bool:
     """An answer with no mark and no capital at all, as raw speech comes ("thanks for the update ill review it
-    tonight"): nothing was polished. Devanagari has no capitals, so there no mark at all and no line break says it."""
+    tonight"): nothing was polished."""
     if len(wrote_text.split()) < RAW_WORDS:
         return False
-    if DEVANAGARI.search(wrote_text) is not None:
-        return RAW_DEVANAGARI_MARKS.search(wrote_text) is None
     latin = re.search(r"[a-z]", wrote_text) is not None
     return latin and RAW_MARKS.search(wrote_text) is None
-
-
-# Marks Hindi never takes in this app: the Arabic "؟", a full stop for "।" at a sentence's end, Devanagari digits.
-HINDI_STOP = re.compile(r"[ऀ-ॿ]{2,}\.(?=\s*(?:\n|$))")
-DEVANAGARI_DIGIT = re.compile("[\N{DEVANAGARI DIGIT ZERO}-\N{DEVANAGARI DIGIT NINE}]")
-
-
-def hindi_marks(said_text: str, wrote_text: str) -> str | None:
-    """A mark a Hindi answer writes that the speech never had: "؟", a Devanagari sentence ending with ".", or a
-    Devanagari digit (rule 11)."""
-    if "؟" in wrote_text and "؟" not in said_text:
-        return "؟"
-    if HINDI_STOP.search(wrote_text) and not HINDI_STOP.search(said_text):
-        return "."
-    digit = DEVANAGARI_DIGIT.search(wrote_text)
-    return digit.group() if digit and not DEVANAGARI_DIGIT.search(said_text) else None
 
 
 def added_sentence(wrote_text: str, opcodes: list[Edit], heard: set[str]) -> tuple[str, ...] | None:
@@ -231,7 +195,7 @@ def added_sentence(wrote_text: str, opcodes: list[Edit], heard: set[str]) -> tup
 
 
 # A sentence or list line written more often than said ("Can you resend? Can you resend?").
-SENTENCE_SPLIT = re.compile(r"[.?!।\n]+")
+SENTENCE_SPLIT = re.compile(r"[.?!\n]+")
 
 
 def repeated(said: list[str], wrote_text: str) -> tuple[str, ...] | None:
@@ -245,10 +209,10 @@ def repeated(said: list[str], wrote_text: str) -> tuple[str, ...] | None:
 
 
 # Joining words a split run-on keeps (rule 2): written ", and" or opening the next sentence, never dropped (round b5:
-# "...rules engine. It will select" lost "and"; "होगा। रिपोर्ट" lost "और").
-SPLIT_JOINERS = word_set("and but so because then aur lekin magar kyunki isliye phir to और लेकिन मगर क्योंकि इसलिए फिर तो")
-# A full stop, "?", "!" or "।" ending a sentence inside the text, and a list item's marker after it.
-SENTENCE_BREAK = re.compile(r"[.?!।]+[\"'\u201d\u2019)]*\s+")
+# "...rules engine. It will select" lost "and").
+SPLIT_JOINERS = word_set("and but so because then")
+# A full stop, "?" or "!" ending a sentence inside the text, and a list item's marker after it.
+SENTENCE_BREAK = re.compile(r"[.?!]+[\"'\u201d\u2019)]*\s+")
 ITEM_MARKER = re.compile(r"(?:\d+\.|[-•])\s")
 
 
@@ -308,7 +272,7 @@ def joiner_put_back(said_text: str, wrote_text: str) -> str | None:
 
 
 # Lines a list, an email's greeting and sign-off, or a spoken line break may make; nothing else breaks a line.
-LINE_WORDS = word_set("line lines paragraph para लाइन पैराग्राफ पैरा")
+LINE_WORDS = word_set("line lines paragraph")
 SHORT_LINE_WORDS = 2
 SHORT_SPEECH = 8
 SHORT_LINES = 3
@@ -334,27 +298,19 @@ def bare_lines(said: list[str], wrote_text: str) -> tuple[str, ...] | None:
     return tuple(short[:2]) if len(short) >= SHORT_LINES else None
 
 
-# Question words a question never takes more of than were said (rule 2: never add "kya" to a question).
-ASKING_WORDS = word_set("kya क्या")
-
-
-def repeated_asking(said: list[str], wrote: list[str]) -> str | None:
-    """A question word written more often than said ("pahunchega kya? Kya usse" for one "kya"), round b5."""
-    asking = ASKING_WORDS.intersection(wrote)
-    return next((word for word in sorted(asking) if wrote.count(word) > said.count(word)), None)
-
-
 def replies(said: list[str], wrote: list[str]) -> bool:
     wrote_start = " ".join(wrote[:3])
     # Most answers open with no reply word: one check of them all.
     if not wrote_start.startswith(OPENING):
         return False
-    said_start = " ".join(said[:3])
+    # A paragraph or line said first opens nothing ("new paragraph here is what ...").
+    opened = 2 if said[:1] == ["new"] and said[1:2] in (["paragraph"], ["line"]) else 0
+    said_start = " ".join(said[opened : opened + 3])
     return any(wrote_start.startswith(o) and not said_start.startswith(o) for o in OPENERS)
 
 
 def acknowledges(said: list[str], wrote: list[str]) -> tuple[str, ...] | None:
-    """An acknowledgement written more often than said ("Noted:", "Thanks!", a doubled "theek hai"), named."""
+    """An acknowledgement written more often than said ("Noted:", "Thanks!", a doubled "okay"), named."""
     present = ACKNOWLEDGING.intersection(wrote)
     if not present:
         return None
@@ -369,8 +325,8 @@ CONFUSIONS = {
     frozenset(pair.split("/"))
     for pair in (
         "cash/cache of/have ask/axe specific/pacific suite/sweet patients/patience flour/flower hour/our quite/quiet "
-        "aloud/allowed no/know to/two two/too to/too for/four one/won ate/eight bones/bonus chorus/course "
-        "formally/formerly negate/negotiate weight/wait yeah/yaha yeah/yahan may/mein"
+        "aloud/allowed no/know to/two two/too to/too for/four one/won ate/eight bones/bonus chorus/course hours/ours "
+        "formally/formerly negate/negotiate weight/wait"
     ).split()
 }
 # Words a misheard-word fix never changes: a negation, a correction cue or a promise. A pair above may still swap:
@@ -383,19 +339,15 @@ LONGEST_SPOKEN_TERM = 3
 # Two small words for one another ("in" "on", "is" "as") change what was meant; a fix needs a word that isn't one.
 SMALL_WORDS = FUNCTION_WORDS | word_set("as by from into onto off up out but so if or nor")
 # Words whose loss alone loses no content: grammar, spoken marks, cues and list counts, the words of a number or
-# a time a symbol or digits replace ("twenty euros" €20, "half past three" 3:30, "पॉइंट"), the joining words of a
-# list ("phir", "और"), and words a grammar fix drops ("discuss about", "more clearer", "proceed ahead", "at the
-# rate" @).
+# a time a symbol or digits replace ("twenty euros" €20, "half past three" 3:30, "point"), the joining words of a
+# list ("then"), and words a grammar fix drops ("discuss about", "more clearer", "proceed ahead", "at the rate" @).
 PLAIN_WORDS = (
     SMALL_WORDS
     | FORMAT_WORDS
     | CUE_WORDS
     | ORDINALS
     | BULLETS
-    | word_set(
-        "plus double triple then saath pratishat equals point pound pounds euro euros phir aur "
-        "ahead more much having rate please thanks फिर और पॉइंट प्वाइंट दशमलव डॉलर्स पाउंड यूरो डबल परसेंट डैश तो"
-    )
+    | word_set("plus double triple then equals point pound pounds euro euros ahead more much having rate please thanks")
 )
 # One misheard-word fix in ten said words is free; each past that costs two changes, as a rewrite would.
 FIX_EVERY = 10
@@ -412,22 +364,14 @@ def sound(word: str) -> tuple[str, int]:
     return heard_as(word), syllables(word)
 
 
-def sounds_alike(heard: list[str], wrote: list[str], hinglish: bool = False) -> bool:
-    """Words for others the recognizer could have heard instead: the same sounds, in the same script. A hyphen joins
-    words without a sound ("brake glass" Break-glass)."""
+def sounds_alike(heard: list[str], wrote: list[str]) -> bool:
+    """Words for others the recognizer could have heard instead: the same sounds. A hyphen joins words without a
+    sound ("brake glass" Break-glass)."""
     said, written = "".join(heard), "".join(wrote).replace("-", "")
-    if (DEVANAGARI.search(said) is None) != (DEVANAGARI.search(written) is None):
-        return False
-    if DEVANAGARI.search(said):
-        written_sound = devanagari_sound(wrote)
-        nasal = len(heard) > 1 and slip(devanagari_sound(heard, LAST_NASAL), written_sound)
-        return nasal or slip(devanagari_sound(heard), written_sound)
     (key, beats), (other, other_beats) = sound(said), sound(written)
     # A longer word may be heard with a vowel sound more or less ("manger" manager, "fiscal" physical), and so may
     # words heard across a wrong word boundary ("get way" gateway); one short word may not ("debit" debt).
-    # Roman Hindi spelling follows no English silent letters, so a vowel sound more or less is allowed there from three
-    # consonants on ("chorus" course), not in a short word ("kal" kela).
-    loose = len(key) >= LONG_KEY - (1 if hinglish else 0) or len(heard) + len(wrote) > 2
+    loose = len(key) >= LONG_KEY or len(heard) + len(wrote) > 2
     beats_off = abs(beats - other_beats)
     if key == other:
         return key not in ("", "A") and (beats_off == 0 or (beats_off == 1 and loose))
@@ -438,45 +382,6 @@ def sounds_alike(heard: list[str], wrote: list[str], hinglish: bool = False) -> 
     clipped = key + "t" == other or other + "t" == key or key + "d" == other or other + "d" == key
     unrolled = beats > 1 and key.replace("r", "") == other.replace("r", "") and abs(len(key) - len(other)) == 1
     return longer and (clipped or unrolled)
-
-
-def devanagari_sound(found: list[str], joining: re.Pattern[str] | None = None) -> str:
-    """Devanagari words said apart, as one sound: each word's own, joined ("बैक कप" bekap, as "बैकअप"); a last "य"
-    after a vowel is the vowel "इ" when it joins the next word ("माय ग्रेशन" माइग्रेशन)."""
-    sounds = [heard_as(word) for word in found]
-    if len(sounds) > 1:
-        sounds = [GLIDE.sub("i", sound) for sound in sounds[:-1]] + sounds[-1:]
-    if joining is not None:
-        sounds = [joining.sub("", sound) for sound in sounds[:-1]] + sounds[-1:]
-    joined = "".join(sounds)
-    return re.sub(r"(.)\1+", r"\1", joined)
-
-
-GLIDE = re.compile(r"(?<=[aeiou])y$")
-# "आउ" said for "ओ" ("लाउड" लोड), a sound a recognizer swaps in English words.
-DIPHTHONG = re.compile("au")
-# A word's last "न" or "म" before the next word is an anusvara once they join ("टेन योर" टेंयोर, as "टेन्योर").
-LAST_NASAL = re.compile("[nm]$")
-
-
-# A voiced consonant and its voiceless twin, which a recognizer swaps ("साइट" साइड, "सीट" सीड).
-DEVOICED = str.maketrans("dgbj", "tkpc")
-
-
-# A "य" glide between vowels is the vowel "ए" ("आयगा" आएगा, "जायेगा" जाएगा).
-GLIDE_Y = re.compile(r"(?<=[aeiou])ye?(?![aeiou])")
-
-
-def slip(heard: str, written: str) -> bool:
-    """A Devanagari word heard with the same consonants, one maybe voiced for voiceless, and one sound wrong at most
-    in a short word ("बैग" बग, "साइट" साइड), never two ("कल" केला)."""
-    heard, written = DIPHTHONG.sub("o", heard), DIPHTHONG.sub("o", written)
-    heard, written = GLIDE_Y.sub("e", heard), GLIDE_Y.sub("e", written)
-    consonants = re.sub("[aeiou]", "", heard).translate(DEVOICED)
-    same = consonants == re.sub("[aeiou]", "", written).translate(DEVOICED)
-    # A word of three consonants or more may be two sounds off ("तारीफ" तरफ, "श्लोक" शुल्क).
-    allowed = 1 if len(consonants) < LONG_KEY - 1 else 2
-    return bool(consonants) and same and edits(heard, written) <= allowed
 
 
 def edits(one: str, other: str) -> int:
@@ -504,9 +409,9 @@ def heard_term(word: str, said: list[str], wrote: set[str] | frozenset[str] = fr
 
 
 def near(said: str, term: str, whole: bool = False) -> bool:
-    """A term's spoken form: its consonants, in any script, or for a longer one one off ("वॉकीन" vkn Joaquin jkn), a
-    voiced consonant for its voiceless twin ("cooper netties" Kubernetes). `whole`: the heard sounds cover the term,
-    so "razor" is never Razorpay."""
+    """A term's spoken form: its consonants, or for a longer one one off ("wakeen" wkn Joaquin jkn), a voiced
+    consonant for its voiceless twin ("cooper netties" Kubernetes). `whole`: the heard sounds cover the term, so
+    "razor" is never Razorpay."""
     if unaccented(said) == unaccented(term):
         return True
     # A mark inside a term is said as a word ("c plus plus" C++, "c sharp" C#).
@@ -527,7 +432,7 @@ TERM_MARK_WORDS = {"+": "plus", "#": "sharp", "&": "and"}
 SPOKEN_TERM_MARKS = re.compile(r"[+#&]")
 
 
-NAME = re.compile(r"(?<![.?!।:\n-])(?<!^)\s+([A-Z][a-z]+)")
+NAME = re.compile(r"(?<![.?!:\n-])(?<!^)\s+([A-Z][a-z]+)")
 
 
 def names(text: str) -> set[str]:
@@ -547,18 +452,17 @@ def swappable(said: list[str], wrote: list[str], terms: set[str]) -> bool:
 
 
 # How many said words for how many written ones a fix may take: one for one, two for one ("a head" ahead), one for
-# two ("aagaya" aa gaya), and three for one only for a term ("post gres q l" PostgreSQL).
+# two ("alot" a lot), and three for one only for a term ("post gres q l" PostgreSQL).
 SHAPES = ((1, 1), (2, 1), (1, 2), (3, 1))
 TERM_SHAPES = ((3, 1), (2, 1), (1, 1), (1, 2))
 
 
 @dataclass(frozen=True)
 class Speech:
-    """What a fix is judged against: both texts, for names, and whether the speech is Hinglish."""
+    """What a fix is judged against: both texts, for names."""
 
     said: str
     wrote: str
-    hinglish: bool
 
 
 def fits(heard: list[str], written: list[str], terms: set[str], speech: Speech, exact: bool) -> bool:
@@ -575,21 +479,19 @@ def fits(heard: list[str], written: list[str], terms: set[str], speech: Speech, 
         return joined_said == joined_written or any(frozenset((joined_said, word)) in CONFUSIONS for word in spelled)
     if term:
         return near(joined_said, joined_written, whole=True)
-    alike = swappable(heard, written, terms) and (
-        sounds_alike(heard, written, speech.hinglish) or plural_alike(heard, written, speech.hinglish)
-    )
+    alike = swappable(heard, written, terms) and (sounds_alike(heard, written) or plural_alike(heard, written))
     return alike and not set(heard + written) & (names(speech.said) | names(speech.wrote))
 
 
-def plural_alike(heard: list[str], written: list[str], hinglish: bool) -> bool:
-    """A sound-alike written in its plural ("car ke break" brakes), round b4."""
+def plural_alike(heard: list[str], written: list[str]) -> bool:
+    """A sound-alike written in its plural ("check the car break" brakes), round b4."""
     plural = len(written) == 1 and written[0].endswith("s") and not heard[-1].endswith("s")
-    return plural and sounds_alike(heard, [written[0][:-1]], hinglish)
+    return plural and sounds_alike(heard, [written[0][:-1]])
 
 
 def swaps(said: list[str], wrote: list[str], op: Edit, terms: set[str], speech: Speech) -> list[Swap]:
     """The misheard-word fixes in a replaced run: said words for written ones that sound the same, one for one, two
-    for one ("a head" ahead) or one for two ("bhejdiya" bhej diya), or a term written for its spoken form. Exact
+    for one ("a head" ahead) or one for two ("alot" a lot), or a term written for its spoken form. Exact
     joins and splits go first, so "mapsme" is "Maps.me", not "maps" alone."""
     _, start, end, written_start, written_end = op
     found: list[Swap] = []
@@ -599,7 +501,7 @@ def swaps(said: list[str], wrote: list[str], op: Edit, terms: set[str], speech: 
         offset = start + j - written_start
         # A term may stand anywhere in the run it replaced; another word near its own place.
         near_place = range(start, end) if wrote[j] in terms else range(max(start, offset - 2), min(end, offset + 3))
-        # A term takes the longest run heard for it ("अ साई ई" Açaí, never "अ साई" and a left-over "ई").
+        # A term takes the longest run heard for it ("a sigh ee" Açaí, never "a sigh" and a left-over "ee").
         shapes = TERM_SHAPES if wrote[j] in terms else SHAPES
         options = (
             (exact, range(i, i + said_size), range(j, j + written_size))
@@ -620,7 +522,7 @@ def swaps(said: list[str], wrote: list[str], op: Edit, terms: set[str], speech: 
                 and slot_fits(wrote[written.start : written.stop], wrote, written)
                 and (
                     wrote[written.start] not in terms
-                    or named_slot(wrote, written.start, said, said[heard.start : heard.stop], speech.hinglish)
+                    or named_slot(wrote, written.start, said, said[heard.start : heard.stop])
                 )
             ),
             None,
@@ -685,7 +587,22 @@ LOCKED = {
     )
 }
 # "their" goes before a noun; "there" before a verb, a preposition or nothing.
-THERE_AFTER = word_set("is are was were will has have at in on by and too yet soon now today tomorrow")
+THERE_AFTER = word_set(
+    "is are was were will has have at in on by and too yet soon now today tomorrow yesterday tonight early late again"
+)
+
+
+def other_person(said: list[str], wrote: list[str], opcodes: list[Edit]) -> str | None:
+    """A pronoun written in place of said ones that name someone else ("we" They, "he" She, "him is" They are),
+    though it was said elsewhere: only a pronoun's case may change ("him is" He is)."""
+    for op, start, end, written_start, written_end in opcodes:
+        if op != "replace":
+            continue
+        named = {person(word) for word in said[start:end]} - {None}
+        other = next((word for word in wrote[written_start:written_end] if person(word) not in named | {None}), None)
+        if named and other is not None:
+            return other
+    return None
 
 
 def right_word_swapped(said: list[str], wrote: list[str], opcodes: list[Edit]) -> str | None:
@@ -715,8 +632,9 @@ def locked(said: list[str], i: int) -> bool:
     return before in befores or after in afters
 
 
-# A word a count is said before: a plural or a time's "am" or "pm" ("two tickets", "two extra chairs", "four pm").
-COUNTED = re.compile(r"^(?:[a-z]{3,}s|am|pm|baje|बजे)$")
+# A word a count is said before: a plural, also an irregular one, or a time's "am" or "pm" ("two tickets", "two extra
+# chairs", "two people", "four pm").
+COUNTED = re.compile(r"^(?:[a-z]{3,}s|am|pm|people|children|men|women|feet|teeth)$")
 
 
 def counts_alike(heard: list[str], written: list[str], wrote: list[str], place: range) -> bool:
@@ -730,7 +648,9 @@ def counts_alike(heard: list[str], written: list[str], wrote: list[str], place: 
     # A count may have one word before its plural ("two extra chairs"), and a time its "p.m." or minutes ("at 8:30").
     meridiem = "".join(after) in MERIDIEMS
     minutes = before in AT_TIMES and bool(after) and after[0].isdigit() and len(after[0]) == 2
-    counted = meridiem or minutes or any(COUNTED.match(word) is not None for word in after)
+    # A clock time ends the sentence after "at" ("see you at for" four).
+    clock = before in AT_TIMES and place.stop == len(wrote)
+    counted = meridiem or minutes or clock or any(COUNTED.match(word) is not None for word in after)
     # "one" goes before a thing ("i have won question" one question); "won" before an object or alone ("we won two").
     thing = (
         bool(after) and after[0] not in SMALL_WORDS and after[0] not in DETERMINERS_BEFORE and not is_number(after[0])
@@ -760,9 +680,9 @@ def slot_fits(written: list[str], wrote: list[str], place: range) -> bool:
     return not after_determiner and not verb_slot
 
 
-def term_slot(wrote: list[str], i: int, said: list[str], hinglish: bool) -> bool:
+def term_slot(wrote: list[str], i: int, said: list[str]) -> bool:
     heard = heard_term(wrote[i], said, set(wrote))
-    return heard is not None and named_slot(wrote, i, said, heard, hinglish)
+    return heard is not None and named_slot(wrote, i, said, heard)
 
 
 # A dictation that opens with one of these asks a question ("is the deck ready").
@@ -774,8 +694,8 @@ TO_VERB = word_set(
     "want wants wanted need needs needed have has had going able try tried trying used ought how start started starts "
     "begin began begins continue continued seem seems seemed"
 )
-# Words around a number word heard for a term that name a tool ("in Xero", "our Xero invoices", "from Xero", "Xero
-# mein"); "start from zero", "was zero", "down to zero", "zero se shuru" are numbers.
+# Words before a number word heard for a term that name a tool ("in Xero", "our Xero invoices", "from Xero"); "start
+# from zero", "was zero", "down to zero" are numbers.
 TOOL_LEADS = word_set("in on into via through using our my your their the with from")
 STARTING = word_set("start starts started starting begin began beginning restart scratch")
 # Nouns a number word counts ("zero balance", "zero waste"), never a term's.
@@ -784,30 +704,17 @@ COUNTED_NOUNS = word_set("balance balances percent interest tolerance waste emis
 USING_TOOL = word_set(
     "use uses used using try tried switch switched check checked open opened sync synced export import"
 )
-TOOL_AFTER = word_set("mein me pe par में पर पे")
 # Verbs a "the" and a term may follow ("book the Lyft").
 USING = word_set("book booked booking call called order ordered take took get got open opened use used")
-# Words after a Hindi or Hinglish term that make it a plain noun's subject ("lift kharab hai", "लिफ्ट बंद है"), and
-# places "ke" and "की" lead to ("lift ke paas").
-PLAIN_HINDI_AFTER = word_set(
-    "kharab band hai hain tha thi chal chalti ruk toot theek kaam nahi खराब बंद है हैं था थी चल चलती रुक टूट ठीक काम नहीं"
-)
-PLACES_AFTER = word_set("paas upar andar neeche saamne bahar पास ऊपर अंदर नीचे सामने बाहर")
-HINDI_VERBS = word_set(
-    "karo kar karna karte karke do de dena lo le lena daal daalo dalo डाल डालो करो कर करना दो दे लो ले"
-)
-# Words a Hindi noun goes on with: case words and "वाला".
-CASE_WORDS = word_set("से में पर को का की के ने वाला वाली वाले तक ऐप एप अकाउंट ऑर्डर वॉलेट")
 # A word after a term that shows it was a plain word's verb or predicate ("the lift is broken", "lights flicker at").
 PLAIN_AFTER = AUXILIARIES | FUNCTION_WORDS | word_set("at when every again all")
 
 
-def named_slot(wrote: list[str], i: int, said: list[str], heard: list[str], hinglish: bool) -> bool:
+def named_slot(wrote: list[str], i: int, said: list[str], heard: list[str]) -> bool:
     """Whether a term written for a different word said stands where the term is meant (D4): a name's slot, never a
     verb's ("He can lift", "help me lift"), never a number's ("start from zero", "the score was zero to one"), never a
-    plain noun's after "the" with a verb after it ("the lift is broken"), in Hindi and Hinglish only before a word
-    that names a service ("Zomato se", never "lift kharab hai"). A run of words heard for one term is no plain word
-    ("the cooper netties cluster"), and a term said as itself stands anywhere."""
+    plain noun's after "the" with a verb after it ("the lift is broken"). A run of words heard for one term is no
+    plain word ("the cooper netties cluster"), and a term said as itself stands anywhere."""
     if wrote[i] in said or unaccented(wrote[i]) in said:
         return True
     before = wrote[i - 1] if i else ""
@@ -815,17 +722,11 @@ def named_slot(wrote: list[str], i: int, said: list[str], heard: list[str], hing
     if any(is_number(word) for word in heard):
         starting = i >= 2 and wrote[i - 2] in STARTING
         used = before in USING_TOOL and (not after or after in BESIDE or after in COORDINATORS)
-        tool = (before in TOOL_LEADS and not starting) or after in TOOL_AFTER or used
+        tool = (before in TOOL_LEADS and not starting) or used
         return tool and after != "to" and not is_number(after) and after not in COUNTED_NOUNS
     infinitive = before == "to" and i >= 2 and (wrote[i - 2] in TO_VERB or wrote[i - 2] in SUBJECTS_BEFORE)
     if before in VERB_LEADS or infinitive or (before == "a" and i >= 3 and wrote[i - 3] in ("give", "gave")):
         return False
-    # A term is a noun: a case word or another noun follows it, never a Hindi verb ("जीरा डाल दो", "show me karo").
-    place = i + 2 < len(wrote) and wrote[i + 2] in PLACES_AFTER
-    if after in PLAIN_HINDI_AFTER or after in HINDI_VERBS or place:
-        return False
-    if hinglish or DEVANAGARI.search(heard[0]):
-        return not DEVANAGARI.search(heard[0]) or after in CASE_WORDS or not DEVANAGARI.search(after)
     # A term opening a sentence before "the" is a verb's place ("Show me the slides").
     if i == 0 and after in DETERMINERS_BEFORE:
         return False
@@ -843,28 +744,26 @@ def no_swaps(op: Edit) -> list[Swap]:
     return []
 
 
-# Marks said as words, in English, Hinglish and Hindi; the words of one are free where it is said.
+# Marks said as words; the words of one are free where it is said.
 SPOKEN_MARKS = [
     tuple(words(phrase))
     for phrase in (
         "open quote|close quote|end quote|unquote|quote|open bracket|close bracket|open paren|close paren|"
-        "open parenthesis|close parenthesis|exclamation mark|exclamation point|new paragraph|new line|naya paragraph|"
-        "nayi line|nai line|naya para|नया पैराग्राफ|नया पैरा|नई लाइन|नयी लाइन|क्वेश्चन मार्क|फुल स्टॉप|कॉमा|पूर्णविराम|"
-        "अल्पविराम|प्रश्नवाचक चिह्न|प्रश्न चिह्न|कोलन|ओपन कोट|क्लोज कोट|ब्रैकेट खोलो|ब्रैकेट बंद करो|पूर्ण विराम|प्रश्नचिह्न|"
-        "सेमीकोलन|next line|dot dot dot"
+        "open parenthesis|close parenthesis|exclamation mark|exclamation point|new paragraph|new line|next line|"
+        "dot dot dot"
     ).split("|")
 ]
 MARK_STARTS = {phrase[0] for phrase in SPOKEN_MARKS}
 # A mark word after one of these is a noun, never a mark ("the period of the contract", "a comma splice").
 NOUN_MARKERS = word_set("the a an each every")
-COORDINATORS = word_set("or and ya aur या और")
-# A cue this close to a left-out run may be taking it back; a lone "no", "nahi" or "नहीं" there is a negation.
+COORDINATORS = word_set("or and")
+# A cue this close to a left-out run may be taking it back; a lone "no" there is a negation.
 CUE_NEAR = 4
 TAKING_CUES = {cue for cue in CUE_PHRASES if not (len(cue) == 1 and cue[0] in NEGATORS)}
 
 
 def spoken_mark_spots(said: list[str], marks: list[bool]) -> set[int]:
-    """Where a mark is said as words ("open quote", "नया पैराग्राफ"), unless a noun marker comes before it."""
+    """Where a mark is said as words ("open quote", "new paragraph"), unless a noun marker comes before it."""
     spots: set[int] = set()
     for i, word in enumerate(said):
         if word not in MARK_STARTS or named_mark(said, marks, i):
@@ -881,7 +780,7 @@ def named_mark(said: list[str], marks: list[bool], i: int) -> bool:
 def taken_back(said: list[str], run: list[int], output: list[str], kept: set[str], marks: list[bool]) -> bool:
     """Whether a cue may take back the left-out words at `run`: one said just after them, or one later followed by
     the words written in their place ("his green journal ... actually blue notebook" his blue notebook). Words after
-    a cue go only when they restate words kept, all but one written elsewhere ("मतलब sourav का नाम" back into the
+    a cue go only when they restate words kept, all but one written elsewhere ("i mean sourav's name" back into the
     prior)."""
     # A cue takes back words before it, never words after the replacement that follows it, and only when it reads as
     # one ("the brake warning actually stayed off" keeps "warning").
@@ -924,7 +823,7 @@ def changed(
     """Said words the output changed or dropped, plus grammar words it added that a fix never needs ("and", "or"),
     and the retracted words, which are free. Dropping "make that" or "change that" though it takes nothing back
     drops a verb ("make that call" "Call"), so it costs every said word; a lone "sorry" is a filler. A fix adds a
-    grammar word of its groups ("the", "is", "ka") about once in four said words; each one past that is a change. A
+    grammar word of its groups ("the", "is") about once in four said words; each one past that is a change. A
     misheard word fixed (`alike`) is free once in ten said words; each one past that costs two. Also each run of
     content words the output left out with nothing taking them back, wherever else those words recur."""
     retracted: list[str] = []
@@ -951,7 +850,7 @@ def changed(
             continue
         added = [word for word in output if word in FUNCTION_WORDS and word not in INSERTABLE and word not in span]
         if added and op == "replace":
-            # A small word written for its sound-alike was heard, not added ("ria say poochna" se).
+            # A small word written for its sound-alike was heard, not added ("are" for "our").
             sounded = alike((op, start, end, written_start, written_end))
             heard_for = {wrote[j] for _, written in sounded for j in written}
             added = [word for word in added if word not in heard_for]
@@ -965,7 +864,7 @@ def changed(
         numbered = any(is_number(word) for word in output)
         listed = not items.isdisjoint(range(written_start, written_end))
         marker = {i for i in range(start + 1, end) if said[i - 1] in BULLETS}
-        # An ordinal that marks a step of a list the answer made ("pehle ac band karo phir ..." - AC band karo).
+        # An ordinal that marks a step of a list the answer made ("first turn off the ac then ..." - Turn off the AC).
         marker |= {
             i
             for i in range(start, end)
@@ -1011,7 +910,7 @@ def changed(
             swapped = {j for _, written in alike((op, start, end, written_start, written_end)) for j in written}
             new_words = [word for j, word in enumerate(output, written_start) if j not in swapped]
             nothing_for = not any(
-                content(word) and not any(related(one, word) or word in RETIMED.get(one, ()) for one in span)
+                content(word) and not any(related(one, word) or word in PARTNERS.get(one, ()) for one in span)
                 for word in new_words
             )
             dropped += [said[i] for i in run] if nothing_for else []
@@ -1134,20 +1033,18 @@ def ordinal_nouns(said: list[str], wrote: list[str], items: set[int]) -> bool:
 
 
 # A word right after itself, whatever marks follow it: the cheap test that a text may hold a stutter.
-DOUBLED = re.compile(r"(?<!\S)([^\s,.;!?।]+)[,.;!?।]*\s+\1(?![^\s,.;!?।])", re.IGNORECASE)
+DOUBLED = re.compile(r"(?<!\S)([^\s,.;!?]+)[,.;!?]*\s+\1(?![^\s,.;!?])", re.IGNORECASE)
 
 
 def unstuttered(said_tokens: list[tuple[str, bool]], wrote: list[str]) -> list[tuple[str, bool]]:
-    """The said words with a stutter's second copy gone: a word right after itself ("it's it's", "kal kal"), unless
-    the answer keeps that repeat ("that that"), it is a doubled cue ("no no", "nahi nahi"), which has its own rule, or
-    it is said twice on purpose: a number ("nine one one") or a spelled letter ("एच टी टी पी")."""
+    """The said words with a stutter's second copy gone: a word right after itself ("it's it's", "the the"), unless
+    the answer keeps that repeat ("that that"), it is a doubled cue ("no no"), which has its own rule, or it is said
+    twice on purpose: a number ("nine one one") or a spelled letter ("w w w")."""
     repeated = {word for word, next_word in pairwise(wrote) if word == next_word}
     kept = said_tokens[:1]
     for (before, _), (word, marked) in pairwise(said_tokens):
         # A mark said twice is meant too ("c plus plus", "dot dot dot").
-        meant = (
-            (word, word) in REPEATS or is_number(word) or word in LETTER_NAMES or len(word) == 1 or word in FORMAT_WORDS
-        )
+        meant = (word, word) in REPEATS or is_number(word) or len(word) == 1 or word in FORMAT_WORDS
         meant = meant or word in TERM_MARK_WORDS.values()
         stutter = word == before and word not in repeated and not meant
         if not stutter:
@@ -1167,33 +1064,6 @@ def numbering(wrote_text: str, first: int) -> bool:
     return bool(found) and on and (len(found) > 1 or found[0] == first)
 
 
-# The small Hindi words a translation drops and the English ones it writes for them ("aur" and, "है" is).
-HINDI_SMALL = word_set(
-    "aur hai hain mein nahi nahin ya lekin bhi par se ka ki ke ko tha thi liye "
-    "और है हैं में नहीं या लेकिन भी पर से का की के को था थी थे लिए"
-)
-ENGLISH_SMALL = word_set("and is are in not no or but also too on at from of to was were for")
-
-
-def translation(said: list[str], wrote: list[str], opcodes: list[Edit]) -> tuple[str, str] | None:
-    """A small Hindi word replaced by an English one never said (or the reverse): a word translated, in Hinglish
-    or Hindi. A word put back for its sound-alike was misheard ("are" aur). Names the pair."""
-    for op, start, end, written_start, written_end in opcodes:
-        if op != "replace":
-            continue
-        span, output = said[start:end], wrote[written_start:written_end]
-        for lost_side, new_side in ((HINDI_SMALL, ENGLISH_SMALL), (ENGLISH_SMALL, HINDI_SMALL)):
-            lost = [word for word in span if word in lost_side and word not in output]
-            if not lost:
-                continue
-            new = [word for word in output if word in new_side and wrote.count(word) > said.count(word)]
-            pairs = ((gone, put) for gone in lost for put in new if not sounds_alike([gone], [put], hinglish=True))
-            found = next(pairs, None)
-            if found is not None:
-                return found
-    return None
-
-
 def by_first_word(phrases: str) -> dict[str, list[tuple[str, ...]]]:
     """The "|"-separated phrases as words, grouped by their first word for a quick lookup."""
     grouped: dict[str, list[tuple[str, ...]]] = {}
@@ -1206,9 +1076,7 @@ def by_first_word(phrases: str) -> dict[str, list[tuple[str, ...]]]:
 # Every cue but a lone negation, by its first word.
 CUE_STARTS = by_first_word("|".join(" ".join(cue) for cue in CUE_PHRASES if not (len(cue) == 1 and cue[0] in NEGATORS)))
 # Cues a speaker never means to keep in the text when the words around them are two versions of one thing.
-STRONG_CUES = by_first_word(
-    "i mean|no wait|scratch that|make that|no|nahi|nahi nahi|नहीं|नहीं नहीं|matlab|मतलब|sorry|actually|balki|बल्कि"
-)
+STRONG_CUES = by_first_word("i mean|no wait|scratch that|make that|no|sorry|actually")
 
 
 def kept_correction(said: list[str], wrote: list[str], named: frozenset[str]) -> tuple[str, ...] | None:
@@ -1237,14 +1105,13 @@ def kept_correction(said: list[str], wrote: list[str], named: frozenset[str]) ->
 
 
 # Words that set a clause's tense.
-# A past's auxiliary, never the English "the" that is also Hinglish "the".
-PAST_MARKERS = word_set("tha thi था थी थे थीं was were")
-TENSE_WORDS = PAST_MARKERS | word_set("is are am will hai hain hoon ho है हैं हूं हो होगा होगी")
+PAST_MARKERS = word_set("was were")
+TENSE_WORDS = PAST_MARKERS | word_set("is are am will")
 
 
 def past_dropped_by_cue(said: list[str], wrote: list[str]) -> bool:
-    """A past said before a cue whose correction names only another day or thing ("upload karna tha tuesday ko
-    rather wednesday ko", "बुधवार को था नहीं नहीं शुक्रवार को"): the answer keeps the past."""
+    """A past said before a cue whose correction names only another day or thing ("the upload was due tuesday rather
+    wednesday"): the answer keeps the past."""
     cue = last_cue(said)
     if cue is None or PAST_MARKERS.isdisjoint(said[: cue[0]]) or not TENSE_WORDS.isdisjoint(said[cue[1] :]):
         return False
@@ -1252,8 +1119,8 @@ def past_dropped_by_cue(said: list[str], wrote: list[str]) -> bool:
 
 
 def negations_after_cue(said: list[str]) -> int:
-    """The negations the speaker says again after the last cue (no lone "no" or "nahi"), each before the word it
-    negated before the cue ("note nahi kiya matlab ... note nahi kiya"): the corrected version keeps them."""
+    """The negations the speaker says again after the last cue (no lone "no"), each before the word it negated before
+    the cue ("don't send the deck i mean don't send the notes"): the corrected version keeps them."""
     cues = [
         (i, i + len(cue))
         for i in range(len(said))
@@ -1269,8 +1136,8 @@ def negations_after_cue(said: list[str]) -> int:
 
 
 def negations_taken_back(said: list[str]) -> int:
-    """Negations a correction takes back by saying the verb again without them ("kal nahi aaunga matlab aaunga par
-    late" comes after all)."""
+    """Negations a correction takes back by saying the verb again without them ("don't send it no wait send it"
+    sends it after all)."""
     found: set[int] = set()
     for i in range(2, len(said) - 1):
         for cue in CUE_STARTS.get(said[i], ()):
@@ -1298,8 +1165,8 @@ RESTATE_REACH = 4
 def restated_both(said: list[str], marks: list[bool], wrote: list[str]) -> tuple[str, ...] | None:
     """Both versions kept where the words after a cue restate the ones before it, with the cue or without: the same
     opening word ("include the case study actually include the testimonial", "has no allergies actually no known
-    allergies"), the same last words ("priya ko bhejo sorry rahul ko bhejo"), or a word of one kind and the same word
-    after it ("kal hai nahi nahi parso hai"). A lone "no" or "nahi" has its own rule. Names the old version's last
+    allergies"), the same last words ("priya will lead sorry rahul will lead"), or a word of one kind and the same
+    word after it ("friday works no no monday works"). A lone "no" has its own rule. Names the old version's last
     word, the cue and the new version's first."""
     for i in range(1, len(said) - 1):
         for cue in CUE_STARTS.get(said[i], ()):
@@ -1325,9 +1192,8 @@ def restated_both(said: list[str], marks: list[bool], wrote: list[str]) -> tuple
 
 def versions(before: list[str], after: list[str], least: int = 2) -> tuple[list[str], list[str]]:
     """The words before a cue and the words after it that say them again, or nothing: the same opening word, the
-    same last words ("priya ko bhejo sorry rahul ko bhejo", "निखिल ने लिखा था actually नितिन ने लिखा था"), a word of one
-    kind and the same word after it ("kal hai nahi nahi parso hai"), or the same small word before one of one kind
-    ("on friday sorry on saturday")."""
+    same last words ("priya will lead sorry rahul will lead"), a word of one kind and the same word after it ("friday
+    works no no monday works"), or the same small word before one of one kind ("on friday sorry on saturday")."""
     if not before or not after:
         return [], []
     restating = after[0] not in CUE_WORDS or after[0] in NEGATORS
@@ -1347,18 +1213,15 @@ def versions(before: list[str], after: list[str], least: int = 2) -> tuple[list[
 
 
 # Cues that put one number for another ("three no four", "fifty dollars wait sixty").
-NUMBER_CUES = by_first_word(
-    "i mean|i meant|no wait|no|nahi|nahi nahi|नहीं|नहीं नहीं|matlab|mera matlab|मतलब|मेरा मतलब|sorry|actually|balki|"
-    "बल्कि|wait|rather|nope|oops|make that|scratch that"
-)
+NUMBER_CUES = by_first_word("i mean|i meant|no wait|no|sorry|actually|wait|rather|nope|oops|make that|scratch that")
 # Numbers a cue reaches across: the old one this many words before it, the new one this many after.
 NUMBER_REACH = 4
-# Words that join two numbers into a range or a choice, never a correction ("three or four", "teen se chaar").
-SPANS = word_set("or to ya se या से and aur और")
+# Words that join two numbers into a range or a choice, never a correction ("three or four", "three to four").
+SPANS = word_set("or to and")
 
 
 # Cues a speaker only says to take words back: dropped with both versions kept, the correction never happened.
-TAKING_BACK = by_first_word("scratch that|no wait|i meant|nahi nahi|नहीं नहीं|mera matlab|मेरा मतलब|galti se bola")
+TAKING_BACK = by_first_word("scratch that|no wait|i meant")
 
 
 def both_kept(said: list[str], marks: list[bool], wrote: list[str]) -> tuple[str, ...] | None:
@@ -1383,8 +1246,8 @@ def both_kept(said: list[str], marks: list[bool], wrote: list[str]) -> tuple[str
 def number_correction(said: list[str], wrote: list[str]) -> tuple[str, ...] | None:
     """A number put right after a cue whose answer lost the new one ("three no four" 3, "fifty dollars wait sixty
     dollars" $50), or kept the old one right beside it ("3 or 4"). Names the old number, the cue and the new one. A
-    list's counts and a fraction's time are left to their own rules ("second ... no ... third", "सात मतलब साढ़े
-    सात")."""
+    list's counts and a fraction's time are left to their own rules ("second ... no ... third", "seven i mean
+    quarter to eight")."""
     written: list[int | None] = []
     for i, word in enumerate(said):
         for cue in NUMBER_CUES.get(word, ()):
@@ -1422,7 +1285,7 @@ def counted(word: str) -> bool:
 
 
 def number_before(said: list[str], at: int) -> list[str]:
-    """The number words said just before `at`, past a unit word or two ("fifty dollars", "teen baje")."""
+    """The number words said just before `at`, past a unit word or two ("fifty dollars", "three hours")."""
     end = at
     while end > max(0, at - 2) and not counted(said[end - 1]) and said[end - 1] in UNIT_WORDS:
         end -= 1
@@ -1441,9 +1304,7 @@ def number_after_cue(said: list[str], at: int) -> list[str]:
 
 
 # Words a number is said before: units of money, time, weight and count.
-UNIT_WORDS = FORMAT_WORDS | word_set(
-    "baje बजे kilo किलो minutes minute hours hour days day percent pratishat प्रतिशत rupees rupaye dollars दिन घंटे"
-)
+UNIT_WORDS = FORMAT_WORDS | word_set("kilo minutes minute hours hour days day percent rupees dollars")
 
 
 # A small word that may lead both versions around a cue ("the plumber no the electrician").
@@ -1467,33 +1328,17 @@ def asked(said: list[str], wrote: list[str]) -> bool:
 
 
 # A written sentence and the mark that ends it.
-WRITTEN_SENTENCE = re.compile(r"[^\n]+?[.?!।؟](?=\s|$)")
+WRITTEN_SENTENCE = re.compile(r"[^\n]+?[.?!](?=\s|$)")
 QUESTION_WORDS = word_set("what when where who whom whose why how which")
 # A subject right after an opening auxiliary asks ("is the deck", "can you").
 SUBJECTS = word_set("i you he she it we they this that these those there the a an my your our his her their")
-HINDI_ASKS = word_set("kya क्या")
-# A Hindi or Hinglish question word asks in a short sentence of its own ("मीटिंग कब है"); one inside a request or
-# after "ki" or "jo" is an indirect question ("pata nahi meeting kab hai").
-HINDI_QUESTIONS = word_set(
-    "kab kahan kahaan kaun kyun kyon kaise kitna kitne kitni kisne kisko kiska kiski kiske कब कहाँ कहां कौन क्यों कैसे "
-    "कितना कितने कितनी किसने किसको किसका किसकी किसके"
-)
-INDIRECT = word_set("ki kii jo jab jahan jaise कि जो जब जहां जैसे")
-SHORT_QUESTION = 7
-OPENS_QUESTIONS = AUXILIARIES | QUESTION_WORDS | HINDI_ASKS
-# Each sentence's first word, and a "kya" before a full stop: a sentence may ask only with one of them.
-SENTENCE_FIRSTS = re.compile(r"(?:^|[.!।\n])[\s\-]*([^\s,.;:!?।\"']+)")
-KYA_END = re.compile(r"(?:kya|क्या)\s*[.।]", re.IGNORECASE)
-# A "kya" at the end after one of these asks inside a request ("check karo queue lagging hai kya").
-EMBEDS = word_set(
-    "karo kar batao bata batana bataya dekho dekh dekhna dekhte dekhenge pata poocho puchho poocha pucha puchha "
-    "jaanna janna check करो बताओ बताना बताया देखो देखना देखते देखेंगे पता पूछो पूछा जानना yaad याद jaane जाने malum "
-    "maloom मालूम"
-)
+OPENS_QUESTIONS = AUXILIARIES | QUESTION_WORDS
+# Each sentence's first word: a sentence may ask only with one of them.
+SENTENCE_FIRSTS = re.compile(r"(?:^|[.!\n])[\s\-]*([^\s,.;:!?\"']+)")
 
 
 # Words a question or a grammar fix moves ("what workflows will be" what will the workflows be).
-MOVABLE = AUXILIARIES | word_set("be been being not hai hain tha thi है हैं था थी")
+MOVABLE = AUXILIARIES | word_set("be been being not")
 
 
 def order_changed(said: list[str], wrote: list[str], retracted: list[str], items: set[int]) -> tuple[str, ...] | None:
@@ -1518,16 +1363,14 @@ def order_changed(said: list[str], wrote: list[str], retracted: list[str], items
 
 # Each currency's symbol and the words that say it; a lakh or a crore is rupees.
 CURRENCIES = {
-    "$": word_set("dollar dollars bucks usd डॉलर डॉलर्स"),
-    "₹": word_set(
-        "rupee rupees rupaye rupaiye rupaya rupiya rs inr paise lakh lakhs crore crores रुपये रुपए रुपया लाख करोड़"
-    ),
-    "€": word_set("euro euros यूरो"),
-    "£": word_set("pound pounds quid पाउंड"),
+    "$": word_set("dollar dollars bucks usd"),
+    "₹": word_set("rupee rupees rs inr paise lakh lakhs crore crores"),
+    "€": word_set("euro euros"),
+    "£": word_set("pound pounds quid"),
 }
 # Words said for the marks of an address.
 ADDRESS_CHARS = {"dot": ".", "at": "@", "underscore": "_", "dash": "-", "hyphen": "-", "slash": "/"}
-POINTS = word_set("point पॉइंट प्वाइंट दशमलव")
+POINTS = word_set("point")
 # Every spoken address holds one of these; "at" alone is prose.
 ADDRESS_JOINS = word_set("dot underscore slash dash hyphen")
 LABEL = re.compile(r"[^._/\-@]+")
@@ -1537,7 +1380,7 @@ RATIO = re.compile(r"(\d+):(\d+)")
 # A name or a mailbox word left before "at" and a written domain ("Sam at acme.io", "support at acme.io"), never a
 # verb ("we met at acme.io").
 HALF_ADDRESS = re.compile(
-    r"(?<![.?!।]\s)(?<!^)\b(?:[A-Z][a-z]+|(?i:support|sales|info|hello|team|ops|hr|careers|admin|contact|billing|jobs))"
+    r"(?<![.?!]\s)(?<!^)\b(?:[A-Z][a-z]+|(?i:support|sales|info|hello|team|ops|hr|careers|admin|contact|billing|jobs))"
     rf" at [a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:{'|'.join(sorted(DOMAINS))})\b",
     re.MULTILINE,
 )
@@ -1552,30 +1395,24 @@ KEPT_MARKS = [
         ("full stop", "."),
         ("exclamation mark", "!"),
         ("exclamation point", "!"),
-        ("क्वेश्चन मार्क", "?"),
-        ("फुल स्टॉप", "।"),
     )
 ]
-# A paragraph named, never said as a command ("the new paragraph in the contract", "निबंध का नया पैराग्राफ").
-NAMING = NOUN_MARKERS | word_set("this that is ka ki ke ye yeh का की के इस यह ये")
-PARAGRAPHS = [
-    tuple(words(phrase)) for phrase in "new paragraph|naya paragraph|naya para|नया पैराग्राफ|नया पैरा".split("|")
-]
+# A paragraph named, never said as a command ("the new paragraph in the contract").
+NAMING = NOUN_MARKERS | word_set("this that is")
+PARAGRAPHS = [tuple(words("new paragraph"))]
 PARAGRAPH_FIRSTS = {phrase[0] for phrase in PARAGRAPHS}
 MARK_FIRSTS = PARAGRAPH_FIRSTS | {phrase[0] for phrase, _ in KEPT_MARKS}
 
 
 def format_changed(
-    said: list[str], said_text: str, spoken: set[str], wrote_text: str, retracted: list[str], indian: bool
+    said: list[str], said_text: str, spoken: set[str], wrote_text: str, retracted: list[str]
 ) -> tuple[str, ...] | None:
     """A number, an amount, an address or a mark written otherwise than said: a currency symbol no word said ("twenty
     euros" $20), a decimal's zero lost or added ("three point zero five" 3.5), a ratio turned round ("three to one"
     1:3), a spoken address cut or changed ("acme dot co dot in" acme.co.), an "@" in prose, a spoken mark kept as
     words, a paragraph said but not made. Names what changed."""
     for symbol, names in CURRENCIES.items():
-        # Hinglish and Hindi speech counts its money in rupees ("rent sixty thousand" ₹60,000).
-        rupees = symbol == "₹" and indian
-        if symbol in wrote_text and symbol not in said_text and names.isdisjoint(spoken) and not rupees:
+        if symbol in wrote_text and symbol not in said_text and names.isdisjoint(spoken):
             return (symbol,)
     if not POINTS.isdisjoint(spoken) and "." in wrote_text:
         said_decimals = decimals_said(said)
@@ -1616,12 +1453,11 @@ def format_changed(
 
 
 # A clock time with one digit of minutes ("6:6"), an ordinal with another number's ending ("4rd"), and an amount of
-# lakhs or crores as a decimal ("₹3.5 लाख").
-ONE_DIGIT_MINUTES = re.compile(r"\b\d{1,2}:\d(?![\d:])(?=\s*(?:[ap]\.?m\b|baje|बजे))", re.IGNORECASE)
+# lakhs or crores as a decimal ("₹3.5 lakh").
+ONE_DIGIT_MINUTES = re.compile(r"\b\d{1,2}:\d(?![\d:])(?=\s*[ap]\.?m\b)", re.IGNORECASE)
 ORDINAL_DIGITS = re.compile(r"\b(\d+)(st|nd|rd|th)\b", re.IGNORECASE)
-SCALED = re.compile(r"(\d+\.\d+)\s*(lakhs?|crores?|लाख|करोड़|करोड|million|billion)", re.IGNORECASE)
-SCALE_OF = {"lakh": 100_000, "crore": 10_000_000, "लाख": 100_000, "करोड़": 10_000_000, "करोड": 10_000_000}
-SCALE_OF |= {"million": 1_000_000, "billion": 1_000_000_000}
+SCALED = re.compile(r"(\d+\.\d+)\s*(lakhs?|crores?|million|billion)", re.IGNORECASE)
+SCALE_OF = {"lakh": 100_000, "crore": 10_000_000, "million": 1_000_000, "billion": 1_000_000_000}
 
 
 def ordinal_ending(number: int) -> str:
@@ -1690,8 +1526,8 @@ def cut_number(said: list[str], wrote_text: str) -> tuple[str, ...] | None:
     return None
 
 
-# "half", "quarter" and "साढ़े" are a time's minutes, which another check reads.
-TIME_HALVES = word_set("half quarter sadhe saade saadhe साढ़े")
+# "half" and "quarter" are a time's minutes, which another check reads.
+TIME_HALVES = word_set("half quarter")
 CLOCK_HOURS = 12
 MINUTES_IN_HOUR = 60
 
@@ -1744,8 +1580,8 @@ def spoken_addresses(said: list[str]) -> list[tuple[str, list[str]]]:
         domain = labels[-1:] and labels[-1] in DOMAINS and "." in marks
         joins = [mark for mark in marks if mark != "@"]
         address = len(joins) >= 2 or "_" in joins or bool(domain) or ("@" in marks and bool(joins))
-        latin = not any(DEVANAGARI.search(part) or is_number(part) for part in parts)
-        if address and latin:
+        numbered = any(is_number(part) for part in parts)
+        if address and not numbered:
             # The labels a cue may take back: those after an "@", which a prose "at" may stand before.
             after_at = (
                 labels[sum(1 for part in parts[: parts.index("@")] if part not in ADDRESS_CHARS.values()) :]
@@ -1790,19 +1626,14 @@ AS_WORDS = [
     for phrase in (
         "colon|semicolon|new line|next line|exclamation point|exclamation mark|open quote|close quote|end quote|"
         "unquote|"
-        "open bracket|close bracket|open paren|close paren|dot dot dot|nayi line|nai line|नई लाइन|नयी लाइन|पूर्ण विराम|"
-        "पूर्णविराम|कॉमा|फुल स्टॉप|क्वेश्चन मार्क|question mark|full stop"
+        "open bracket|close bracket|open paren|close paren|dot dot dot|question mark|full stop"
     ).split("|")
 ]
 AS_WORDS_FIRSTS = {phrase[0] for phrase in AS_WORDS}
 NAMING_MARK = NOUN_MARKERS | word_set(
-    "our my your their his her its this that of new launch product add put type insert use enter mein me ka ki ke ek "
-    "koi में का की के एक कोई"
+    "our my your their his her its this that of new launch product add put type insert use enter"
 )
-MARK_NOUN_AFTER = word_set(
-    "cancer surgery polyp polyps health cleanse key keys lagana lagao lagaya laga lagta bichhai lagani बिछाई बिछाना "
-    "लगाना लगाओ लगाया लगा लगानी"
-)
+MARK_NOUN_AFTER = word_set("cancer surgery polyp polyps health cleanse key keys")
 
 
 def marks_as_words(said: list[str], wrote_text: str) -> tuple[str, ...] | None:
@@ -1824,44 +1655,36 @@ def marks_as_words(said: list[str], wrote_text: str) -> tuple[str, ...] | None:
     return None
 
 
-def unasked(wrote_text: str, spoken: set[str]) -> tuple[str, ...] | None:
-    """A direct question written with a full stop or the Arabic "؟": one opening with an auxiliary and its subject
-    ("can you send it."), with a question word and an auxiliary ("where is the invoice."), or opening or ending
-    with "kya" or "क्या". Names its first words. An indirect question ("I wonder if", "pata nahi kya hua") opens
-    otherwise and may end with a full stop."""
+def unasked(wrote_text: str) -> tuple[str, ...] | None:
+    """A direct question written with a full stop: one opening with an auxiliary and its subject ("can you send
+    it."), with a question word and an auxiliary ("where is the invoice."), or ending with a tag ("right."). Names
+    its first words. An indirect question ("I wonder if") opens otherwise and may end with a full stop."""
     firsts = {word.lower() for word in SENTENCE_FIRSTS.findall(wrote_text)}
-    ends_kya = ("kya" in wrote_text or "क्या" in wrote_text) and KYA_END.search(wrote_text) is not None
-    asks_hindi = not HINDI_QUESTIONS.isdisjoint(spoken)
     tagged = TAG.search(wrote_text) is not None
     opens = not OPENS_QUESTIONS.isdisjoint(firsts) or not ASKING_CONTRACTIONS.isdisjoint(firsts)
-    if "؟" not in wrote_text and not opens and not ends_kya and not asks_hindi and not tagged:
+    if not opens and not tagged:
         return asked_after_comma(wrote_text)
     for found in WRITTEN_SENTENCE.finditer(wrote_text):
         sentence = found.group()
         if sentence[-1] in "?!":
             continue
-        # A tag asks whatever the sentence opens with ("You sent it, didn't you.", "Tum aa rahe ho na.").
+        # A tag asks whatever the sentence opens with ("You sent it, didn't you.").
         if TAG.search(sentence) is not None:
             return tuple(words(sentence)[-3:])
-        # Most sentences open and end with no question word: read only their edges before splitting them.
+        # Most sentences open with no question word: read only their first word before splitting them.
         edges = sentence.lower().strip(" -\t").split(maxsplit=1)
-        first = edges[0].strip(".,;:!?।؟\"'") if edges else ""
-        last = sentence.lower().rstrip(" .।؟").rsplit(maxsplit=1)[-1:]
-        ends_asking = bool(last) and last[0] in HINDI_ASKS
-        asking = first in OPENS_QUESTIONS or first in ASKING_CONTRACTIONS or ends_asking or sentence[-1] == "؟"
-        if not asking and not asks_hindi:
+        first = edges[0].strip(".,;:!?\"'") if edges else ""
+        if first not in OPENS_QUESTIONS and first not in ASKING_CONTRACTIONS:
             continue
         said = words(sentence)
-        if len(said) < 2 or (said[0] in EXCLAIMING and said[1] in EXCLAIMS) or said[0] in INTERJECTIONS:
-            continue
-        if asking_sentence(said, sentence) or sentence[-1] == "؟":
+        if len(said) >= 2 and asking_sentence(said, sentence):
             return tuple(said[:4])
     return asked_after_comma(wrote_text)
 
 
 # A question after a greeting or a lead-in, past a comma ("Hello, how are you.").
 ASKED_CLAUSE = re.compile(
-    r",\s+((?:how|what|where|when|why|who)\s+(?:is|are|was|were|do|does|did|can|will|would)\s+(?:you|we|they|he|she|it|i))\b[^.?!।]*[.।](?=\s|$)",
+    r",\s+((?:how|what|where|when|why|who)\s+(?:is|are|was|were|do|does|did|can|will|would)\s+(?:you|we|they|he|she|it|i))\b[^.?!]*\.(?=\s|$)",
     re.IGNORECASE,
 )
 
@@ -1883,32 +1706,14 @@ HOW_MUCH = word_set("many much long often far soon old")
 FINITE = AUXILIARIES | word_set(
     "isn't aren't wasn't weren't doesn't don't didn't won't can't makes means matters sounds seems looks depends shows"
 )
-# A Hindi question word followed by "bhi" asks nothing ("kaise bhi karke"), and a sentence that ends in a command is
-# one ("... aaj bhej do").
-ANY_WAY = word_set("bhi भी")
-COMMAND_ENDS = word_set(
-    "do karo bhejo batao dekho chalo aao lo rakho dena karna दो करो भेजो बताओ देखो चलो आओ लो रखो देना करना"
-)
-# "kya" or "kitna" before a word of praise exclaims ("Kya shandaar match tha!", "Kitna accha laga.", "कितनी प्यारी
-# बच्ची है।"), and so does a sentence opening with an interjection ("Wah, packing kitni premium lagi.").
-EXCLAIMING = word_set("kya kitna kitni kitne क्या कितना कितनी कितने")
-EXCLAIMS = word_set(
-    "shandaar shaandaar kamaal kamal gazab ghazab mast badhiya zabardast khoob sundar accha achha acha baat bakwaas "
-    "pyara pyari pyare pyaara pyaari khubsurat khoobsurat mazedaar mazedar cute premium "
-    "शानदार कमाल गजब मस्त बढ़िया जबरदस्त खूब सुंदर सुन्दर अच्छा अच्छी बात बकवास प्यारा प्यारी प्यारे खूबसूरत मजेदार"
-)
-INTERJECTIONS = word_set("wah waah wow arre shabash वाह अरे शाबाश")
-# A tag that asks: ", right", ", didn't you", or a Hindi "na" after a verb ("ho na", "आओगे ना").
-TAG = re.compile(
-    r"(?:,\s*(?:right|\w+n't\s+(?:i|you|he|she|it|we|they|there))|\b(?:hai|hain|ho|tha|thi|है|हैं|हो|था|थी|\w*(?:ga|gi|ge|गा|गी|गे))\s+(?:na|ना))\s*[.।](?=\s|$)",
-    re.IGNORECASE,
-)
+# A tag that asks: ", right", ", didn't you".
+TAG = re.compile(r",\s*(?:right|\w+n't\s+(?:i|you|he|she|it|we|they|there))\s*\.(?=\s|$)", re.IGNORECASE)
 
 
 def asking_sentence(said: list[str], sentence: str) -> bool:
     """A written sentence that asks directly: an auxiliary and its subject ("can you", "can Priya"), a question word
     and an auxiliary ("where is", "how many people are", "which vendor was"), a question word and a past ("who sent
-    this"), or a Hindi question ("kya", a short one with "kab" or "kaun")."""
+    this")."""
     opener = said[0]
     named = len(sentence.split()) > 1 and sentence.split()[1][:1].isupper()
     asked_about = ASKING_PRONOUNS if opener in COMMANDING else SUBJECTS
@@ -1921,26 +1726,16 @@ def asking_sentence(said: list[str], sentence: str) -> bool:
     question = opener in ASKING_CONTRACTIONS or (
         opener in QUESTION_WORDS and (said[1] in AUXILIARIES or bool(noun_first) or measured or who)
     )
-    hindi = opener in HINDI_ASKS or (said[-1] in HINDI_ASKS and EMBEDS.isdisjoint(said))
-    worded = (
-        len(said) <= SHORT_QUESTION
-        and any(word in HINDI_QUESTIONS and after not in ANY_WAY for word, after in pairwise([*said, ""]))
-        and EMBEDS.isdisjoint(said)
-        and INDIRECT.isdisjoint(said)
-        and said[-1] not in COMMAND_ENDS
-    )
-    return auxiliary or question or hindi or worded
+    return auxiliary or question
 
 
 # A question mark on what asks nothing directly: an indirect question ("She asked if we can move the call?"), a wish
-# or a sign-off ("Have a great weekend?", "May the best team win?") or an exclamation ("Kya shandaar match tha?").
+# or a sign-off ("Have a great weekend?", "May the best team win?").
 OVERASKED = re.compile(
-    r"(?:^|[.!?।\n]\s*)(?:(?:i|we|she|he|they)\s+(?:wonder|wondered|asked|was wondering)\s+"
+    r"(?:^|[.!?\n]\s*)(?:(?:i|we|she|he|they)\s+(?:wonder|wondered|asked|was wondering)\s+"
     r"(?:if|whether|why|what|when|where|how)\b"
-    r"|(?:then\s+)?(?:you\s+can\s+|please\s+)?(?:ask|tell|show)\s+[^.!?।\n]{1,30}?\s+(?:what|how|when|where|which)\s+to\s"
-    r"|have\s+(?:a|an|fun)\s|may\s+the\s|(?:kya|क्या)\s+"
-    r"(?:shandaar|shaandaar|kamaal|gazab|ghazab|mast|zabardast|khoob|bakwaas"
-    r"|शानदार|कमाल|गजब|गज़ब|मस्त|ज़बरदस्त|जबरदस्त|खूब|बकवास)\s)[^.!?।\n]*\?",
+    r"|(?:then\s+)?(?:you\s+can\s+|please\s+)?(?:ask|tell|show)\s+[^.!?\n]{1,30}?\s+(?:what|how|when|where|which)\s+to\s"
+    r"|have\s+(?:a|an|fun)\s|may\s+the\s)[^.!?\n]*\?",
     re.IGNORECASE,
 )
 
@@ -1960,14 +1755,12 @@ def overasked(wrote_text: str) -> tuple[str, ...] | None:
 ANY_ITEM_LINE = re.compile(r"^\s*(?:\d+\.|[-•*])\s", re.MULTILINE)
 # Words that announce a list (D5) or say how items are counted.
 ANNOUNCES = word_set(
-    "following follows below here these those steps things points list lists items reasons tasks ideas questions "
-    "options thing notes agenda plan checklist todo todos updates summary ye yeh प्लान लिस्ट नोट्स एजेंडा स्टेप्स ये "
-    "यह कदम "
-    "kaam baatein baatien cheezein cheezen points बातें चीजें चीज़ें काम निम्नलिखित सूची"
+    "following follows below here here's these those steps things points list lists items reasons tasks ideas "
+    "questions options thing notes agenda plan checklist todo todos updates summary priorities goals"
 )
 
 
-# Words between two counts that make each an item, not a quantity ("ek paint ka advance add karo do repair ...").
+# Words between two counts that make each an item, not a quantity ("one add the paint advance two repair ...").
 ITEM_WORDS = 3
 
 
@@ -1996,7 +1789,7 @@ def false_list(said: list[str], marks: list[bool], wrote_text: str, first_item: 
     list is announced: "one designer two engineers" says how many."""
     lines = ANY_ITEM_LINE.findall(wrote_text)
     if len(lines) == 1:
-        # One item alone is a list only where one goes on, or a bullet said ("Ek kaam karo:\n- Usko call karo").
+        # One item alone is a list only where one goes on, or a bullet said ("Do one thing:\n- Call him").
         numbered = lines[0].strip()[:1].isdigit()
         return first_item == 1 and (numbered or BULLETS.isdisjoint(said))
     if len(lines) < 2:
@@ -2012,7 +1805,9 @@ def false_list(said: list[str], marks: list[bool], wrote_text: str, first_item: 
     first = ANY_ITEM_LINE.search(wrote_text)
     lead = words(wrote_text[: first.start()]) if first else []
     led_in = any(word in ANNOUNCES or is_number(word) for word in lead)
-    return not counted and not led_in
+    # A plural noun that names the items announces them too ("The blockers are:"), prompt rule 3.
+    plural = len(lead) >= 2 and lead[-1] in ("are", "were") and lead[-2].endswith("s") and not lead[-2].endswith("ss")
+    return not counted and not led_in and not plural
 
 
 def phrase_starts(said: list[str], phrase: tuple[str, ...]) -> list[int]:
@@ -2022,12 +1817,10 @@ def phrase_starts(said: list[str], phrase: tuple[str, ...]) -> list[int]:
     return found
 
 
-DO_ONE_THING = [
-    tuple(words(phrase)) for phrase in "do one thing|ek kaam karo|ek kaam karte|एक काम करो|एक काम करते".split("|")
-]
+DO_ONE_THING = [tuple(words("do one thing"))]
 DO_ONE_THING_ITEMS = 3
 # An ordinal before one of these is prose ("second time", "first half"), and so is "at first".
-ORDINAL_NOUNS = word_set("time times half hand place round try attempt chance baar बार")
+ORDINAL_NOUNS = word_set("time times half hand place round try attempt chance")
 
 
 def prose_ordinal(said: list[str], marks: list[bool], i: int) -> bool:
@@ -2036,21 +1829,21 @@ def prose_ordinal(said: list[str], marks: list[bool], i: int) -> bool:
     return before == "at" or after in ORDINAL_NOUNS or before in DETERMINERS or in_prose(said, marks, i)
 
 
-# A counting word's digit opening a sentence ("2 रिन्यूअल पर ...").
-COUNT_OPENS = re.compile(r"(?:^|[.।?!]\s+)2\s")
+# A counting word's digit opening a sentence ("2 renewals ...").
+COUNT_OPENS = re.compile(r"(?:^|[.?!]\s+)2\s")
 
 
 def counted_as_numbers(said: list[str], marks: list[bool], wrote_text: str) -> bool:
-    """Items counted off at sentence starts ("एक ... । दो ... । तीन ...") written as prose that opens its sentences
-    with the counts as numbers ("2 रिन्यूअल पर ..."): the list was lost and the counts read as quantities."""
-    # Three counts in order, so "Ek baat bolun? Do din se ..." stays prose.
+    """Items counted off at sentence starts ("one ... . two ... . three ...") written as prose that opens its
+    sentences with the counts as numbers ("2 renewals ..."): the list was lost and the counts read as quantities."""
+    # Three counts in order, so "One more thing. Two days ago ..." stays prose.
     starts = [VALUES.get(word) for word, marked in zip(said, marks, strict=True) if marked]
     counted = {1, 2, 3} <= set(starts) and starts.index(1) < starts.index(2) < starts.index(3)
     return counted and COUNT_OPENS.search(wrote_text) is not None
 
 
-# Words that ask for a numbered list ("in a numbered list", "नंबर वाली लिस्ट").
-NUMBERED_ASKS = [tuple(words(phrase)) for phrase in "numbered|numbering|number wali|नंबर वाली|नंबर वाला|नंबरिंग".split("|")]
+# Words that ask for a numbered list ("in a numbered list").
+NUMBERED_ASKS = [tuple(words(phrase)) for phrase in "numbered|numbering".split("|")]
 BULLET_LINE = re.compile(r"^\s*[-•*]\s", re.MULTILINE)
 
 
@@ -2166,7 +1959,7 @@ PADDED = re.compile(r"([₹$€£]\s?\d[\d,]*\.)(\d)0\b")
 CENTS = re.compile(r"\$0\.(\d\d)\b")
 # "Rs 1,200" for rupees said.
 RUPEES_WRITTEN = re.compile(r"\bRs\.?\s?(?=\d)", re.IGNORECASE)
-RUPEE_WORDS = word_set("rupees rupee rupaye rupaiye rupaya रुपये रुपए")
+RUPEE_WORDS = word_set("rupees rupee")
 DOTTED_MERIDIEM = re.compile(r"(?<=\d)(\s?)([apAP])\.[mM]\.(?=,?\s+[a-z])")
 DOTTED_MERIDIEM_END = re.compile(r"(?<=\d)(\s?)([apAP])\.[mM]\.")
 TENS = dict(zip("123456789", words("ten twenty thirty forty fifty sixty seventy eighty ninety"), strict=True))
@@ -2174,7 +1967,7 @@ TENS = dict(zip("123456789", words("ten twenty thirty forty fifty sixty seventy 
 UNIT_SAYINGS = {
     unit: [tuple(words(saying)) for saying in sayings.split("|")]
     for unit, sayings in {
-        "kg": "kilograms|kilogram|kilos|kilo|किलो",
+        "kg": "kilograms|kilogram|kilos|kilo",
         "g": "grams|gram",
         "mg": "milligrams|milligram",
         "km": "kilometers|kilometer|kilometres|kilometre",
@@ -2232,7 +2025,7 @@ def readable(wrote_text: str, said: list[str]) -> str:
     if not any(mark in text for mark in MINUS + ":.$°Rr") and WRITTEN_UNIT.search(text) is None:
         return text
     spoken = set(said)
-    sign = next((word for word in ("minus", "negative", "माइनस") if word in spoken), None)
+    sign = next((word for word in ("minus", "negative") if word in spoken), None)
     if sign is not None:
         text = MINUS_SIGN.sub(f"{sign} ", text)
     if "rs" in text.lower() and not RUPEE_WORDS.isdisjoint(spoken):
@@ -2272,17 +2065,9 @@ def slash_verbed(said: list[str], wrote_text: str) -> tuple[str, ...] | None:
     return None
 
 
-# Round b2 fix: a spoken number written as its word and its digit ("two 2-liter bottles"), an email or a web address
-# with Devanagari in it, and a fraction word left before an hour's digit ("saade 6", "साढ़े 6").
+# Round b2 fix: a spoken number written as its word and its digit ("two 2-liter bottles").
 SMALL_VALUES = dict(zip(words("one two three four five six seven eight nine ten"), map(str, range(1, 11)), strict=True))
 SAID_TWICE = re.compile(r"\b(one|two|three|four|five|six|seven|eight|nine|ten)[\s-]+(\d+)\b", re.IGNORECASE)
-SCRIPTED_ADDRESS = re.compile(r"[ऀ-ॿ]@|@[ऀ-ॿ]")
-HALVES = word_set("sava savaa sawa saade sade saadhe sadhe paune pone dedh dhai adhai साढ़े साढे सवा पौने डेढ़ ढाई")
-HALF_TIME = re.compile(
-    r"(?<![\wऀ-ॿ])(?:sava|savaa|sawa|saade|sade|saadhe|sadhe|paune|pone|dedh|dhai|adhai|साढ़े|साढे|सवा|पौने|डेढ़|ढाई)"
-    r"\s+\d",
-    re.IGNORECASE,
-)
 
 
 def count_value(word: str) -> int:
@@ -2326,7 +2111,7 @@ def signed_off(said_text: str, said: list[str], wrote_text: str) -> str | None:
     invented = 0 < len(last) <= 2 and all(word in said and not word.isdigit() for word in last)
     if not invented or said[-len(last) :] == last:
         return None
-    # A line said with the name first is a sign-off said ("Neha balki Guwahati").
+    # A line said with the name first is a sign-off said ("Neha from Guwahati").
     said_lines = [words(line)[: len(last)] for line in said_text.splitlines()]
     return None if last in said_lines else last[-1]
 
@@ -2346,6 +2131,7 @@ def verdict(
     """The first rule the answer breaks, with the words it is about, or None for an answer to trust. `first_item`
     is the number a one-item list may start at: the next after a list in the prior. A refused answer that puts a
     usage slip right ("did you went" Did you go) is judged again against the speech with the slip fixed."""
+    said_text = spoken(said_text, wrote_text)
     found = judged(said_text, wrote_text, terms, first_item, revised)
     if found is not None and any(
         judged(fixed, wrote_text, terms, first_item, revised) is None for fixed in usage_fixed(said_text)
@@ -2379,17 +2165,17 @@ def glued_item(said_text: str, wrote_text: str) -> str | None:
     return None
 
 
-AFTER_STOP = re.compile(r"[.?!।]\s+([A-Za-z']+)")
-STEP_JOINS = word_set("then phir फिर")
-# A step that waits on what someone says ("whatever he says, then call her", "jo wo kahen") is no step of its own.
-DEPENDING = word_set("whatever jo जो")
+AFTER_STOP = re.compile(r"[.?!]\s+([A-Za-z']+)")
+STEP_JOINS = word_set("then")
+# A step that waits on what someone says ("whatever he says, then call her") is no step of its own.
+DEPENDING = word_set("whatever")
 
 
 def steps_unlisted(said_text: str) -> str | None:
-    """Three steps or more after "do one thing" ("ek kaam karo"), joined by "then", "phir" or "फिर" across full stops
-    too, written back as prose: rule 3 makes them a bulleted list (founder-003, round b6). Names the phrase."""
-    # Letters each phrase holds, to pass over speech with none at once.
-    if "thing" not in said_text and "aam kar" not in said_text and "काम कर" not in said_text:
+    """Three steps or more after "do one thing", joined by "then" across full stops too, written back as prose: rule
+    3 makes them a bulleted list (founder-003, round b6). Names the phrase."""
+    # Letters the phrase holds, to pass over speech with none at once.
+    if "thing" not in said_text:
         return None
     said = words(said_text)
     for phrase in DO_ONE_THING:
@@ -2417,18 +2203,13 @@ def judged(
     if DOUBLED.search(said_text):
         said_tokens = unstuttered(said_tokens, wrote)
     said = [word for word, _ in said_tokens]
-    if not said_text.isascii():
-        said = in_latin(said, wrote_text)
     marks = [marked for _, marked in said_tokens]
     if replies(said, wrote):
         return Reason(Reject.REPLY, tuple(wrote[:3]))
-    script_mark = hindi_marks(said_text, wrote_text) if DEVANAGARI.search(wrote_text) or "؟" in wrote_text else None
-    if script_mark is not None:
-        return Reason(Reject.FORMAT, (script_mark,))
     in_terms = {word for term in terms for word in term_words(term)}
     heard = set(said)
     spoken = spoken_numbers(said)
-    known = heard | grammar_words(said) | {value for _, value in spoken}
+    known = heard | FUNCTION_WORDS | {value for _, value in spoken}
     if "plus" in heard:
         known.add("+")
     if DIGIT_RUN.search(said_text):
@@ -2443,7 +2224,7 @@ def judged(
         known |= joins(said) | timed_forms(said)
         unexplained = [i for i in unexplained if not explained(wrote[i], known, heard)]
     opcodes = align(said, wrote)
-    speech = Speech(said_text, wrote_text, not ROMAN_HINDI_GRAMMAR.isdisjoint(said))
+    speech = Speech(said_text, wrote_text)
 
     found_swaps: dict[Edit, list[Swap]] = {}
 
@@ -2452,20 +2233,14 @@ def judged(
             found_swaps[op] = swaps(said, wrote, op, in_terms, speech)
         return found_swaps[op]
 
-    # A fraction word left before an hour's digit ("paune 8") is named as such, not as every number (round b3).
-    halved = HALF_TIME.search(wrote_text) if not heard.isdisjoint(HALVES) else None
-    if halved is not None:
-        return Reason(Reject.FORMAT, (halved.group(),))
     if unexplained:
         fixed = {j for op in opcodes if op[0] == "replace" for _, written in alike(op) for j in written}
         unheard = [
-            wrote[i]
-            for i in unexplained
-            if i not in fixed and not (wrote[i] in in_terms and term_slot(wrote, i, said, speech.hinglish))
+            wrote[i] for i in unexplained if i not in fixed and not (wrote[i] in in_terms and term_slot(wrote, i, said))
         ]
         if unheard:
             return Reason(Reject.UNHEARD, unique(unheard))
-    overfixed = right_word_swapped(said, wrote, opcodes)
+    overfixed = other_person(said, wrote, opcodes) or right_word_swapped(said, wrote, opcodes)
     if overfixed is not None:
         return Reason(Reject.UNHEARD, (overfixed,))
     acknowledged = acknowledges(said, wrote) or added_sentence(wrote_text, opcodes, heard)
@@ -2474,10 +2249,6 @@ def judged(
     twice = repeated(said, wrote_text)
     if twice is not None:
         return Reason(Reject.REPEATED, twice)
-    asked_kya = "क्या" in wrote_text or "kya" in wrote_text or "Kya" in wrote_text
-    asking = repeated_asking(said, wrote) if asked_kya else None
-    if asking is not None:
-        return Reason(Reject.REPEATED, (asking,))
     lined = bare_lines(said, wrote_text) if "\n" in wrote_text and "\n" not in said_text else None
     if lined is not None:
         return Reason(Reject.FALSE_LIST, lined)
@@ -2513,7 +2284,7 @@ def judged(
         "\n" in wrote_text and ANY_ITEM_LINE.search(wrote_text) is not None,
         spoken,
     )
-    # A qualifier misheard for its sound-alike ("kal karunga" call karunga, "notebook may" me) was never said.
+    # A qualifier misheard for its sound-alike ("hand it to may" me) was never said.
     pairs = [pair for found in found_swaps.values() for pair in found]
     swapped_said = {i for heard, _ in pairs for i in heard}
     swapped_written = {j for _, written in pairs for j in written}
@@ -2559,7 +2330,10 @@ def judged(
         timed = timed or [word for word in wrote if past_form(word) and word not in said]
         # A dropped "will" names itself when the words alone don't ("once i will reach" Once I reach... I will).
         timed = timed or (["will"] if futures(said) > futures(wrote) else [])
-        return Reason(Reject.TENSE, unique(timed))
+        # A tense change no word shows is another change read as one: the checks after this name it, so the
+        # correction can say what to fix (14 Oct).
+        if timed:
+            return Reason(Reject.TENSE, unique(timed))
     kept_qualifiers = qualifiers(said) - qualifiers(retracted)
     written_qualifiers = qualifiers(wrote)
     if heard_swapped and written_swapped:
@@ -2571,9 +2345,6 @@ def judged(
     new_meridiems = meridiems(wrote) - said_meridiems(said, said_text) if not MERIDIEMS.isdisjoint(wrote) else None
     if new_meridiems:
         return Reason(Reject.QUALIFIER, tuple(sorted(new_meridiems)))
-    flipped_gender = misgenders(said, wrote, opcodes)
-    if flipped_gender is not None:
-        return Reason(Reject.GENDER, (flipped_gender,))
     verbed = slash_verbed(said, wrote_text) if "slash" in heard and "/" in wrote_text else None
     if verbed is not None:
         return Reason(Reject.FORMAT, verbed)
@@ -2581,12 +2352,7 @@ def judged(
     halved_address = HALF_ADDRESS.search(wrote_text) if {"at", "dot"} <= heard else None
     if halved_address is not None:
         return Reason(Reject.FORMAT, (halved_address.group(),))
-    scripted = SCRIPTED_ADDRESS.search(wrote_text) if "@" in wrote_text else None
-    if scripted is not None:
-        return Reason(Reject.FORMAT, (scripted.group(),))
-    written_otherwise = format_changed(
-        said, said_text, heard, wrote_text, retracted, speech.hinglish or bool(DEVANAGARI.search(said_text))
-    )
+    written_otherwise = format_changed(said, said_text, heard, wrote_text, retracted)
     if written_otherwise is not None:
         return Reason(Reject.FORMAT, written_otherwise)
     # A word can only have moved when the alignment both left it out and wrote it somewhere else.
@@ -2598,7 +2364,7 @@ def judged(
     glued = glued_item(said_text, wrote_text) if "\n" in wrote_text else None
     if glued is not None:
         return Reason(Reject.DROPPED_ITEM, (glued,))
-    spoken_list = (marks, first_item, revised, heard)
+    spoken_list = (marks, first_item, revised, heard, heard_swapped or Counter())
     return lost_content(said, wrote, wrote_text, opcodes, retracted, (lost_runs, dropped), named, spoken_list)
 
 
@@ -2610,18 +2376,23 @@ def lost_content(
     retracted: list[str],
     lost: tuple[list[list[str]], list[str]],
     named: frozenset[str],
-    spoken_list: tuple[list[bool], int, bool, set[str]] = ([], 1, False, set()),
+    spoken_list: tuple[list[bool], int, bool, set[str], Counter[str]] = ([], 1, False, set(), Counter()),
 ) -> Reason | None:
-    """Content lost or changed in ways the change budget can't see: a run of content words left out, a word
-    translated, both versions of a correction kept, a question made a statement, a list never asked for or missing
+    """Content lost or changed in ways the change budget can't see: a run of content words left out, both versions
+    of a correction kept, a question made a statement, a list never asked for or missing
     an item. A run of two content words, four in all, or one dropped with nothing written in its place is lost."""
     lost_runs, left_out = lost
-    marks, first_item, revised, heard = spoken_list
+    marks, first_item, revised, heard, misheard = spoken_list
     heard = heard or set(said)
     # A word written elsewhere moved ("what workflows will be" what will the workflows be).
     dropped = [word for word in left_out if wrote.count(word) < said.count(word)] if left_out else []
     if dropped and not CUE_WORDS.isdisjoint(heard):
         dropped = [word for word in dropped if not bridged(said, word, wrote)]
+    # A "like" said right after the words that lead a list in goes with them ("the blockers are like" ...:), rule 3.
+    first = ANY_ITEM_LINE.search(wrote_text) if "like" in dropped else None
+    lead = words(wrote_text[: first.start()]) if first else []
+    if lead and any(word == "like" and before == lead[-1] for before, word in pairwise(said)):
+        dropped.remove("like")
     listed = "\n" in wrote_text or not BULLETS.isdisjoint(said) or ANY_ITEM_LINE.match(wrote_text) is not None
     short = short_list(said, wrote_text, retracted) if listed else None
     if short is not None:
@@ -2641,16 +2412,13 @@ def lost_content(
     if len(said) < SHORT_TEXT and CUE_WORDS.isdisjoint(said):
         # "a" and "an" are one article ("we has a idea" We have an idea.).
         unapostrophed = Counter(ONE_ARTICLE.get(word, word).replace("'", "") for word in wrote)
-        # A joining word ending the speech after a full stop drops ("We left. and" We left.).
-        dangling = said[-1] in DANGLING or (said[-1] in DANGLING_AFTER_STOP and marks[-1:] == [True])
-        keepable = said[:-1] if dangling else said
-        said_small = Counter(ONE_ARTICLE.get(word, word).replace("'", "") for word in keepable if word in SHORT_KEEP)
+        # A joining word ending the speech ("We left. and" We left.) is gone from `said` already (`spoken`).
+        said_small = Counter(ONE_ARTICLE.get(word, word).replace("'", "") for word in said if word in SHORT_KEEP)
+        # A misheard word put right is no loss ("need too people" two).
+        said_small -= misheard
         lost_small = [word for word, times in said_small.items() if times > unapostrophed[word]]
         if lost_small:
             return Reason(Reject.DROPPED_WORD, tuple(sorted(lost_small)))
-    translated = translation(said, wrote, opcodes)
-    if translated is not None:
-        return Reason(Reject.TRANSLATED, translated)
     cued = not CUE_WORDS.isdisjoint(heard)
     both = kept_correction(said, wrote, named) if cued else None
     if both is None and cued and not heard.isdisjoint(VALUES):
@@ -2667,7 +2435,7 @@ def lost_content(
         return Reason(Reject.KEPT_CORRECTION, both)
     if asked(said, wrote):
         return Reason(Reject.QUESTION, tuple(said[:4]))
-    statement = unasked(wrote_text, heard)
+    statement = unasked(wrote_text)
     if statement is not None:
         return Reason(Reject.QUESTION, statement)
     exclaimed = overasked(wrote_text)
@@ -2685,7 +2453,7 @@ def lost_content(
 
 def bridged(said: list[str], word: str, wrote: list[str]) -> bool:
     """A word said on both sides of a correction cue and written once: the answer kept it where both versions meet
-    ("डिलीवरी स्लॉट नहीं नहीं कुरियर ने स्लॉट बदलकर" डिलीवरी स्लॉट कुरियर ने बदलकर), round b6."""
+    ("move the delivery slot no no the courier changed the slot" the courier changed the delivery slot), round b6."""
     if not content(word) or qualifiers([word]) or word not in wrote:
         return False
     spots = [
@@ -2707,13 +2475,12 @@ BRIDGE_AFTER = 5
 
 # A sentence that announces the statements after it (D5): "Here are a few things about me.", "the following".
 ANNOUNCING = re.compile(
-    r"\bhere are\b.*\b(?:things|points|facts|details|notes|updates|reasons|items)\b|\bthe following\b"
-    r"|\bkuch (?:baatein|cheezein|points)\b|कुछ (?:बातें|चीज़ें|चीजें)",
+    r"\bhere are\b.*\b(?:things|points|facts|details|notes|updates|reasons|items)\b|\bthe following\b",
     re.IGNORECASE,
 )
 
 ANNOUNCING_WORDS = 12
-SAID_SENTENCE = re.compile(r"(?<=[.!?।:])\s+")
+SAID_SENTENCE = re.compile(r"(?<=[.!?:])\s+")
 
 
 def unlisted(said_text: str, wrote_text: str) -> str | None:
@@ -2721,29 +2488,29 @@ def unlisted(said_text: str, wrote_text: str) -> str | None:
     back as prose: the list D5 asks for was lost (founder-019). Speech with no stops, or questions, is left to the
     model."""
     # Letters every announcement holds, to pass over speech with none at once.
-    hinted = "ere are" in said_text or "ollowing" in said_text or "uch " in said_text or "कुछ" in said_text
+    hinted = "ere are" in said_text or "ollowing" in said_text
     if not hinted or ANY_ITEM_LINE.search(wrote_text):
         return None
     sentences = SAID_SENTENCE.split(said_text.strip())
     for i, sentence in enumerate(sentences):
         short = len(sentence.split()) <= ANNOUNCING_WORDS
-        if not short or sentence[-1:] not in ".:।" or ANNOUNCING.search(sentence) is None:
+        if not short or sentence[-1:] not in ".:" or ANNOUNCING.search(sentence) is None:
             continue
-        statements = [after for after in sentences[i + 1 :] if after[-1:] in ".।"]
+        statements = [after for after in sentences[i + 1 :] if after[-1:] == "."]
         if len(statements) >= 2 and len(statements) == len(sentences) - i - 1:
-            return sentence.rstrip(".:।")
+            return sentence.rstrip(".:")
     return None
 
 
 SHORT_TEXT = 5
-# Round b2 fix: a particle that carries meaning in a short dictation ("kal milte hain phir", "main bhi") too.
-SHORT_KEEP = word_set("its it's it i we you he she they the a an this that phir then too also bhi hi toh फिर भी ही तो")
+# Round b2 fix: a particle that carries meaning in a short dictation ("see you then", "me too") too.
+SHORT_KEEP = word_set("its it's it i we you he she they the a an this that then too also")
 ONE_ARTICLE = {"an": "a"}
 
 
 def spelled(term: str, found: re.Match[str], text: str) -> str:
     """The term as given where the model wrote a variant of it; a lowercase one keeps the capital the model gave it
-    at a sentence start ("Bahut"). A plain lowercase word stays as written unless the term mixes cases or holds a
+    at a sentence start ("Zoom"). A plain lowercase word stays as written unless the term mixes cases or holds a
     mark ("ios" iOS, "node.js" Node.js): "cut me some slack" keeps "slack" with the term Slack, "let us know" keeps
     "us" with US. A word inside an email, a web address or a path stays too ("sales@northstar.com")."""
     written = found.group()
@@ -2823,8 +2590,20 @@ def twins_as_said(said: str, text: str, terms: list[str]) -> str:
     return text
 
 
+def digits_as_said(said: str, text: str) -> str:
+    """A count up to ten the speaker's text already held as a digit, and never as its word, goes back to the digit
+    where the model wrote the word ("5 countries" five countries), as rule 4 asks (14 Oct 2026)."""
+    heard = said.lower()
+    for word, digit in SMALL_VALUES.items():
+        typed = re.search(rf"(?<![\w.,:$₹/-]){digit}(?![\w.,:%/-])", said) is not None
+        if typed and re.search(rf"\b{word}\b", heard) is None:
+            text = re.sub(rf"\b{word}\b", digit, text, flags=re.IGNORECASE)
+    return text
+
+
 def as_said(said: str, text: str, terms: list[str]) -> str:
-    joined = joins_as_said(said, text, terms)
+    digits_kept = digits_as_said(said, text)
+    joined = joins_as_said(said, digits_kept, terms)
     tidied = tidy(joined, terms)
     twins = twins_as_said(said, tidied, terms) if terms else tidied
     return twins
@@ -2842,7 +2621,7 @@ def mid_sentence(prior: str) -> bool:
 def opening(text: str) -> str:
     """The first word, lowercase and without the marks around it: cheaper than `words` for one word."""
     found = text.split(maxsplit=1)
-    first = found[0].lower().strip(".,;:!?।\"'()") if found else ""
+    first = found[0].lower().strip(".,;:!?\"'()") if found else ""
     return first
 
 
@@ -2858,7 +2637,7 @@ def drops_join(prior: str, text: str, output: str) -> bool:
 # Cues that take back the sentence before them when they end the speech.
 ENDING_CUES = [tuple(words(cue)) for cue in "scratch that|strike that|ignore that|cancel that|no wait".split("|")]
 # Cues that only take back, which a piece may open with to correct its prior.
-OPENING_CUES = [tuple(words(cue)) for cue in "nahi nahi|नहीं नहीं|no no|no wait|scratch that|strike that".split("|")]
+OPENING_CUES = [tuple(words(cue)) for cue in "no no|no wait|scratch that|strike that".split("|")]
 
 
 def opening_cue(text: str) -> tuple[str, ...] | None:
@@ -2922,24 +2701,22 @@ def past_prior(prior: str, revision: str) -> str | None:
 # Cues that open a piece and take back the end of the prior (round b6): "make that" and its like always do; the
 # rest only when the piece restates words of the prior's end, and "sorry" never as an apology, nor "wait" as a verb.
 ALWAYS_TAKING = [tuple(words(cue)) for cue in "make that|no wait|scratch that|i meant".split("|")]
-SEAM_CUES = ALWAYS_TAKING + [
-    tuple(words(cue)) for cue in "i mean|wait|rather|sorry|matlab|mera matlab|मतलब|सॉरी".split("|")
-]
-APOLOGY_AFTER = word_set("for about to i i'm im main मैं but yaar guys everyone all")
-WAITING_AFTER = word_set("for until till karo kar karna करो कर करना a here there and")
+SEAM_CUES = ALWAYS_TAKING + [tuple(words(cue)) for cue in "i mean|wait|rather|sorry".split("|")]
+APOLOGY_AFTER = word_set("for about to i i'm im but guys everyone all")
+WAITING_AFTER = word_set("for until till a here there and")
 SEAM_REACH = 8
 SEAM_PLAIN = word_set("the a an and is are was were to of it this that i we you")
 
 
 def seam_cue(prior: str, text: str, wrote: str) -> tuple[str, ...] | None:
     """A piece that opens with a cue taking back the end of the prior, answered with the cue still written: both
-    versions kept ("...at 3:15. I mean, at 8:45", "...ballroom में—wait, जेडब्ल्यू मैरियट..."). Names the cue."""
+    versions kept ("...at 3:15. I mean, at 8:45", "...the ballroom—wait, the JW Marriott..."). Names the cue."""
     said = words(text)
     cue = next((cue for cue in SEAM_CUES if tuple(said[: len(cue)]) == cue), None)
     if cue is None or len(said) == len(cue):
         return None
     after = said[len(cue) :]
-    if (cue[-1] in {"sorry", "सॉरी"} and after[0] in APOLOGY_AFTER) or (cue == ("wait",) and after[0] in WAITING_AFTER):
+    if (cue[-1] == "sorry" and after[0] in APOLOGY_AFTER) or (cue == ("wait",) and after[0] in WAITING_AFTER):
         return None
     tail = set(words(prior)[-SEAM_REACH:]) - SEAM_PLAIN
     if cue not in ALWAYS_TAKING and tail.isdisjoint(after[:SEAM_REACH]):
@@ -2968,7 +2745,7 @@ def judge(prior: str, text: str, terms: list[str], revision: str | None, output:
         return Polished(text=text, revision=None, rejected=Reject.UNPOLISHED, reason=raw)
     opener = opening_cue(text)
     if prior and revision is None and opener and tuple(words(output)[: len(opener)]) == opener:
-        # A piece that opens by taking back the prior ("nahi nahi parso") came back with its cue and no revision.
+        # A piece that opens by taking back the prior ("no no friday") came back with its cue and no revision.
         kept = Reason(Reject.KEPT_CORRECTION, opener)
         return Polished(text=raw, revision=None, rejected=Reject.KEPT_CORRECTION, reason=kept)
     said = text if revision is None else join(prior, text)

@@ -10,10 +10,9 @@ POLISH = {
     "terms": [],
     "app": "",
     "style": "other",
-    "language": "en",
     "deadline_ms": 2000,
 }
-COMMAND = {"selection": "hey", "instruction": "formal", "app": "", "language": "en", "deadline_ms": 6000}
+COMMAND = {"selection": "hey", "instruction": "formal", "app": "", "deadline_ms": 6000}
 
 
 @pytest.mark.parametrize(
@@ -23,10 +22,9 @@ COMMAND = {"selection": "hey", "instruction": "formal", "app": "", "language": "
         {"text": "", "prior": "Let's meet on Friday."},
         {"prior": " ".join(["word"] * 300)},
         {"terms": ["x"] * 200},
-        {"terms": ["a" * 100, "GMMCO", "प्रिया"]},
+        {"terms": ["a" * 100, "GMMCO"]},
         {"app": "a" * 100},
         {"style": "email"},
-        {"language": "hinglish"},
         {"deadline_ms": 300},
         # The app waits up to 20 s for the AI: accuracy over speed (D2, 11 Oct).
         {"deadline_ms": 20_000},
@@ -55,6 +53,13 @@ def test_polish_requests_at_the_limits_are_valid(changes: dict) -> None:
 def test_polish_requests_past_the_limits_are_invalid(changes: dict) -> None:
     with pytest.raises(ValidationError):
         PolishRequest.model_validate({**POLISH, **changes})
+
+
+@pytest.mark.parametrize(("model", "fields"), [(PolishRequest, POLISH), (CommandRequest, COMMAND)])
+def test_requests_carry_no_language_and_an_older_apps_language_is_dropped(model: type, fields: dict) -> None:
+    # Snapbak is English only (founder, 14 Oct 2026): the field left the contract.
+    request = model.model_validate({**fields, "language": "en"})
+    assert "language" not in request.model_dump()
 
 
 def test_continues_is_false_unless_the_app_says_the_cursor_is_mid_sentence() -> None:

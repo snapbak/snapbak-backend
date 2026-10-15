@@ -49,12 +49,12 @@ def test_a_provider_without_its_key_is_refused() -> None:
 
 
 def polish_turns(text: str, prior: str = "") -> list[tuple[str, str]]:
-    request = {"text": text, "prior": prior, "terms": [], "app": "", "style": "chat", "language": "en"}
+    request = {"text": text, "prior": prior, "terms": [], "app": "", "style": "chat"}
     return [("system", "rules"), ("user", json.dumps(request))]
 
 
 def command_turns(selection: str) -> list[tuple[str, str]]:
-    request = {"selection": selection, "instruction": "shout", "app": "", "language": "en"}
+    request = {"selection": selection, "instruction": "shout", "app": ""}
     return [("system", "rules"), ("user", json.dumps(request))]
 
 
@@ -72,8 +72,6 @@ async def answer(mode: str, turns: list[tuple[str, str]]) -> dict[str, object]:
         ("ship it", "ship it!"),
         ("really?", "really!"),
         ("done!", "done!"),
-        ("kal milte hain", "kal milte hain!"),
-        ("कल मिलते हैं।", "कल मिलते हैं।!"),
         ("", ""),
     ],
 )
@@ -105,31 +103,13 @@ async def test_fake_fail_raises_a_provider_error() -> None:
         ("Ship it today! no wait friday", "Ship it friday!"),
         ("We ship it today. No, wait, Friday.", "We ship it Friday."),
         ("We ship it today! No, wait! Friday", "We ship it Friday!"),
-        ("मीटिंग सोमवार। no wait मंगलवार", "मीटिंग मंगलवार।"),
+        ("We ship it today. No, wait. Friday.", "We ship it Friday."),
         ("no wait friday", "no wait friday!"),
         ("Ship it today! now wait for it", "Ship it today! now wait for it!"),
         ("Ship it today! no wait make it friday", "Ship it today! no wait make it friday!"),
     ],
 )
 async def test_fake_edit_swaps_the_last_word_of_the_sentence_before_no_wait(text: str, expected: str) -> None:
-    assert await answer("edit", polish_turns(text)) == {"revision": None, "text": expected}
-
-
-@pytest.mark.anyio
-@pytest.mark.parametrize(
-    ("text", "expected"),
-    [
-        ("Kal subah meeting rakhte hain. nahi nahi parso", "Parso subah meeting rakhte hain."),
-        ("Kal subah meeting rakhte hain. Nahi nahi, parso.", "Parso subah meeting rakhte hain."),
-        ("KAL SUBAH MEETING RAKHTE HAIN! Nahin nahin, parso!", "Parso SUBAH MEETING RAKHTE HAIN!"),
-        ("कल सुबह मीटिंग रखते हैं। नहीं नहीं, परसों।", "परसों सुबह मीटिंग रखते हैं।"),
-        ("Subah meeting rakhte hain. nahi nahi parso", "Subah meeting rakhte hain. nahi nahi parso!"),
-        ("nahi nahi parso", "nahi nahi parso!"),
-    ],
-)
-async def test_fake_edit_puts_the_word_after_a_doubled_nahi_in_place_of_the_first_day_word(
-    text: str, expected: str
-) -> None:
     assert await answer("edit", polish_turns(text)) == {"revision": None, "text": expected}
 
 
@@ -144,3 +124,24 @@ def test_providers_keep_idle_connections_for_five_minutes(monkeypatch: pytest.Mo
     make_provider("openai:gpt-4.1-nano", KEYS)
     assert built[0]["limits"].keepalive_expiry == 300
     assert built[0]["http2"] is True
+
+
+# The fake's correction follows every cue of `routing.CUES` the app's dictation may say, a "no" before or after it too
+# (14 Oct 2026).
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("We ship it today. No, don't do this. Friday.", "We ship it Friday."),
+        ("We ship it today. Scratch that, Friday.", "We ship it Friday."),
+        ("We ship it today, actually Friday.", "We ship it Friday."),
+        ("We ship it today, I mean Friday.", "We ship it Friday."),
+        ("We ship it today. Wait, no, Friday.", "We ship it Friday."),
+        ("We ship it today. Delete that, Friday.", "We ship it Friday."),
+        ("We ship it today, make that Friday.", "We ship it Friday."),
+        ("We ship it today, sorry, Friday.", "We ship it Friday."),
+        ("I'm sorry about today.", "I'm sorry about today!"),
+    ],
+)
+async def test_fake_edit_swaps_the_last_word_before_any_correction_cue(text: str, expected: str) -> None:
+    assert await answer("edit", polish_turns(text)) == {"revision": None, "text": expected}
