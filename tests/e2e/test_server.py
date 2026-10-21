@@ -31,6 +31,8 @@ def server() -> Iterator[str]:
     port = free_port()
     env = {**os.environ, "SNAPBAK_TOKEN": "dev", "SNAPBAK_POLISH": "fake:edit", "SNAPBAK_BIG": "fake:edit"}
     env.pop("SNAPBAK_FALLBACK", None)
+    # The dictation server, as it runs without the cloud settings.
+    env.pop("DATABASE_URL", None)
     command = [sys.executable, "-m", *SERVE[2:]]
     command[command.index("${PORT:-8787}")] = str(port)
     process = subprocess.Popen(command, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)

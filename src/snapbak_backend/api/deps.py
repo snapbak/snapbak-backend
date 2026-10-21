@@ -1,4 +1,4 @@
-"""What a route needs from the request: the bearer token checked, and the tiers built at startup."""
+"""What a dictation route needs from the request: the bearer token checked, and the tiers built at startup."""
 
 import secrets
 

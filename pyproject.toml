@@ -4,9 +4,15 @@ version = "0.1.0"
 description = "Snapbak Cloud AI: polish and command for dictation"
 requires-python = ">=3.14"
 dependencies = [
+    "alembic>=1.20.0",
+    "arq>=0.28.0",
+    "asyncpg>=0.32.0",
+    "boto3>=1.43.114",
+    "cryptography>=50.0.2",
     "fastapi>=0.143.0",
     "httpx[http2]>=0.28.1",
     "pydantic>=2.14.0",
+    "sqlalchemy[asyncio]>=2.1.5",
     "uvicorn>=0.54.0",
 ]
 
@@ -17,6 +23,9 @@ build-backend = "uv_build"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["scripts"]
+# Real vendor and model calls cost money: only `just test-cloud` runs them (D19).
+markers = ["cloud: calls a real vendor or model; run by `just test-cloud`, charged to the eval budget"]
+addopts = "-m 'not cloud'"
 
 [tool.ruff]
 line-length = 120
@@ -36,6 +45,7 @@ venv = ".venv"
 
 [dependency-groups]
 dev = [
+    "boto3-stubs[s3]>=1.43.114",
     "pyright>=1.1.414",
     "pytest>=9.1.1",
     "respx>=0.23.1",

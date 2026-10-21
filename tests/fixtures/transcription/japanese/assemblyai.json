@@ -1,0 +1,72 @@
+{
+  "id": "aai-japanese",
+  "status": "completed",
+  "language_confidence": 0.97,
+  "language_code": "ja",
+  "audio_duration": 30,
+  "words": [
+    {
+      "text": "こんにちは",
+      "start": 800,
+      "end": 990,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "、",
+      "start": 1050,
+      "end": 1240,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "今日",
+      "start": 1300,
+      "end": 1490,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "は",
+      "start": 1550,
+      "end": 1740,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "新しい",
+      "start": 1800,
+      "end": 1990,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "画面",
+      "start": 2050,
+      "end": 2240,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "を",
+      "start": 2300,
+      "end": 2490,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "見せます",
+      "start": 2550,
+      "end": 2740,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "。",
+      "start": 2800,
+      "end": 2990,
+      "confidence": 0.95,
+      "speaker": "A"
+    }
+  ]
+}

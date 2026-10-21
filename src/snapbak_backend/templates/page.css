@@ -1,0 +1,124 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--sb-font-family);
+  font-size: var(--sb-font-size-md);
+  line-height: 1.5;
+  color: var(--sb-color-text);
+  background-color: var(--sb-color-background);
+  background-image:
+    radial-gradient(64rem 34rem at 50% -14rem, color-mix(in srgb, var(--sb-color-accent) 26%, transparent), transparent 70%),
+    radial-gradient(36rem 28rem at 100% 0, color-mix(in srgb, var(--sb-color-glow-end) 12%, transparent), transparent 70%);
+  background-repeat: no-repeat;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+}
+.bar,
+main {
+  width: min(1080px, 100% - var(--sb-spacing-8));
+  margin: 0 auto;
+}
+.bar {
+  display: flex;
+  align-items: center;
+  padding: var(--sb-spacing-6) 0;
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sb-spacing-2);
+  color: var(--sb-color-text);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+}
+.brand svg {
+  height: 26px;
+  width: auto;
+  filter: drop-shadow(0 4px 14px color-mix(in srgb, var(--sb-color-accent) 50%, transparent));
+}
+main {
+  flex: 1;
+}
+h1 {
+  margin: 0;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sb-spacing-2);
+  height: 40px;
+  padding: 0 var(--sb-spacing-4);
+  border-radius: var(--sb-radius-pill);
+  font: 600 var(--sb-font-size-sm) / 1 var(--sb-font-family);
+  white-space: nowrap;
+  text-decoration: none;
+  color: var(--sb-color-on-accent);
+  background: linear-gradient(135deg, var(--sb-color-accent-strong), var(--sb-color-accent-indigo-strong));
+  box-shadow:
+    0 10px 28px -10px color-mix(in srgb, var(--sb-color-accent) 80%, transparent),
+    inset 0 1px 0 var(--sb-color-border);
+  transition:
+    transform var(--sb-duration-fast) ease,
+    box-shadow var(--sb-duration-base) ease;
+}
+.button:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 14px 34px -10px color-mix(in srgb, var(--sb-color-accent) 95%, transparent),
+    inset 0 1px 0 var(--sb-color-border);
+}
+.button:active {
+  transform: translateY(0);
+}
+a:focus-visible {
+  outline: 2px solid var(--sb-color-accent);
+  outline-offset: 3px;
+  border-radius: var(--sb-radius-sm);
+}
+.button:focus-visible {
+  border-radius: var(--sb-radius-pill);
+}
+footer {
+  padding: var(--sb-spacing-8) var(--sb-spacing-4);
+  text-wrap: balance;
+  text-align: center;
+  font-size: var(--sb-font-size-sm);
+  color: var(--sb-color-text-muted);
+}
+footer a {
+  color: inherit;
+  text-decoration: none;
+}
+footer strong {
+  color: var(--sb-color-text);
+  font-weight: 600;
+}
+footer span {
+  color: var(--sb-color-accent);
+  font-weight: 600;
+}
+footer a:hover span {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .button {
+    transition: none;
+  }
+  .button:hover {
+    transform: none;
+  }
+}

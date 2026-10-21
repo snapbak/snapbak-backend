@@ -1,0 +1,79 @@
+{
+  "id": "aai-slow",
+  "status": "completed",
+  "language_confidence": 0.97,
+  "language_code": "en_us",
+  "audio_duration": 30,
+  "words": [
+    {
+      "text": "This",
+      "start": 500,
+      "end": 740,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "is",
+      "start": 800,
+      "end": 1040,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "a",
+      "start": 1100,
+      "end": 1340,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "short",
+      "start": 1400,
+      "end": 1640,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "demo",
+      "start": 1700,
+      "end": 1940,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "of",
+      "start": 2000,
+      "end": 2240,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "the",
+      "start": 2300,
+      "end": 2540,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "new",
+      "start": 2600,
+      "end": 2840,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "export",
+      "start": 2900,
+      "end": 3140,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "screen.",
+      "start": 3200,
+      "end": 3440,
+      "confidence": 0.95,
+      "speaker": "A"
+    }
+  ]
+}

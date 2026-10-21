@@ -1,0 +1,21 @@
+{
+  "text": "So there.",
+  "words": [
+    {
+      "w": "So",
+      "s": 1200,
+      "e": 1350,
+      "filler": false,
+      "conf": 0.98
+    },
+    {
+      "w": "there.",
+      "s": 1400,
+      "e": 1700,
+      "filler": false,
+      "conf": 1
+    }
+  ],
+  "speakerId": "e8a0c1d2-3b4f-4a5e-9c6d-7f8a9b0c1d2e",
+  "rev": 1
+}

@@ -1,0 +1,25 @@
+# Local Postgres and Redis for `just serve`, `just worker` and the tests; the buckets are real S3 (SETUP.md). Host ports sit off the defaults
+# so a Postgres or Redis already running on the Mac doesn't collide.
+name: snapbak-backend
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: snapbak
+      POSTGRES_PASSWORD: dev
+      POSTGRES_DB: snapbak
+    ports: ["127.0.0.1:15432:5432"]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "snapbak"]
+      interval: 1s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    ports: ["127.0.0.1:16379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1s
+      retries: 30
+

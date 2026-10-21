@@ -1,0 +1,170 @@
+{
+  "id": "aai-two-speakers-en",
+  "status": "completed",
+  "language_confidence": 0.97,
+  "language_code": "en_us",
+  "audio_duration": 120,
+  "words": [
+    {
+      "text": "Hi",
+      "start": 1200,
+      "end": 1440,
+      "confidence": 0.95,
+      "speaker": "Priya"
+    },
+    {
+      "text": "Arjun,",
+      "start": 1500,
+      "end": 1740,
+      "confidence": 0.95,
+      "speaker": "Priya"
+    },
+    {
+      "text": "um,",
+      "start": 1800,
+      "end": 2040,
+      "confidence": 0.95,
+      "speaker": "Priya"
+    },
+    {
+      "text": "thanks",
+      "start": 2100,
+      "end": 2340,
+      "confidence": 0.95,
+      "speaker": "Priya"
+    },
+    {
+      "text": "for",
+      "start": 2400,
+      "end": 2640,
+      "confidence": 0.95,
+      "speaker": "Priya"
+    },
+    {
+      "text": "joining.",
+      "start": 2700,
+      "end": 2940,
+      "confidence": 0.95,
+      "speaker": "Priya"
+    },
+    {
+      "text": "Thanks",
+      "start": 4000,
+      "end": 4240,
+      "confidence": 0.95,
+      "speaker": "Arjun"
+    },
+    {
+      "text": "Priya.",
+      "start": 4300,
+      "end": 4540,
+      "confidence": 0.95,
+      "speaker": "Arjun"
+    },
+    {
+      "text": "Uh,",
+      "start": 4600,
+      "end": 4840,
+      "confidence": 0.95,
+      "speaker": "Arjun"
+    },
+    {
+      "text": "shall",
+      "start": 4900,
+      "end": 5140,
+      "confidence": 0.95,
+      "speaker": "Arjun"
+    },
+    {
+      "text": "we",
+      "start": 5200,
+      "end": 5440,
+      "confidence": 0.95,
+      "speaker": "Arjun"
+    },
+    {
+      "text": "start",
+      "start": 5500,
+      "end": 5740,
+      "confidence": 0.95,
+      "speaker": "Arjun"
+    },
+    {
+      "text": "with",
+      "start": 5800,
+      "end": 6040,
+      "confidence": 0.95,
+      "speaker": "Arjun"
+    },
+    {
+      "text": "the",
+      "start": 6100,
+      "end": 6340,
+      "confidence": 0.95,
+      "speaker": "Arjun"
+    },
+    {
+      "text": "dashboard?",
+      "start": 6400,
+      "end": 6640,
+      "confidence": 0.95,
+      "speaker": "Arjun"
+    },
+    {
+      "text": "Yes.",
+      "start": 8200,
+      "end": 8440,
+      "confidence": 0.95,
+      "speaker": "Priya"
+    },
+    {
+      "text": "So",
+      "start": 8500,
+      "end": 8740,
+      "confidence": 0.95,
+      "speaker": "Priya"
+    },
+    {
+      "text": "here",
+      "start": 8800,
+      "end": 9040,
+      "confidence": 0.95,
+      "speaker": "Priya"
+    },
+    {
+      "text": "you",
+      "start": 9100,
+      "end": 9340,
+      "confidence": 0.95,
+      "speaker": "Priya"
+    },
+    {
+      "text": "can",
+      "start": 9400,
+      "end": 9640,
+      "confidence": 0.95,
+      "speaker": "Priya"
+    },
+    {
+      "text": "see",
+      "start": 9700,
+      "end": 9940,
+      "confidence": 0.95,
+      "speaker": "Priya"
+    },
+    {
+      "text": "the",
+      "start": 10000,
+      "end": 10240,
+      "confidence": 0.95,
+      "speaker": "Priya"
+    },
+    {
+      "text": "numbers.",
+      "start": 10300,
+      "end": 10540,
+      "confidence": 0.95,
+      "speaker": "Priya"
+    }
+  ]
+}

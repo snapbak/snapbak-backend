@@ -1,0 +1,50 @@
+{
+  "recordingId": "8a1d4c52-0f0e-4d55-9a44-2f1a7e6c3b10",
+  "language": "en_us",
+  "script": "native",
+  "speakers": [
+    {
+      "id": "3f2e9a4c-1b7d-4e5f-8a90-1c2d3e4f5a6b",
+      "label": "Speaker 1",
+      "name": "Priya",
+      "nameSource": "vendor",
+      "colorIdx": 0
+    },
+    {
+      "id": "e8a0c1d2-3b4f-4a5e-9c6d-7f8a9b0c1d2e",
+      "label": "Speaker 2",
+      "name": null,
+      "nameSource": null,
+      "colorIdx": 1
+    }
+  ],
+  "lines": [
+    {
+      "id": "77aa1c2d-3e4f-4a5b-8c6d-9e0f1a2b3c4d",
+      "idx": 0,
+      "speakerId": "3f2e9a4c-1b7d-4e5f-8a90-1c2d3e4f5a6b",
+      "start": 1200,
+      "end": 1700,
+      "text": "So here.",
+      "words": [
+        {
+          "w": "So",
+          "s": 1200,
+          "e": 1350,
+          "filler": false,
+          "conf": 0.98
+        },
+        {
+          "w": "here.",
+          "s": 1400,
+          "e": 1700,
+          "filler": false,
+          "conf": 0.95
+        }
+      ],
+      "romanText": null,
+      "romanWords": null,
+      "rev": 1
+    }
+  ]
+}

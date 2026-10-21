@@ -1,0 +1,69 @@
+{
+  "request": {
+    "language": "es",
+    "lines": [
+      {
+        "idx": 10,
+        "lineId": "ln_77aa1c2d-3e4f-4a5b-8c6d-9e0f1a2b3c4d",
+        "rev": 3,
+        "sourceHash": "1f3a9c0b2e7d41",
+        "text": "So here you can see the dashboard."
+      },
+      {
+        "idx": 11,
+        "lineId": "ln_88bb2d3e-4f5a-4b6c-9d7e-0f1a2b3c4d5e",
+        "rev": 1,
+        "sourceHash": "9c0b2e7d411f3a",
+        "text": "Press Command K to search."
+      }
+    ],
+    "force": false
+  },
+  "response": {
+    "track": {
+      "id": "c4d5e6f7-0a1b-4c2d-8e3f-4a5b6c7d8e9f",
+      "recordingId": "8a1d4c52-0f0e-4d55-9a44-2f1a7e6c3b10",
+      "language": "es",
+      "sourceLanguage": "en",
+      "lines": [
+        {
+          "idx": 10,
+          "lineId": "ln_77aa1c2d-3e4f-4a5b-8c6d-9e0f1a2b3c4d",
+          "sourceRev": 3,
+          "sourceHash": "1f3a9c0b2e7d41",
+          "text": "Así que aquí puedes ver el panel.",
+          "failed": false,
+          "edited": false,
+          "updatedAt": "2026-10-19T16:02:11Z"
+        },
+        {
+          "idx": 11,
+          "lineId": "ln_88bb2d3e-4f5a-4b6c-9d7e-0f1a2b3c4d5e",
+          "sourceRev": 1,
+          "sourceHash": "9c0b2e7d411f3a",
+          "text": null,
+          "failed": true,
+          "edited": false,
+          "updatedAt": "2026-10-19T16:02:11Z"
+        }
+      ]
+    },
+    "failed": [11]
+  },
+  "lineEdit": {
+    "text": "Aquí ves el panel.",
+    "rev": 2,
+    "edited": true,
+    "failed": false
+  },
+  "line": {
+    "idx": 10,
+    "lineId": "ln_77aa1c2d-3e4f-4a5b-8c6d-9e0f1a2b3c4d",
+    "sourceRev": 3,
+    "sourceHash": "1f3a9c0b2e7d41",
+    "text": "Aquí ves el panel.",
+    "failed": false,
+    "edited": true,
+    "updatedAt": "2026-10-19T16:02:11Z"
+  }
+}

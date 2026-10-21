@@ -1,0 +1,36 @@
+{
+  "diarization": [
+    {
+      "speaker": "SPEAKER_00",
+      "start": 0.0,
+      "end": 1.0
+    },
+    {
+      "speaker": "SPEAKER_01",
+      "start": 1.0,
+      "end": 1.6
+    },
+    {
+      "speaker": "SPEAKER_00",
+      "start": 1.8,
+      "end": 2.7
+    }
+  ],
+  "exclusiveDiarization": [
+    {
+      "speaker": "SPEAKER_00",
+      "start": 0.0,
+      "end": 1.0
+    },
+    {
+      "speaker": "SPEAKER_01",
+      "start": 1.0,
+      "end": 1.6
+    },
+    {
+      "speaker": "SPEAKER_00",
+      "start": 1.8,
+      "end": 2.7
+    }
+  ]
+}

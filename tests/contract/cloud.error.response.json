@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "not_found",
+    "message": "Nothing with this ID belongs to this device."
+  }
+}

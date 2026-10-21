@@ -1,0 +1,23 @@
+{
+  "id": "aai-fail-unsupported",
+  "status": "completed",
+  "language_confidence": 0.97,
+  "language_code": "ta",
+  "audio_duration": 30,
+  "words": [
+    {
+      "text": "வணக்கம்",
+      "start": 500,
+      "end": 740,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "எல்லோருக்கும்.",
+      "start": 800,
+      "end": 1040,
+      "confidence": 0.95,
+      "speaker": "A"
+    }
+  ]
+}

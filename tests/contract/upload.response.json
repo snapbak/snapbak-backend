@@ -1,0 +1,11 @@
+{
+  "uploadId": "c41e7b2a-9d3f-4e1c-8b5a-6f7e8d9c0b1a",
+  "partSize": 8388608,
+  "expiresAt": "2026-10-17T05:32:11Z",
+  "urls": [
+    {
+      "n": 1,
+      "url": "https://snapbak-media.s3.ap-south-1.amazonaws.com/audio/8a1d4c52-0f0e-4d55-9a44-2f1a7e6c3b10/c41e7b2a-9d3f-4e1c-8b5a-6f7e8d9c0b1a.m4a?partNumber=1&uploadId=abc&X-Amz-Signature=def"
+    }
+  ]
+}
