@@ -100,6 +100,26 @@ the E2E test runs the `just serve` command and checks the output.
 
 The shapes are pinned by `tests/contract/*.json` (see the LLD's contract table).
 
+### Marketing site
+
+The website at `snapbak.site` (its own repo, `../snapbak-website`) calls these
+with no token. CORS allows `https://snapbak.site` and `http://localhost:3000`.
+Fields are camelCase like the rest of the cloud API.
+
+| Route                     | Answer                                                                                         |
+| ------------------------- | ---------------------------------------------------------------------------------------------- |
+| `GET /v1/waitlist/status` | 200 `{spotsTotal, spotsClaimed, waitlistOpen}`; the first read makes the 100-spot row          |
+| `POST /v1/waitlist`       | 201 `{message}` for `{email, useCase?, source?}`; the same email again keeps the first row     |
+| `POST /v1/waitlist/claim` | 200 the status, one more spot claimed, never past the total; `Bearer SNAPBAK_WAITLIST_TOKEN`   |
+| `POST /v1/contact`        | 201 `{message}` for `{name, email, message, source?}`; message up to 5,000 characters, stored |
+
+A bad email or an empty name or message is 422 `invalid`. Emails are stored
+lowercased. Contact messages land in `contact_messages` and nothing alerts
+anyone yet; read them with
+`SELECT created_at, name, email, message FROM contact_messages ORDER BY 1 DESC`.
+Like every cloud route, these log the route, time and status, never an email,
+a name or a message.
+
 ## Job states
 
 `queued` (with no upload, then with one) → `processing` (`transcribing`, then
@@ -323,6 +343,7 @@ Without `DATABASE_URL` the server runs dictation only and has no cloud routes.
 | `ASSEMBLYAI_API_KEY`, `PYANNOTE_API_KEY`, `PYANNOTE_WEBHOOK_SECRET` | needed by `assemblyai+pyannote`                                                                           |
 | `SNAPBAK_WEBHOOK_SECRET`                                            | signs the AssemblyAI webhook header per job                                                               |
 | `VOICEPRINT_KEYS`                                                   | `{"1": "<base64 of 32 bytes>"}`; the highest ID seals                                                     |
+| `SNAPBAK_WAITLIST_TOKEN`                                            | the bearer secret for `POST /v1/waitlist/claim`; empty refuses every claim                                |
 
 The limits (2 h a job, 7,200 s a device a UTC day, 20,000 translated caption
 lines a device a UTC day, 1 GiB a share video, 100 shares a device) are

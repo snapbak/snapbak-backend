@@ -1,4 +1,4 @@
-"""Waitlist routes for the Snapbak marketing site: status, signups and spot claims."""
+"""Routes for the Snapbak marketing site: waitlist status, signups, spot claims and the contact form."""
 
 import uuid
 from datetime import UTC, datetime
@@ -12,8 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from snapbak_backend.api.cloud_deps import session
 from snapbak_backend.api.logged import LoggedRoute
 from snapbak_backend.config.settings import WAITLIST_SPOTS_DEFAULT
-from snapbak_backend.db.models import EarlyAccessSpot, WaitlistEntry
+from snapbak_backend.db.models import ContactMessage, EarlyAccessSpot, WaitlistEntry
 from snapbak_backend.schemas.waitlist import (
+    ContactRequest,
+    ContactResponse,
     EarlyAccessStatusResponse,
     WaitlistSignupRequest,
     WaitlistSignupResponse,
@@ -51,9 +53,9 @@ async def waitlist_status(db: Session) -> EarlyAccessStatusResponse:
     spots = await _get_or_create_spots(db)
     await db.commit()
     return EarlyAccessStatusResponse(
-        spots_total=spots.total_spots,
-        spots_claimed=spots.claimed_spots,
-        waitlist_open=spots.claimed_spots < spots.total_spots,
+        spotsTotal=spots.total_spots,
+        spotsClaimed=spots.claimed_spots,
+        waitlistOpen=spots.claimed_spots < spots.total_spots,
     )
 
 
@@ -65,7 +67,7 @@ async def waitlist_signup(body: WaitlistSignupRequest, db: Session) -> WaitlistS
         .values(
             id=uuid.uuid4(),
             email=str(body.email).lower().strip(),
-            use_case=body.use_case,
+            use_case=body.useCase,
             source=body.source,
             created_at=datetime.now(UTC),
         )
@@ -95,7 +97,23 @@ async def claim_spot(
     spots.updated_at = datetime.now(UTC)
     await db.commit()
     return EarlyAccessStatusResponse(
-        spots_total=spots.total_spots,
-        spots_claimed=spots.claimed_spots,
-        waitlist_open=spots.claimed_spots < spots.total_spots,
+        spotsTotal=spots.total_spots,
+        spotsClaimed=spots.claimed_spots,
+        waitlistOpen=spots.claimed_spots < spots.total_spots,
     )
+
+
+@router.post("/v1/contact", status_code=201)
+async def contact(body: ContactRequest, db: Session) -> ContactResponse:
+    """Store a contact-form message for the team to read; nothing about it is logged (CLAUDE.md rule 3)."""
+    db.add(
+        ContactMessage(
+            id=uuid.uuid4(),
+            name=body.name,
+            email=str(body.email).lower(),
+            message=body.message,
+            source=body.source,
+        )
+    )
+    await db.commit()
+    return ContactResponse(message="Thanks for reaching out. We'll reply soon.")

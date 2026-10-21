@@ -46,6 +46,7 @@ def test_cld01_the_cloud_settings_come_from_the_environment() -> None:
         pyannote_webhook_secret="",
         webhook_secret="hook",
         voiceprint_keys={1: bytes(range(32))},
+        waitlist_token="",
     )
 
 

@@ -55,7 +55,7 @@ NO_AWS = "no Snapbak AWS key for the test buckets: set SNAPBAK_AWS_ACCESS_KEY_ID
 REGION = "ap-south-1"
 TABLES = (
     "shares, usage_daily, caption_tracks, transcript_lines, speakers, transcription_jobs, uploads, recordings, "
-    "devices, early_access_spots, waitlist_entries"
+    "devices, early_access_spots, waitlist_entries, contact_messages"
 )
 
 type Sql = Callable[..., list[dict[str, Any]]]

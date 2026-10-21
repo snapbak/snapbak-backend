@@ -1,6 +1,9 @@
-"""The waitlist routes' request and response bodies."""
+"""The marketing site's request and response bodies (waitlist and contact), named as on the wire like the cloud
+routes' (docs/cloud.md)."""
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from typing import Annotated
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints
 
 
 class WaitlistBase(BaseModel):
@@ -9,7 +12,7 @@ class WaitlistBase(BaseModel):
 
 class WaitlistSignupRequest(WaitlistBase):
     email: EmailStr
-    use_case: str | None = Field(default=None, max_length=2000)
+    useCase: str | None = Field(default=None, max_length=2000)
     source: str = Field(default="website", max_length=100)
 
 
@@ -18,6 +21,17 @@ class WaitlistSignupResponse(WaitlistBase):
 
 
 class EarlyAccessStatusResponse(WaitlistBase):
-    spots_total: int
-    spots_claimed: int
-    waitlist_open: bool
+    spotsTotal: int
+    spotsClaimed: int
+    waitlistOpen: bool
+
+
+class ContactRequest(WaitlistBase):
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+    email: EmailStr
+    message: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=5000)]
+    source: str = Field(default="website", max_length=100)
+
+
+class ContactResponse(WaitlistBase):
+    message: str

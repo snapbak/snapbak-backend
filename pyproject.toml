@@ -11,7 +11,7 @@ dependencies = [
     "cryptography>=50.0.2",
     "fastapi>=0.143.0",
     "httpx[http2]>=0.28.1",
-    "pydantic>=2.14.0",
+    "pydantic[email]>=2.14.0",
     "sqlalchemy[asyncio]>=2.1.5",
     "uvicorn>=0.54.0",
 ]

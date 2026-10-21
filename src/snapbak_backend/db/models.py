@@ -59,6 +59,16 @@ class WaitlistEntry(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
+class ContactMessage(Base):
+    __tablename__ = "contact_messages"
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    name: Mapped[str]
+    email: Mapped[str]
+    message: Mapped[str]
+    source: Mapped[str] = mapped_column(server_default="website")
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
 class EarlyAccessSpot(Base):
     __tablename__ = "early_access_spots"
     id: Mapped[int] = mapped_column(primary_key=True)
