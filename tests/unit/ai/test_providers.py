@@ -145,3 +145,10 @@ def test_providers_keep_idle_connections_for_five_minutes(monkeypatch: pytest.Mo
 )
 async def test_fake_edit_swaps_the_last_word_before_any_correction_cue(text: str, expected: str) -> None:
     assert await answer("edit", polish_turns(text)) == {"revision": None, "text": expected}
+
+
+@pytest.mark.anyio
+async def test_trx09_fake_marks_each_word_of_a_transliteration_request() -> None:
+    request = {"lines": [{"i": 0, "words": ["तो", "dashboard"]}]}
+    output, _ = await Fake("echo").complete([("user", json.dumps(request, ensure_ascii=False))], 100, 1.0)
+    assert json.loads(output) == {"lines": [{"i": 0, "words": ["r:तो", "r:dashboard"]}]}

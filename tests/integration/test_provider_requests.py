@@ -1,10 +1,11 @@
 import json
-import time
+from types import SimpleNamespace
 
 import httpx
 import pytest
 import respx
 
+from snapbak_backend.ai.providers import base
 from snapbak_backend.ai.providers.base import ProviderError, Usage
 from snapbak_backend.ai.providers.factory import make_provider
 
@@ -335,18 +336,40 @@ ANSWERED = httpx.Response(
 )
 
 
+MOST_WAITS = 10
+
+
+class Clock:
+    """The provider client's clock, sleep and jitter, made exact: waiting moves the clock at once, so a test of
+    backoff against a deadline never depends on how loaded the machine is."""
+
+    def __init__(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self.now = 1000.0
+        self.waited: list[float] = []
+        monkeypatch.setattr(base, "time", SimpleNamespace(monotonic=lambda: self.now))
+        monkeypatch.setattr(base, "asyncio", SimpleNamespace(sleep=self.sleep))
+        monkeypatch.setattr(base, "random", SimpleNamespace(uniform=lambda low, high: 1.0))
+
+    async def sleep(self, seconds: float) -> None:
+        # A broken deadline would wait forever on a clock that never runs out; it fails here instead.
+        assert len(self.waited) < MOST_WAITS, f"waited {MOST_WAITS} times: {self.waited}"
+        self.waited.append(seconds)
+        self.now += seconds
+
+
 @pytest.mark.anyio
-async def test_a_rate_limited_answer_is_asked_again_after_its_retry_after() -> None:
+async def test_a_rate_limited_answer_is_asked_again_after_its_retry_after(monkeypatch: pytest.MonkeyPatch) -> None:
     # Founder dictations failed with "HTTP/2 429 Too Many Requests" on both models (D6, 11 Oct).
+    clock = Clock(monkeypatch)
     provider = make_provider("openai:gpt-4.1-nano", KEYS)
     limited = httpx.Response(429, headers={"retry-after": "0.2"}, json={"error": {"code": "rate_limit_exceeded"}})
     with respx.mock() as mock:
         route = mock.post(OPENAI_URL).mock(side_effect=[limited, ANSWERED])
-        started = time.monotonic()
         output = await provider.complete(TURNS, 64, 3.0)
     assert output == (REPLY, Usage(120, 9, 0, 1))
     assert route.call_count == 2
-    assert time.monotonic() - started >= 0.2
+    # Retry-After 0.2 s, plus a tenth of the jitter (1.0 here).
+    assert clock.waited == [pytest.approx(0.22)]
     await provider.aclose()
 
 
@@ -375,27 +398,28 @@ async def test_an_account_out_of_credits_is_not_asked_again() -> None:
 
 
 @pytest.mark.anyio
-async def test_retries_stop_before_the_deadline_and_are_counted() -> None:
+async def test_retries_stop_before_the_deadline_and_are_counted(monkeypatch: pytest.MonkeyPatch) -> None:
+    clock = Clock(monkeypatch)
     provider = make_provider("openai:gpt-4.1-nano", KEYS)
     with respx.mock() as mock:
         route = mock.post(OPENAI_URL).mock(return_value=httpx.Response(503))
-        started = time.monotonic()
         with pytest.raises(ProviderError) as failed:
             await provider.complete(TURNS, 64, 0.8)
-    assert time.monotonic() - started < 0.8
-    assert failed.value.retries == route.call_count - 1 >= 1
+    # Backoff 0.25 s, then 0.5 s; the next, 1 s, would pass the 0.8 s deadline, so it isn't waited for.
+    assert clock.waited == [0.25, 0.5]
+    assert (route.call_count, failed.value.retries) == (3, 2)
     await provider.aclose()
 
 
 @pytest.mark.anyio
-async def test_a_retry_after_past_the_deadline_is_not_waited_for() -> None:
+async def test_a_retry_after_past_the_deadline_is_not_waited_for(monkeypatch: pytest.MonkeyPatch) -> None:
+    clock = Clock(monkeypatch)
     provider = make_provider("openai:gpt-4.1-nano", KEYS)
     limited = httpx.Response(429, headers={"retry-after": "30"})
     with respx.mock() as mock:
         route = mock.post(OPENAI_URL).mock(return_value=limited)
-        started = time.monotonic()
         with pytest.raises(ProviderError):
             await provider.complete(TURNS, 64, 2.0)
-    assert time.monotonic() - started < 0.5
+    assert clock.waited == []
     assert route.call_count == 1
     await provider.aclose()

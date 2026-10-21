@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+$refresh<title>$message · Snapbak</title>
+<meta property="og:site_name" content="Snapbak">
+<meta property="og:title" content="$message">
+<link rel="icon" href="$icon">
+<style>
+$tokens
+$style
+.bar,
+main {
+  /* The ready page's column for a 16:9 video, so the brand stays put when a link stops working. */
+  width: min(1080px, 100% - var(--sb-spacing-8), max(280px, calc((100dvh - 300px) * 16 / 9)));
+}
+main {
+  display: grid;
+  place-items: center;
+  padding: var(--sb-spacing-8) 0;
+}
+.card {
+  width: min(440px, 100%);
+  padding: var(--sb-spacing-8);
+  text-align: center;
+  border-radius: var(--sb-radius-lg);
+  border: 1px solid var(--sb-color-border);
+  background: var(--sb-color-glass);
+  box-shadow: 0 30px 90px -36px color-mix(in srgb, var(--sb-color-accent) 50%, transparent);
+}
+.icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin: 0 auto var(--sb-spacing-4);
+  border-radius: var(--sb-radius-pill);
+  color: var(--sb-color-accent);
+  background: color-mix(in srgb, var(--sb-color-accent) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sb-color-accent) 30%, transparent);
+}
+h1 {
+  font-size: var(--sb-font-size-lg);
+}
+p {
+  margin: var(--sb-spacing-2) 0 var(--sb-spacing-6);
+  color: var(--sb-color-text-muted);
+  font-size: var(--sb-font-size-sm);
+}
+</style>
+</head>
+<body>
+<header class="bar"><a class="brand" href="$home_url?ref=share">$mark<span>Snapbak</span></a></header>
+<main>
+<div class="card">
+<div class="icon">$glyph</div>
+<h1>$message</h1>
+<p>$hint</p>
+<a class="button" href="$home_url?ref=share">Get Snapbak</a>
+</div>
+</main>
+<footer>Snapbak records your screen, then edits and shares it in a click.</footer>
+</body>
+</html>

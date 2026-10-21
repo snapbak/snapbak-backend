@@ -1,0 +1,54 @@
+{
+  "ES2002a-480": {
+    "speaker words %": 85.91,
+    "merge DER %": 21.71,
+    "word time median ms": 33.0,
+    "word time p95 ms": 353.0,
+    "line breaks F1 %": 73.29,
+    "mixed-speaker lines %": 19.4,
+    "filler precision %": 100.0,
+    "filler recall %": 95.38,
+    "pause F1 %": 89.47,
+    "pause cuts into speech %": 14.29,
+    "caption violations %": 15.03
+  },
+  "IS1009a-180": {
+    "speaker words %": 81.87,
+    "merge DER %": 24.17,
+    "word time median ms": 33.0,
+    "word time p95 ms": 416.0,
+    "line breaks F1 %": 66.29,
+    "mixed-speaker lines %": 27.8,
+    "filler precision %": 98.08,
+    "filler recall %": 94.44,
+    "pause F1 %": 98.11,
+    "pause cuts into speech %": 14.81,
+    "caption violations %": 24.35
+  },
+  "EN2002a-180": {
+    "speaker words %": 70.22,
+    "merge DER %": 35.73,
+    "word time median ms": 42.0,
+    "word time p95 ms": 819.0,
+    "line breaks F1 %": 62.83,
+    "mixed-speaker lines %": 34.13,
+    "filler precision %": 95.83,
+    "filler recall %": 97.87,
+    "pause F1 %": 93.33,
+    "pause cuts into speech %": 8.7,
+    "caption violations %": 30.5
+  },
+  "all": {
+    "speaker words %": 79.33,
+    "merge DER %": 27.2,
+    "word time median ms": 36.0,
+    "word time p95 ms": 529.33,
+    "line breaks F1 %": 67.47,
+    "mixed-speaker lines %": 27.11,
+    "filler precision %": 97.97,
+    "filler recall %": 95.9,
+    "pause F1 %": 93.64,
+    "pause cuts into speech %": 12.6,
+    "caption violations %": 23.29
+  }
+}

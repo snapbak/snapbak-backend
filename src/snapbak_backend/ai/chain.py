@@ -27,6 +27,8 @@ class Tiers:
     correction: Provider | None = None
     effort: str = "medium"
     examples: ExamplesPolicy = "all"
+    # The caption translation model (`SNAPBAK_TRANSLATE`); None asks the big model.
+    translate: Provider | None = None
 
     def chain(self, first: Provider) -> list[Provider]:
         return [first] if self.fallback is None else [first, self.fallback]
@@ -34,7 +36,7 @@ class Tiers:
     def providers(self) -> list[Provider]:
         """Every model the server asks, each once though it fills several roles: each connection is warmed at /healthz
         and closed at shutdown."""
-        each = [self.polish, self.command, self.correction, self.fallback]
+        each = [self.polish, self.command, self.correction, self.fallback, self.translate]
         made = {id(provider): provider for provider in each if provider is not None}
         unique = list(made.values())
         return unique

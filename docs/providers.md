@@ -79,6 +79,7 @@ unknown.
 | `SNAPBAK_BIG`                | the big model, which runs every command (required)                                                                |
 | `SNAPBAK_CORRECTION`         | the model that corrects a refused polish answer once, at medium effort, or `none` for no retry (default the big model) |
 | `SNAPBAK_FALLBACK`           | tried once when a model errors or times out (optional; `.env.example` sets the polish model)                      |
+| `SNAPBAK_TRANSLATE`          | the caption translation model, `provider:model` (default the big model; TRX-07, needs a bench before launch)      |
 
 The server refuses to start when the temperature is not a number from 0 to 2 or
 the examples policy is not one of the three. Until 15 Oct the settings were
@@ -130,6 +131,11 @@ no sentence to put right, so "no wait make it friday" gets the bang:
 | `fail`  | a provider error, so a 502                                              | the same                  |
 | `slow`  | waits 5 s, then echoes, so a short deadline gives a 502                 | the same                  |
 | `reply` | "Sure, " and the text, which the guardrail rejects                      | the selection             |
+| `translate-drop` | `text` unchanged                                               | the selection             |
+
+In every mode but `fail` and `slow`, a caption translation answers each line as
+`[<target>] <text>`; `translate-drop` leaves the last line out, for the retry
+path.
 
 ## Prices
 

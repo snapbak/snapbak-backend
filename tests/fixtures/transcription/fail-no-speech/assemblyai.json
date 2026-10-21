@@ -1,0 +1,8 @@
+{
+  "id": "aai-fail-no-speech",
+  "status": "completed",
+  "language_confidence": 0.97,
+  "language_code": "en_us",
+  "audio_duration": 30,
+  "words": []
+}

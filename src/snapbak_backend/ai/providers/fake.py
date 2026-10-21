@@ -8,13 +8,15 @@ from typing import Any
 from snapbak_backend.ai import routing
 from snapbak_backend.ai.providers.base import ProviderError, Turn, Usage
 
-FAKE_MODES = {"echo", "edit", "fail", "slow", "reply"}
+FAKE_MODES = {"echo", "edit", "fail", "slow", "reply", "translate-drop"}
 
 
 class Fake:
     """Answers without a model, for the app's E2E tests: echo, edit (a final "!", or for "<sentence> <cue> <word>",
     such as "no wait" or "scratch that", the form the server sends a correction in, the sentence with its last word
-    swapped), fail, slow (5 s, then echo) or reply ("Sure, " first, which the guardrail rejects)."""
+    swapped), fail, slow (5 s, then echo) or reply ("Sure, " first, which the guardrail rejects). A transliteration
+    comes back with each word marked "r:", and a caption translation with each line as "[<target>] <text>"; in
+    translate-drop mode (otherwise echo) the last line is left out, for the retry path."""
 
     def __init__(self, mode: str) -> None:
         if mode not in FAKE_MODES:
@@ -32,6 +34,16 @@ class Fake:
             next(content for role, content in reversed(turns) if role == "user" and content[:1] == "{")
         )
         edit = self.mode == "edit"
+        if "translate" in request:
+            # A caption translation (16-caption-translation LLD): each line marked with its target.
+            mark = f"[{request['target']}]"
+            lines = [{"idx": line["idx"], "text": f"{mark} {line['text']}"} for line in request["translate"]]
+            kept = lines[:-1] if self.mode == "translate-drop" else lines
+            return json.dumps({"lines": kept}, ensure_ascii=False), Usage(0, 0)
+        if "lines" in request:
+            # A transliteration (docs/cloud.md): each word marked, so a test sees the model's answer was used.
+            marked = [{"i": line["i"], "words": [f"r:{word}" for word in line["words"]]} for line in request["lines"]]
+            return json.dumps({"lines": marked}, ensure_ascii=False), Usage(0, 0)
         if "selection" in request:
             selection = request["selection"]
             answer: dict[str, Any] = {"text": selection.upper() if edit else selection}

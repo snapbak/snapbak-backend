@@ -1,0 +1,79 @@
+{
+  "id": "aai-overlap",
+  "status": "completed",
+  "language_confidence": 0.97,
+  "language_code": "en_us",
+  "audio_duration": 30,
+  "words": [
+    {
+      "text": "I",
+      "start": 0,
+      "end": 240,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "think",
+      "start": 300,
+      "end": 540,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "we",
+      "start": 600,
+      "end": 840,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "should",
+      "start": 900,
+      "end": 1140,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "wait,",
+      "start": 900,
+      "end": 1140,
+      "confidence": 0.95,
+      "speaker": "B"
+    },
+    {
+      "text": "sorry.",
+      "start": 1200,
+      "end": 1440,
+      "confidence": 0.95,
+      "speaker": "B"
+    },
+    {
+      "text": "ship",
+      "start": 1800,
+      "end": 2040,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "it",
+      "start": 2100,
+      "end": 2340,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "today.",
+      "start": 2400,
+      "end": 2640,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "Done.",
+      "start": 6000,
+      "end": 6240,
+      "confidence": 0.95,
+      "speaker": "A"
+    }
+  ]
+}

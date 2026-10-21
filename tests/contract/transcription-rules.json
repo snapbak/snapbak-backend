@@ -1,0 +1,782 @@
+{
+  "about": "Golden vectors for the transcript eval's copies of 14-transcript-editing A6 (pauses) and 15-captions C1 (caption groups and rows). Each expected value was printed by the app's own code: web/studio/src/studio/transcript/editor/cleanup.ts candidates() and apps/desktop/src/captions/layout.rs track(), byte-identical copies of the files with these SHA-256 sums, English, one whole segment at speed 1. A pause is [lo, hi], the words' gap; its cut keeps 150 ms each side. A caption is its rows of words.",
+  "sources": {
+    "apps/desktop/src/captions/layout.rs": "c68979e0998f7bc7fc810a2030ae99d74612e313f7bb544b5f7d063586c37253",
+    "web/studio/src/studio/transcript/editor/cleanup.ts": "2ad0f543cdaed748b40bdbf7df47ec3ce21b2ce7f4aeb5545c7039c108bb2c73",
+    "web/studio/src/studio/transcript/editor/align.ts": "5aa3b8cf2e72076aa6eacade4d6f4cd1b1099a6a9cf8b73abd05aaa049304b13"
+  },
+  "pauses": [
+    {
+      "name": "a gap of exactly a second is a pause and 999 ms is not",
+      "lines": [
+        [
+          {
+            "w": "one",
+            "s": 0,
+            "e": 500,
+            "filler": false
+          },
+          {
+            "w": "two",
+            "s": 1500,
+            "e": 2000,
+            "filler": false
+          },
+          {
+            "w": "three",
+            "s": 2999,
+            "e": 3200,
+            "filler": false
+          }
+        ]
+      ],
+      "expected": [[500, 1500]]
+    },
+    {
+      "name": "a filler on either side of a gap offers no pause",
+      "lines": [
+        [
+          {
+            "w": "so",
+            "s": 0,
+            "e": 400,
+            "filler": false
+          },
+          {
+            "w": "um",
+            "s": 1600,
+            "e": 1800,
+            "filler": true
+          },
+          {
+            "w": "then",
+            "s": 3000,
+            "e": 3300,
+            "filler": false
+          },
+          {
+            "w": "uh",
+            "s": 4500,
+            "e": 4600,
+            "filler": true
+          }
+        ]
+      ],
+      "expected": []
+    },
+    {
+      "name": "a filler run across two lines offers no pause",
+      "lines": [
+        [
+          {
+            "w": "yes.",
+            "s": 0,
+            "e": 400,
+            "filler": false
+          }
+        ],
+        [
+          {
+            "w": "um",
+            "s": 1500,
+            "e": 1700,
+            "filler": true
+          },
+          {
+            "w": "uh",
+            "s": 3000,
+            "e": 3100,
+            "filler": true
+          },
+          {
+            "w": "right",
+            "s": 4200,
+            "e": 4500,
+            "filler": false
+          }
+        ]
+      ],
+      "expected": []
+    },
+    {
+      "name": "pauses span lines in reading order",
+      "lines": [
+        [
+          {
+            "w": "first.",
+            "s": 0,
+            "e": 400,
+            "filler": false
+          }
+        ],
+        [
+          {
+            "w": "second",
+            "s": 1700,
+            "e": 2100,
+            "filler": false
+          },
+          {
+            "w": "third.",
+            "s": 3300,
+            "e": 3600,
+            "filler": false
+          }
+        ]
+      ],
+      "expected": [[400, 1700], [2100, 3300]]
+    },
+    {
+      "name": "overlapping words pair in reading order",
+      "lines": [
+        [
+          {
+            "w": "long",
+            "s": 0,
+            "e": 5000,
+            "filler": false
+          },
+          {
+            "w": "a",
+            "s": 100,
+            "e": 200,
+            "filler": false
+          },
+          {
+            "w": "b",
+            "s": 4000,
+            "e": 4500,
+            "filler": false
+          }
+        ]
+      ],
+      "expected": [[200, 4000]]
+    },
+    {
+      "name": "a long pause leaves 150 ms each side",
+      "lines": [
+        [
+          {
+            "w": "before",
+            "s": 1000,
+            "e": 1200,
+            "filler": false
+          },
+          {
+            "w": "after",
+            "s": 9200,
+            "e": 9500,
+            "filler": false
+          }
+        ]
+      ],
+      "expected": [[1200, 9200]]
+    }
+  ],
+  "captions": [
+    {
+      "name": "rows hold seven words and a caption two rows",
+      "lines": [
+        {
+          "speaker": "A",
+          "words": [
+            {
+              "w": "go",
+              "s": 0,
+              "e": 250,
+              "filler": false
+            },
+            {
+              "w": "go",
+              "s": 300,
+              "e": 550,
+              "filler": false
+            },
+            {
+              "w": "go",
+              "s": 600,
+              "e": 850,
+              "filler": false
+            },
+            {
+              "w": "go",
+              "s": 900,
+              "e": 1150,
+              "filler": false
+            },
+            {
+              "w": "go",
+              "s": 1200,
+              "e": 1450,
+              "filler": false
+            },
+            {
+              "w": "go",
+              "s": 1500,
+              "e": 1750,
+              "filler": false
+            },
+            {
+              "w": "go",
+              "s": 1800,
+              "e": 2050,
+              "filler": false
+            },
+            {
+              "w": "go",
+              "s": 2100,
+              "e": 2350,
+              "filler": false
+            },
+            {
+              "w": "go",
+              "s": 2400,
+              "e": 2650,
+              "filler": false
+            },
+            {
+              "w": "go",
+              "s": 2700,
+              "e": 2950,
+              "filler": false
+            },
+            {
+              "w": "go",
+              "s": 3000,
+              "e": 3250,
+              "filler": false
+            },
+            {
+              "w": "go",
+              "s": 3300,
+              "e": 3550,
+              "filler": false
+            },
+            {
+              "w": "go",
+              "s": 3600,
+              "e": 3850,
+              "filler": false
+            },
+            {
+              "w": "go",
+              "s": 3900,
+              "e": 4150,
+              "filler": false
+            },
+            {
+              "w": "go",
+              "s": 4200,
+              "e": 4450,
+              "filler": false
+            },
+            {
+              "w": "go",
+              "s": 4500,
+              "e": 4750,
+              "filler": false
+            }
+          ]
+        }
+      ],
+      "expected": [
+        [["go", "go", "go", "go", "go", "go", "go"], ["go", "go", "go", "go", "go", "go", "go"]],
+        [["go", "go"]]
+      ]
+    },
+    {
+      "name": "a 700 ms gap breaks and 699 ms does not",
+      "lines": [
+        {
+          "speaker": "A",
+          "words": [
+            {
+              "w": "a",
+              "s": 0,
+              "e": 100,
+              "filler": false
+            },
+            {
+              "w": "b",
+              "s": 799,
+              "e": 900,
+              "filler": false
+            },
+            {
+              "w": "c",
+              "s": 1600,
+              "e": 1700,
+              "filler": false
+            }
+          ]
+        }
+      ],
+      "expected": [[["a", "b"]], [["c"]]]
+    },
+    {
+      "name": "sentence marks end a caption",
+      "lines": [
+        {
+          "speaker": "A",
+          "words": [
+            {
+              "w": "Is",
+              "s": 0,
+              "e": 100,
+              "filler": false
+            },
+            {
+              "w": "it?",
+              "s": 100,
+              "e": 200,
+              "filler": false
+            },
+            {
+              "w": "Yes!",
+              "s": 200,
+              "e": 300,
+              "filler": false
+            },
+            {
+              "w": "Fine.",
+              "s": 300,
+              "e": 400,
+              "filler": false
+            },
+            {
+              "w": "next",
+              "s": 400,
+              "e": 500,
+              "filler": false
+            }
+          ]
+        }
+      ],
+      "expected": [[["Is", "it?"]], [["Yes!"]], [["Fine."]], [["next"]]]
+    },
+    {
+      "name": "a new speaker starts a caption",
+      "lines": [
+        {
+          "speaker": "A",
+          "words": [
+            {
+              "w": "hello",
+              "s": 0,
+              "e": 300,
+              "filler": false
+            }
+          ]
+        },
+        {
+          "speaker": "B",
+          "words": [
+            {
+              "w": "hi",
+              "s": 300,
+              "e": 500,
+              "filler": false
+            }
+          ]
+        },
+        {
+          "speaker": "B",
+          "words": [
+            {
+              "w": "there",
+              "s": 500,
+              "e": 700,
+              "filler": false
+            }
+          ]
+        }
+      ],
+      "expected": [[["hello"]], [["hi", "there"]]]
+    },
+    {
+      "name": "a line break alone does not break a caption",
+      "lines": [
+        {
+          "speaker": "A",
+          "words": [
+            {
+              "w": "one",
+              "s": 0,
+              "e": 200,
+              "filler": false
+            }
+          ]
+        },
+        {
+          "speaker": "A",
+          "words": [
+            {
+              "w": "two",
+              "s": 200,
+              "e": 400,
+              "filler": false
+            }
+          ]
+        }
+      ],
+      "expected": [[["one", "two"]]]
+    },
+    {
+      "name": "seven seconds at most, counted in seconds",
+      "lines": [
+        {
+          "speaker": "A",
+          "words": [
+            {
+              "w": "x",
+              "s": 1100,
+              "e": 1200,
+              "filler": false
+            },
+            {
+              "w": "y",
+              "s": 1700,
+              "e": 7500,
+              "filler": false
+            },
+            {
+              "w": "z",
+              "s": 7600,
+              "e": 8100,
+              "filler": false
+            }
+          ]
+        }
+      ],
+      "expected": [[["x", "y", "z"]]]
+    },
+    {
+      "name": "seven seconds exactly at round times",
+      "lines": [
+        {
+          "speaker": "A",
+          "words": [
+            {
+              "w": "x",
+              "s": 1000,
+              "e": 1100,
+              "filler": false
+            },
+            {
+              "w": "y",
+              "s": 1600,
+              "e": 7500,
+              "filler": false
+            },
+            {
+              "w": "z",
+              "s": 7600,
+              "e": 8000,
+              "filler": false
+            }
+          ]
+        }
+      ],
+      "expected": [[["x", "y", "z"]]]
+    },
+    {
+      "name": "rows hold 42 characters",
+      "lines": [
+        {
+          "speaker": "A",
+          "words": [
+            {
+              "w": "abcdefghijkl",
+              "s": 0,
+              "e": 150,
+              "filler": false
+            },
+            {
+              "w": "abcdefghijkl",
+              "s": 200,
+              "e": 350,
+              "filler": false
+            },
+            {
+              "w": "abcdefghijkl",
+              "s": 400,
+              "e": 550,
+              "filler": false
+            },
+            {
+              "w": "abcdefghijkl",
+              "s": 600,
+              "e": 750,
+              "filler": false
+            },
+            {
+              "w": "abcdefghijkl",
+              "s": 800,
+              "e": 950,
+              "filler": false
+            },
+            {
+              "w": "abcdefghijkl",
+              "s": 1000,
+              "e": 1150,
+              "filler": false
+            },
+            {
+              "w": "abcdefghijkl",
+              "s": 1200,
+              "e": 1350,
+              "filler": false
+            },
+            {
+              "w": "abcdefghijkl",
+              "s": 1400,
+              "e": 1550,
+              "filler": false
+            }
+          ]
+        }
+      ],
+      "expected": [
+        [["abcdefghijkl", "abcdefghijkl", "abcdefghijkl"], ["abcdefghijkl", "abcdefghijkl", "abcdefghijkl"]],
+        [["abcdefghijkl", "abcdefghijkl"]]
+      ]
+    },
+    {
+      "name": "a word longer than a row stays alone",
+      "lines": [
+        {
+          "speaker": "A",
+          "words": [
+            {
+              "w": "short",
+              "s": 0,
+              "e": 100,
+              "filler": false
+            },
+            {
+              "w": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "s": 100,
+              "e": 300,
+              "filler": false
+            },
+            {
+              "w": "after",
+              "s": 300,
+              "e": 400,
+              "filler": false
+            }
+          ]
+        }
+      ],
+      "expected": [[["short"]], [["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]], [["after"]]]
+    },
+    {
+      "name": "fillers are left out",
+      "lines": [
+        {
+          "speaker": "A",
+          "words": [
+            {
+              "w": "well",
+              "s": 0,
+              "e": 100,
+              "filler": false
+            },
+            {
+              "w": "um",
+              "s": 100,
+              "e": 200,
+              "filler": true
+            },
+            {
+              "w": "okay",
+              "s": 200,
+              "e": 300,
+              "filler": false
+            }
+          ]
+        }
+      ],
+      "expected": [[["well", "okay"]]]
+    },
+    {
+      "name": "seven seconds and a millisecond breaks",
+      "lines": [
+        {
+          "speaker": "A",
+          "words": [
+            {
+              "w": "x",
+              "s": 1000,
+              "e": 1100,
+              "filler": false
+            },
+            {
+              "w": "y",
+              "s": 1600,
+              "e": 7500,
+              "filler": false
+            },
+            {
+              "w": "z",
+              "s": 7600,
+              "e": 8001,
+              "filler": false
+            }
+          ]
+        }
+      ],
+      "expected": [[["x", "y"]], [["z"]]]
+    },
+    {
+      "name": "a row of exactly 42 characters stays one row",
+      "lines": [
+        {
+          "speaker": "A",
+          "words": [
+            {
+              "w": "aaaaaaaaaaaaaaaaaaaa",
+              "s": 0,
+              "e": 300,
+              "filler": false
+            },
+            {
+              "w": "bbbbbbbbbbbbbbbbbbbbb",
+              "s": 400,
+              "e": 700,
+              "filler": false
+            }
+          ]
+        }
+      ],
+      "expected": [[["aaaaaaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbbbbbbb"]]]
+    },
+    {
+      "name": "a row of 43 characters breaks into two rows",
+      "lines": [
+        {
+          "speaker": "A",
+          "words": [
+            {
+              "w": "aaaaaaaaaaaaaaaaaaaa",
+              "s": 0,
+              "e": 300,
+              "filler": false
+            },
+            {
+              "w": "bbbbbbbbbbbbbbbbbbbbbb",
+              "s": 400,
+              "e": 700,
+              "filler": false
+            }
+          ]
+        }
+      ],
+      "expected": [[["aaaaaaaaaaaaaaaaaaaa"], ["bbbbbbbbbbbbbbbbbbbbbb"]]]
+    },
+    {
+      "name": "an Arabic question mark ends a caption",
+      "lines": [
+        {
+          "speaker": "A",
+          "words": [
+            {
+              "w": "هل",
+              "s": 0,
+              "e": 300,
+              "filler": false
+            },
+            {
+              "w": "فهمت؟",
+              "s": 350,
+              "e": 700,
+              "filler": false
+            },
+            {
+              "w": "نعم",
+              "s": 750,
+              "e": 1000,
+              "filler": false
+            }
+          ]
+        }
+      ],
+      "expected": [[["هل", "فهمت؟"]], [["نعم"]]]
+    },
+    {
+      "name": "two rows of exactly 42 characters hold four words",
+      "lines": [
+        {
+          "speaker": "A",
+          "words": [
+            {
+              "w": "aaaaaaaaaaaaaaaaaaaa",
+              "s": 0,
+              "e": 300,
+              "filler": false
+            },
+            {
+              "w": "bbbbbbbbbbbbbbbbbbbbb",
+              "s": 350,
+              "e": 650,
+              "filler": false
+            },
+            {
+              "w": "cccccccccccccccccccc",
+              "s": 700,
+              "e": 1000,
+              "filler": false
+            },
+            {
+              "w": "ddddddddddddddddddddd",
+              "s": 1050,
+              "e": 1350,
+              "filler": false
+            }
+          ]
+        }
+      ],
+      "expected": [
+        [["aaaaaaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbbbbbbb"], ["cccccccccccccccccccc", "ddddddddddddddddddddd"]]
+      ]
+    },
+    {
+      "name": "rows of 43 characters close a caption after two words",
+      "lines": [
+        {
+          "speaker": "A",
+          "words": [
+            {
+              "w": "aaaaaaaaaaaaaaaaaaaa",
+              "s": 0,
+              "e": 300,
+              "filler": false
+            },
+            {
+              "w": "bbbbbbbbbbbbbbbbbbbbbb",
+              "s": 350,
+              "e": 650,
+              "filler": false
+            },
+            {
+              "w": "cccccccccccccccccccc",
+              "s": 700,
+              "e": 1000,
+              "filler": false
+            },
+            {
+              "w": "dddddddddddddddddddddd",
+              "s": 1050,
+              "e": 1350,
+              "filler": false
+            }
+          ]
+        }
+      ],
+      "expected": [
+        [["aaaaaaaaaaaaaaaaaaaa"], ["bbbbbbbbbbbbbbbbbbbbbb"]],
+        [["cccccccccccccccccccc"], ["dddddddddddddddddddddd"]]
+      ]
+    }
+  ]
+}

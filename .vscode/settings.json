@@ -1,9 +1,12 @@
 {
     "cSpell.words": [
+        "chainguard",
         "dotenv",
         "groq",
+        "healthcheck",
         "healthz",
         "Hinglish",
+        "isready",
         "keepalive",
         "milte",
         "respx",

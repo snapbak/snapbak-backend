@@ -24,3 +24,8 @@ def log(route: str, engine: str, tier: str, ms: int, tokens: int, verdict: str, 
 
 def verdicts(calls: list[Call]) -> str:
     return ">".join(call.verdict for call in calls)
+
+
+def task_log(task: str, job: str, vendor: str, ms: int, verdict: str) -> None:
+    """One line per worker task or webhook: IDs, counts and the verdict, never a word, name or title."""
+    logger.info("task=%s job=%s vendor=%s ms=%d verdict=%s", task, job, vendor, ms, verdict)

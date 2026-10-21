@@ -1,0 +1,228 @@
+{
+  "languages": [
+    {
+      "code": "ar",
+      "name": "Arabic",
+      "rowChars": 42,
+      "rtl": true,
+      "source": "ar"
+    },
+    {
+      "code": "bn",
+      "name": "Bengali",
+      "rowChars": 42,
+      "rtl": false,
+      "source": null
+    },
+    {
+      "code": "zh-Hans",
+      "name": "Chinese, Simplified",
+      "rowChars": 16,
+      "rtl": false,
+      "source": "zh"
+    },
+    {
+      "code": "zh-Hant",
+      "name": "Chinese, Traditional",
+      "rowChars": 16,
+      "rtl": false,
+      "source": null
+    },
+    {
+      "code": "da",
+      "name": "Danish",
+      "rowChars": 42,
+      "rtl": false,
+      "source": "da"
+    },
+    {
+      "code": "nl",
+      "name": "Dutch",
+      "rowChars": 42,
+      "rtl": false,
+      "source": "nl"
+    },
+    {
+      "code": "en",
+      "name": "English",
+      "rowChars": 42,
+      "rtl": false,
+      "source": "en"
+    },
+    {
+      "code": "fi",
+      "name": "Finnish",
+      "rowChars": 42,
+      "rtl": false,
+      "source": "fi"
+    },
+    {
+      "code": "fr",
+      "name": "French",
+      "rowChars": 42,
+      "rtl": false,
+      "source": "fr"
+    },
+    {
+      "code": "de",
+      "name": "German",
+      "rowChars": 42,
+      "rtl": false,
+      "source": "de"
+    },
+    {
+      "code": "el",
+      "name": "Greek",
+      "rowChars": 42,
+      "rtl": false,
+      "source": null
+    },
+    {
+      "code": "he",
+      "name": "Hebrew",
+      "rowChars": 42,
+      "rtl": true,
+      "source": "he"
+    },
+    {
+      "code": "hi",
+      "name": "Hindi",
+      "rowChars": 42,
+      "rtl": false,
+      "source": "hi"
+    },
+    {
+      "code": "id",
+      "name": "Indonesian",
+      "rowChars": 42,
+      "rtl": false,
+      "source": null
+    },
+    {
+      "code": "it",
+      "name": "Italian",
+      "rowChars": 42,
+      "rtl": false,
+      "source": "it"
+    },
+    {
+      "code": "ja",
+      "name": "Japanese",
+      "rowChars": 13,
+      "rtl": false,
+      "source": "ja"
+    },
+    {
+      "code": "ko",
+      "name": "Korean",
+      "rowChars": 16,
+      "rtl": false,
+      "source": null
+    },
+    {
+      "code": "ms",
+      "name": "Malay",
+      "rowChars": 42,
+      "rtl": false,
+      "source": null
+    },
+    {
+      "code": "mr",
+      "name": "Marathi",
+      "rowChars": 42,
+      "rtl": false,
+      "source": null
+    },
+    {
+      "code": "nb",
+      "name": "Norwegian",
+      "rowChars": 42,
+      "rtl": false,
+      "source": "no"
+    },
+    {
+      "code": "pl",
+      "name": "Polish",
+      "rowChars": 42,
+      "rtl": false,
+      "source": null
+    },
+    {
+      "code": "pt-BR",
+      "name": "Portuguese, Brazil",
+      "rowChars": 42,
+      "rtl": false,
+      "source": "pt"
+    },
+    {
+      "code": "pt-PT",
+      "name": "Portuguese, Portugal",
+      "rowChars": 42,
+      "rtl": false,
+      "source": null
+    },
+    {
+      "code": "ru",
+      "name": "Russian",
+      "rowChars": 42,
+      "rtl": false,
+      "source": null
+    },
+    {
+      "code": "es",
+      "name": "Spanish",
+      "rowChars": 42,
+      "rtl": false,
+      "source": "es"
+    },
+    {
+      "code": "sv",
+      "name": "Swedish",
+      "rowChars": 42,
+      "rtl": false,
+      "source": "sv"
+    },
+    {
+      "code": "ta",
+      "name": "Tamil",
+      "rowChars": 42,
+      "rtl": false,
+      "source": null
+    },
+    {
+      "code": "te",
+      "name": "Telugu",
+      "rowChars": 42,
+      "rtl": false,
+      "source": null
+    },
+    {
+      "code": "th",
+      "name": "Thai",
+      "rowChars": 42,
+      "rtl": false,
+      "source": null
+    },
+    {
+      "code": "tr",
+      "name": "Turkish",
+      "rowChars": 42,
+      "rtl": false,
+      "source": "tr"
+    },
+    {
+      "code": "uk",
+      "name": "Ukrainian",
+      "rowChars": 42,
+      "rtl": false,
+      "source": null
+    },
+    {
+      "code": "vi",
+      "name": "Vietnamese",
+      "rowChars": 42,
+      "rtl": false,
+      "source": "vi"
+    }
+  ]
+}

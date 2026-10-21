@@ -4,7 +4,29 @@ set dotenv-load
 serve:
     uv run uvicorn snapbak_backend.main:app --host 127.0.0.1 --port ${PORT:-8787} --timeout-keep-alive 75
 
-# Unit, integration, functional and end-to-end tests.
+# The arq worker for the cloud transcript (needs `just db-up` and DATABASE_URL, REDIS_URL in .env).
+worker:
+    uv run arq snapbak_backend.worker.WorkerSettings
+
+# Postgres and Redis in Docker, with the schema migrated (docs/cloud.md).
+db-up:
+    docker compose up -d --wait postgres redis
+    DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://snapbak:dev@127.0.0.1:15432/snapbak} uv run alembic upgrade head
+
+# The lifecycle rules on S3_BUCKET; once (SETUP.md).
+bucket-rules:
+    uv run scripts/bucket_rules.py
+
+# Stop the compose stack; its data stays in Docker volumes.
+db-down:
+    docker compose down
+
+# Apply the migrations to DATABASE_URL.
+migrate:
+    uv run alembic upgrade head
+
+# Unit, integration, functional and end-to-end tests. Tests that need the compose stack skip, with the reason, when
+# it is down; start it with `just db-up`.
 test:
     uv run pytest
 
@@ -13,6 +35,12 @@ lint:
     uv run ruff check
     uv run ruff format --check
     uv run pyright
+
+# Real AssemblyAI and pyannoteAI on bench/transcription/ audio: costs money, on demand only, never in `just test`
+# (docs/cloud.md). Needs the vendor keys, a real bucket and a tunnel for the webhooks.
+test-cloud *args:
+    uv run pytest -m cloud
+    uv run scripts/test_cloud.py {{ args }}
 
 # Polish quality, latency and cost per engine on the corpus sample (needs keys).
 bench *specs="openai:gpt-5.6-luna+openai:gpt-6-luna openai:gpt-4.1-nano+openai:gpt-4.1-mini":
@@ -25,3 +53,11 @@ replay *engines:
 # Generate the missing corpus slices with OpenAI (needs OPENAI_API_KEY).
 corpus *args:
     uv run scripts/gen_corpus.py {{ args }}
+
+# Our transcript code scored on AMI meetings with seeded vendor errors (free); fails when worse than the baseline.
+eval-transcript *args:
+    uv run scripts/eval_transcript.py {{ args }}
+
+# The same AMI excerpts through the real vendors (costs money): needs both keys, a real bucket and --budget-usd.
+eval-transcript-live *args:
+    uv run scripts/eval_transcript.py --live {{ args }}

@@ -1,0 +1,114 @@
+{
+  "id": "aai-hinglish",
+  "status": "completed",
+  "language_confidence": 0.97,
+  "language_code": "hi",
+  "audio_duration": 60,
+  "words": [
+    {
+      "text": "मेरा",
+      "start": 1000,
+      "end": 1240,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "रुकने",
+      "start": 1300,
+      "end": 1540,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "का",
+      "start": 1600,
+      "end": 1840,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "तो",
+      "start": 1900,
+      "end": 2140,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "बहुत",
+      "start": 2200,
+      "end": 2440,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "मन",
+      "start": 2500,
+      "end": 2740,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "है,",
+      "start": 2800,
+      "end": 3040,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "but",
+      "start": 3100,
+      "end": 3340,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "I",
+      "start": 3400,
+      "end": 3640,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "have",
+      "start": 3700,
+      "end": 3940,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "an",
+      "start": 4000,
+      "end": 4240,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "exam",
+      "start": 4300,
+      "end": 4540,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "to",
+      "start": 4600,
+      "end": 4840,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "give",
+      "start": 4900,
+      "end": 5140,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "tomorrow.",
+      "start": 5200,
+      "end": 5440,
+      "confidence": 0.95,
+      "speaker": "A"
+    }
+  ]
+}

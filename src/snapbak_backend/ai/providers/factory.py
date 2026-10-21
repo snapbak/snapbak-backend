@@ -3,12 +3,13 @@
 from collections.abc import Callable, Mapping
 from typing import Any
 
+from snapbak_backend.ai.chain import Tiers
 from snapbak_backend.ai.providers.anthropic import Anthropic
 from snapbak_backend.ai.providers.base import Provider
 from snapbak_backend.ai.providers.fake import Fake
 from snapbak_backend.ai.providers.gemini import Gemini
 from snapbak_backend.ai.providers.openai import OpenAICompatible
-from snapbak_backend.config.settings import KEYS
+from snapbak_backend.config.settings import KEYS, Config
 
 # OpenAI models that reason run at their lowest effort; the newest refuse temperature 0 (docs/providers.md).
 # Any other model gets temperature 0, or the polish temperature it is made with, and a fixed seed.
@@ -71,3 +72,20 @@ def make_provider(spec: str, keys: Mapping[str, str], temperature: float = 0.0) 
         raise ValueError(f"Set {KEYS[name]} to use {spec}.")
     provider = build(model, key, temperature)
     return provider
+
+
+def make_tiers(config: Config) -> Tiers:
+    """Every model the settings name, built once per process: by the API at startup and by the worker."""
+    fallback = make_provider(config.fallback, config.keys) if config.fallback else None
+    correction = make_provider(config.correction, config.keys) if config.correction else None
+    translate = make_provider(config.translate, config.keys) if config.translate else None
+    tiers = Tiers(
+        polish=make_provider(config.polish, config.keys, config.temperature),
+        command=make_provider(config.big, config.keys),
+        fallback=fallback,
+        correction=correction,
+        effort=config.effort,
+        examples=config.examples,
+        translate=translate,
+    )
+    return tiers

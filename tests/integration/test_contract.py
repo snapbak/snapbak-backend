@@ -4,6 +4,8 @@ from pathlib import Path
 import pytest
 from pydantic import BaseModel
 
+from snapbak_backend.ai import languages
+from snapbak_backend.schemas import cloud, translations
 from snapbak_backend.schemas.command import CommandRequest, CommandResponse
 from snapbak_backend.schemas.polish import PolishRequest, PolishResponse
 
@@ -39,3 +41,65 @@ def test_each_fixture_is_exactly_its_model(fixture: str, model: type[BaseModel])
 def test_the_error_fixture_is_one_code() -> None:
     data = json.loads((CONTRACT / "error.response.json").read_text())
     assert data == {"error": "unauthorized"}
+
+
+@pytest.mark.parametrize(
+    ("fixture", "model"),
+    [
+        ("cloud.error.response.json", cloud.CloudError),
+        ("devices.request.json", cloud.DeviceRequest),
+        ("devices.response.json", cloud.DeviceResponse),
+        ("consent.request.json", cloud.ConsentRequest),
+        ("consent.response.json", cloud.ConsentResponse),
+        ("recording.request.json", cloud.RecordingRequest),
+        ("recording.response.json", cloud.RecordingResponse),
+        ("upload.request.json", cloud.UploadRequest),
+        ("upload.response.json", cloud.UploadResponse),
+        ("upload-parts.request.json", cloud.PartsRequest),
+        ("upload-complete.request.json", cloud.CompleteRequest),
+        ("upload-complete.response.json", cloud.CompleteResponse),
+        ("transcription.request.json", cloud.TranscriptionRequest),
+        ("transcription.response.json", cloud.TranscriptionResponse),
+        ("transcription.conflict.json", cloud.JobConflict),
+        ("job.response.json", cloud.JobResponse),
+        ("transcript.response.json", cloud.TranscriptResponse),
+        ("line.request.json", cloud.LineRequest),
+        ("line.response.json", cloud.LineResponse),
+        ("speaker-name.request.json", cloud.SpeakerNameRequest),
+        ("speaker.request.json", cloud.SpeakerRequest),
+        ("speaker.response.json", cloud.SpeakerOut),
+        ("transliterate.request.json", cloud.TransliterateRequest),
+        ("transliterate.response.json", cloud.TransliterateResponse),
+        ("share.request.json", cloud.ShareRequest),
+        ("share.response.json", cloud.ShareResponse),
+        ("share-update.request.json", cloud.ShareUpdateRequest),
+        ("share-complete.response.json", cloud.ShareCompleteResponse),
+        ("upload-share.request.json", cloud.ShareUploadRequest),
+    ],
+)
+def test_each_cloud_fixture_is_exactly_its_model(fixture: str, model: type[BaseModel]) -> None:
+    """Cloud bodies carry UUIDs and times, so they compare as JSON."""
+    data = json.loads((CONTRACT / fixture).read_text())
+    parsed = model.model_validate(data)
+    assert parsed.model_dump(mode="json") == data
+    assert set(data) == set(model.model_fields)
+
+
+@pytest.mark.parametrize(
+    ("part", "model"),
+    [
+        ("request", translations.TranslateRequest),
+        ("response", translations.TranslateResponse),
+        ("lineEdit", translations.LineEdit),
+        ("line", translations.TrackLine),
+    ],
+)
+def test_trx07_each_translation_body_is_exactly_its_model(part: str, model: type[BaseModel]) -> None:
+    data = json.loads((CONTRACT / "translations.json").read_text())[part]
+    parsed = model.model_validate(data)
+    assert parsed.model_dump(mode="json") == data
+
+
+def test_trx07_the_languages_fixture_is_the_backends_list() -> None:
+    text = (CONTRACT / "languages.json").read_text()
+    assert text == json.dumps(languages.payload(), indent=2, ensure_ascii=False) + "\n"
