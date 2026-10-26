@@ -116,13 +116,16 @@ async def complete(
         return again
     storage = cloud.storage
     listed = [(part.n, part.etag) for part in body.parts]
-    # An earlier complete may have succeeded and lost its answer; the object's size tells.
+    # An earlier complete may have succeeded and lost its answer; the object's size tells. S3 keeps a completed
+    # upload's ID a while: asked again it answers NoSuchUpload once the ID is gone, but InvalidPart before that when
+    # the ETags differ from the ones that completed it.
     try:
         with contextlib.suppress(NoSuchUpload):
             await storage.complete(upload.s3_key, upload.upload_id, listed)
     except BadParts as error:
-        # The upload stays open: the app can complete again with the right ETags, or send the parts again.
-        raise CloudFailure(422, "invalid") from error
+        if await storage.size(upload.s3_key) != upload.bytes:
+            # The upload stays open: the app can complete again with the right ETags, or send the parts again.
+            raise CloudFailure(422, "invalid") from error
     size = await storage.size(upload.s3_key)
     if size != upload.bytes:
         upload.state = "aborted"

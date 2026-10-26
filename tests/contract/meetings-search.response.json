@@ -1,0 +1,22 @@
+{
+  "hits": [
+    {
+      "meetingId": "3f9c2a64-7b1e-4d8a-9c33-2e5f6a7b8c9d",
+      "recordingId": "8a1d4c52-0f0e-4d55-9a44-2f1a7e6c3b10",
+      "title": "Weekly sync",
+      "kind": "action",
+      "snippet": "Ship the pricing page with the new tiers owner Priya due 2026-10-30",
+      "owner": "Priya",
+      "score": 0.87
+    },
+    {
+      "meetingId": "3f9c2a64-7b1e-4d8a-9c33-2e5f6a7b8c9d",
+      "recordingId": "8a1d4c52-0f0e-4d55-9a44-2f1a7e6c3b10",
+      "title": "Weekly sync",
+      "kind": "decision",
+      "snippet": "Ship the pricing page on Friday because billing confirmed proration",
+      "owner": null,
+      "score": 0.81
+    }
+  ]
+}

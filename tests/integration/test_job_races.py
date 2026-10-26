@@ -37,9 +37,10 @@ async def together(calls: Iterable[Coroutine[Any, Any, int]]) -> list[int]:
 
 async def generate(device: uuid.UUID, recording_id: uuid.UUID, duration_ms: int) -> int:
     """One Generate in its own session and connection: 201 or the error's status."""
-    config = load(os.environ).cloud
+    whole = load(os.environ)
+    config = whole.cloud
     assert config is not None
-    cloud = await open_cloud(config)
+    cloud = await open_cloud(config, whole.keys)
     try:
         async with cloud.sessions() as db:
             recording = Recording(

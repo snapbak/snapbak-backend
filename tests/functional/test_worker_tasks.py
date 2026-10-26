@@ -103,9 +103,10 @@ def partial(error: VendorError) -> VendorError:
 
 def run(task: Callable[..., Any], strategy: Any, *args: Any, job_try: int = 1) -> None:
     async def call() -> None:
-        config = load(os.environ).cloud
+        whole = load(os.environ)
+        config = whole.cloud
         assert config is not None
-        cloud = await open_cloud(config)
+        cloud = await open_cloud(config, whole.keys)
         try:
             ctx = {"cloud": cloud, "strategy": strategy, "job_try": job_try, "redis": cloud.redis, "cut": fake_cut}
             await task(ctx, *args)
@@ -576,7 +577,8 @@ def test_trx01_a_merge_whose_job_failed_while_it_waited_returns_and_writes_nothi
 
     import asyncpg
 
-    config = load(os.environ).cloud
+    whole = load(os.environ)
+    config = whole.cloud
     assert config is not None
     url = config.database_url.replace("+asyncpg", "")
     holding = threading.Event()
@@ -647,9 +649,10 @@ def test_trx01_a_fail_that_lost_to_another_writer_lets_the_recordings_lock_go(
     ctx_strategy: list[Vendors] = []
 
     async def call() -> tuple[bool, bool]:
-        config = load(os.environ).cloud
+        whole = load(os.environ)
+        config = whole.cloud
         assert config is not None
-        cloud = await open_cloud(config)
+        cloud = await open_cloud(config, whole.keys)
         try:
             ctx = {"cloud": cloud, "strategy": ctx_strategy[0], "job_try": 1, "redis": cloud.redis, "cut": fake_cut}
             async with cloud.sessions() as db:

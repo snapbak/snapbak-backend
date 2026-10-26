@@ -7,9 +7,18 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-import httpx
 import pytest
-from conftest import RECORDING, VIDEO_SIZE, Sql, create_share, put_recording, register, share_live, upload_share
+from conftest import (
+    RECORDING,
+    S3_HTTP,
+    VIDEO_SIZE,
+    Sql,
+    create_share,
+    put_recording,
+    register,
+    share_live,
+    upload_share,
+)
 from sqlalchemy import event
 
 from snapbak_backend.api import share_page
@@ -50,11 +59,11 @@ def test_shr01_the_live_page_plays_the_signed_video_with_its_headers(api: Any) -
     assert '<h1 title="Recording 2026-10-17 at 10.02.11">Recording 2026-10-17 at 10.02.11</h1>' in page.text
     assert f'<meta property="og:video" content="http://testserver/v/{made["slug"]}/video.mp4">' in page.text
     src = page.text.split(' src="')[1].split('"')[0].replace("&amp;", "&")
-    assert httpx.get(src).content == VIDEO
+    assert S3_HTTP.get(src).content == VIDEO
     poster = page.text.split(' poster="')[1].split('"')[0].replace("&amp;", "&")
     assert f"/shares/{made['shareId']}/v1/poster.jpg?" in poster
     assert "X-Amz-Signature=" in poster
-    assert httpx.get(poster).content == b"jpeg"
+    assert S3_HTTP.get(poster).content == b"jpeg"
 
 
 def test_shr01_the_helper_routes_redirect_to_fresh_signed_urls(api: Any) -> None:
@@ -70,12 +79,12 @@ def test_shr01_the_helper_routes_redirect_to_fresh_signed_urls(api: Any) -> None
         (302, "no-store"),
         (200, "no-store"),
     ]
-    assert httpx.get(video.headers["location"]).content == VIDEO
-    assert httpx.get(poster.headers["location"]).content == b"\xff\xd8 jpeg"
+    assert S3_HTTP.get(video.headers["location"]).content == VIDEO
+    assert S3_HTTP.get(poster.headers["location"]).content == b"\xff\xd8 jpeg"
     assert "response-content-disposition" not in poster.headers["location"]
     assert "response-content-disposition" not in video.headers["location"]
     assert "response-content-disposition=attachment" in download.headers["location"]
-    saved = httpx.get(download.headers["location"])
+    saved = S3_HTTP.get(download.headers["location"])
     assert (saved.content, saved.headers["content-disposition"]) == (
         VIDEO,
         'attachment; filename="Recording 2026-10-17 at 10.02.11.mp4"; '
@@ -83,7 +92,7 @@ def test_shr01_the_helper_routes_redirect_to_fresh_signed_urls(api: Any) -> None
     )
     fresh = source.json()
     assert fresh["expiresAt"].endswith("Z")
-    assert httpx.get(fresh["video"]).content == VIDEO
+    assert S3_HTTP.get(fresh["video"]).content == VIDEO
     for signed in (fresh["video"], video.headers["location"], download.headers["location"]):
         assert "X-Amz-Expires=3600" in signed, signed
     expires = datetime.fromisoformat(fresh["expiresAt"])
@@ -148,10 +157,10 @@ def test_shr01_an_update_in_flight_keeps_playing_the_previous_version(api: Any) 
     body = {"kind": "share", "bytes": 11, "contentType": "video/mp4", "shareId": made["shareId"], **VIDEO_SIZE}
     api.post(f"/v1/recordings/{RECORDING}/uploads", json=body, headers=auth)
     video = get(api, f"/v/{made['slug']}/video.mp4")
-    assert httpx.get(video.headers["location"]).content == b"version one"
+    assert S3_HTTP.get(video.headers["location"]).content == b"version one"
     upload_share(api, auth, made["shareId"], b"version two")
     video = get(api, f"/v/{made['slug']}/video.mp4")
-    assert httpx.get(video.headers["location"]).content == b"version two"
+    assert S3_HTTP.get(video.headers["location"]).content == b"version two"
 
 
 def test_shr01_without_a_poster_the_page_still_plays_and_the_poster_route_is_404(api: Any) -> None:

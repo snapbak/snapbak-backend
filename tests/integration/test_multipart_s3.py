@@ -3,8 +3,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-import httpx
-from conftest import MIB, RECORDING, Sql, failure, put_recording, register, s3, upload_audio
+from conftest import MIB, RECORDING, S3_HTTP, Sql, failure, put_recording, register, s3, upload_audio
 
 AUDIO = {"kind": "audio", "contentType": "audio/mp4"}
 
@@ -65,7 +64,7 @@ def test_cld02_a_size_mismatch_is_refused_and_aborts_the_upload(api: Any, sql: S
     auth = register(api)
     put_recording(api, auth)
     body = start(api, auth, 10).json()
-    etag = httpx.put(body["urls"][0]["url"], content=b"eleven byte").headers["etag"]
+    etag = S3_HTTP.put(body["urls"][0]["url"], content=b"eleven byte").headers["etag"]
     done = api.post(f"/v1/uploads/{body['uploadId']}/complete", json={"parts": [{"n": 1, "etag": etag}]}, headers=auth)
     assert (done.status_code, done.json()["error"]["code"]) == (422, "upload_size_mismatch")
     assert sql("SELECT state FROM uploads") == [{"state": "aborted"}]
@@ -119,7 +118,7 @@ def test_cld02_a_wrong_etag_is_invalid_and_a_corrected_complete_still_succeeds(a
     auth = register(api)
     put_recording(api, auth)
     body = start(api, auth, 10).json()
-    etag = httpx.put(body["urls"][0]["url"], content=b"ten bytes!").headers["etag"]
+    etag = S3_HTTP.put(body["urls"][0]["url"], content=b"ten bytes!").headers["etag"]
     complete = f"/v1/uploads/{body['uploadId']}/complete"
     wrong = api.post(complete, json={"parts": [{"n": 1, "etag": '"0000"'}]}, headers=auth)
     assert (wrong.status_code, wrong.json()["error"]["code"]) == (422, "invalid")
@@ -134,7 +133,7 @@ def test_cld02_another_device_cannot_start_or_complete_uploads_of_a_recording_it
     auth = register(api)
     put_recording(api, auth)
     body = start(api, auth, 10).json()
-    etag = httpx.put(body["urls"][0]["url"], content=b"ten bytes!").headers["etag"]
+    etag = S3_HTTP.put(body["urls"][0]["url"], content=b"ten bytes!").headers["etag"]
     other = register(api, str(uuid.uuid4()))
     started = api.post(f"/v1/recordings/{RECORDING}/uploads", json={**AUDIO, "bytes": 10}, headers=other)
     completed = api.post(

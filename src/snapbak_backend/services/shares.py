@@ -5,6 +5,7 @@ import re
 import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -12,7 +13,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from snapbak_backend.config.settings import SHARES_PER_DEVICE
-from snapbak_backend.db.models import Device, Recording, Share, Upload
+from snapbak_backend.db.models import Device, Meeting, Recording, Share, Upload
 from snapbak_backend.schemas.cloud import Expiry, ShareRequest
 from snapbak_backend.services import recordings
 from snapbak_backend.services.failures import CloudFailure
@@ -82,13 +83,15 @@ async def open_share(
     # The recording's lock first, as every write under a recording takes; then the device's, so one device's
     # creates take turns and the 100-share count holds across its recordings. In this order a create waiting for a
     # busy recording holds nothing of the device's. FOR NO KEY UPDATE, as the recording's lock: no key changes.
-    await recordings.locked(session, device_id, recording_id)
+    recording = await recordings.locked(session, device_id, recording_id)
     await session.execute(select(Device.id).where(Device.id == device_id).with_for_update(key_share=True))
     share = await live_of(session, recording_id)
     created = share is None
     if share is None:
-        share = await insert_share(session, device_id, recording_id, body)
+        share = await insert_share(session, device_id, recording, body)
     share.title = body.title
+    # A recording promoted to a meeting after its first share shows the meeting from the next share on.
+    share.type = await share_type(session, recording)
     return share, created
 
 
@@ -103,17 +106,35 @@ async def live_count(session: AsyncSession, device_id: UUID) -> int:
     return count or 0
 
 
-async def insert_share(session: AsyncSession, device_id: UUID, recording_id: UUID, body: ShareRequest) -> Share:
-    """A new `uploading` share under the device's limit; a slug already taken is drawn again."""
+async def share_type(session: AsyncSession, recording: Recording) -> Literal["video", "audio", "meeting"]:
+    """What a share of this recording shows (D20): the meeting's minutes and transcript when it has a live meeting;
+    else its audio or video. Derived here, never sent by the app."""
+    meeting = await session.scalar(
+        select(Meeting.id).where(Meeting.recording_id == recording.id, Meeting.deleted_at.is_(None))
+    )
+    if meeting is not None:
+        return "meeting"
+    if recording.recording_type == "audio":
+        return "audio"
+    return "video"
+
+
+async def insert_share(session: AsyncSession, device_id: UUID, recording: Recording, body: ShareRequest) -> Share:
+    """A new `uploading` share under the device's limit; a slug already taken is drawn again. An audio recording's
+    share plays the recording's own audio upload (D12, D16), so it has nothing to upload and is live at once, as
+    version 1; its page waits on the audio when that isn't complete yet."""
     count = await live_count(session, device_id)
     if count >= SHARES_PER_DEVICE:
         raise CloudFailure(429, "share_limit")
     values = {
         "id": uuid.uuid4(),
-        "recording_id": recording_id,
+        "recording_id": recording.id,
         "title": body.title,
         "expires_at": expiry(body.expiresIn),
+        "type": await share_type(session, recording),
     }
+    if recording.recording_type == "audio":
+        values.update(state="live", version=1, duration_ms=recording.duration_ms)
     for _ in range(SLUG_TRIES):
         made = insert(Share).values(slug=new_slug(), **values).on_conflict_do_nothing().returning(Share)
         share = await session.scalar(made)

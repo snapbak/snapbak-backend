@@ -13,6 +13,13 @@ serves share links: the app uploads a recording's web video, and anyone with the
 link watches it at `snapbak.site/v/<slug>`
 ([docs/cloud.md](docs/cloud.md#share-links)).
 
+Meetings ride on cloud transcripts (MEETINGS.md): a recording promoted to a
+meeting gets minutes from one model call (summary, minutes, decisions, action
+items, open questions, pins), every claim checked against the transcript by
+rules, then per-meeting questions and a search over all minutes. Its share page
+shows the player, the minutes and the full transcript
+([docs/cloud.md](docs/cloud.md#meetings)).
+
 Snapbak is English only (14 Oct 2026); text is never translated.
 
 ## Run it
@@ -76,7 +83,7 @@ curl -s localhost:8787/v1/polish -H 'Authorization: Bearer dev' \
 | `transformers/`  | a request as model turns, and the model's JSON back as an answer                                                                                                          |
 | `db/`            | the cloud tables (SQLAlchemy) and the engine; migrations live in `migrations/`                                                                                            |
 | `transcription/` | the `TranscriptionStrategy` facade, AssemblyAI + pyannoteAI, the fake, the merge, languages and voiceprint spans                                                          |
-| `services/`      | the polish and command flows, the counts-only log line, and the cloud services: storage, events, jobs, usage, sealing, shares                                             |
+| `services/`      | the polish and command flows, the counts-only log line, and the cloud services: storage, events, jobs, usage, sealing, shares, meetings, minutes, details, folding, qa, purge |
 | `api/`           | the token check, the error bodies, one module per route, and `share_page.py`, the public share page                                                                       |
 | `templates/`     | the share page and its error page, with the app's design tokens (`tokens.css`, a copy checked by a test)                                                                  |
 | `main.py`        | the app: startup, error handlers and routes                                                                                                                               |
@@ -85,7 +92,8 @@ curl -s localhost:8787/v1/polish -H 'Authorization: Bearer dev' \
 ## Docs
 
 - [API, limits, errors and the guardrail](docs/api.md)
-- [Cloud transcripts and share links: routes, worker, runbook](docs/cloud.md)
+- [Cloud transcripts, meetings and share links: routes, worker,
+  runbook](docs/cloud.md)
 - [Providers, the fake model and prices](docs/providers.md)
 - [Escalation](docs/escalation.md)
 - [Bench: corpus, gates, latency and cost](docs/bench.md)
@@ -94,6 +102,7 @@ curl -s localhost:8787/v1/polish -H 'Authorization: Bearer dev' \
 ## Development
 
 `just test` runs every test level (start the compose stack with `just db-up`
-and set the AWS credentials first, or the cloud tests skip; see
-[SETUP.md](SETUP.md)), and `just lint` runs ruff and pyright. Rules
+and set the AWS credentials first, or the cloud tests fail; a plain
+`uv run pytest` skips them instead; see [SETUP.md](SETUP.md)), and `just lint`
+runs ruff and pyright. Rules
 for working here are in [CLAUDE.md](CLAUDE.md).

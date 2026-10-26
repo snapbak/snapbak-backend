@@ -13,6 +13,7 @@ from typing import Any
 
 import asyncpg
 import boto3
+import httpx
 import pytest
 import redis
 from alembic import command
@@ -54,8 +55,8 @@ DOWN = "the compose stack is not running: start it with `just db-up` (docs/cloud
 NO_AWS = "no Snapbak AWS key for the test buckets: set SNAPBAK_AWS_ACCESS_KEY_ID in .env (SETUP.md)"
 REGION = "ap-south-1"
 TABLES = (
-    "shares, usage_daily, caption_tracks, transcript_lines, speakers, transcription_jobs, uploads, recordings, "
-    "devices, early_access_spots, waitlist_entries, contact_messages"
+    "meeting_chunks, meeting_pins, meetings, shares, usage_daily, caption_tracks, transcript_lines, speakers, "
+    "transcription_jobs, uploads, recordings, devices, early_access_spots, waitlist_entries, contact_messages"
 )
 
 type Sql = Callable[..., list[dict[str, Any]]]
@@ -120,7 +121,7 @@ def empty_bucket(bucket: str) -> None:
 def database() -> Iterator[str]:
     """A fresh database for this test run, migrated to head; its asyncpg URL."""
     if not reachable(POSTGRES):
-        pytest.skip(DOWN)
+        absent(DOWN)
     name = f"snapbak_test_{os.getpid()}"
     asyncio.run(admin(f"DROP DATABASE IF EXISTS {name}"))
     asyncio.run(admin(f"CREATE DATABASE {name}"))
@@ -130,12 +131,20 @@ def database() -> Iterator[str]:
     asyncio.run(admin(f"DROP DATABASE {name} WITH (FORCE)"))
 
 
+def absent(reason: str) -> None:
+    """A service the cloud tests need is missing: a skip for a plain `pytest`, a failure under `just test`
+    (SNAPBAK_REQUIRE_CLOUD), so a run that covered none of them never reads as green."""
+    if os.environ.get("SNAPBAK_REQUIRE_CLOUD"):
+        pytest.fail(reason)
+    pytest.skip(reason)
+
+
 @pytest.fixture(scope="session")
 def bucket() -> Iterator[str]:
     """The run's own bucket, never the shared `snapbak-media` one. Bucket names are global across AWS, hence the random
     part; the IAM policy allows `snapbak-test-*` (SETUP.md)."""
     if not os.environ.get("SNAPBAK_AWS_ACCESS_KEY_ID"):
-        pytest.skip(NO_AWS)
+        absent(NO_AWS)
     name = f"snapbak-test-{secrets.token_hex(4)}"
     s3().create_bucket(Bucket=name, CreateBucketConfiguration={"LocationConstraint": REGION})
     yield name
@@ -148,7 +157,7 @@ def cloud(database: str, bucket: str, monkeypatch: pytest.MonkeyPatch) -> dict[s
     """The environment of a server and worker on the compose stack and the run's S3 bucket, with every table, the
     Redis DB and the bucket emptied."""
     if not reachable(REDIS):
-        pytest.skip(DOWN)
+        absent(DOWN)
     asyncio.run(admin_on(database, f"TRUNCATE {TABLES}"))
     client = redis.Redis.from_url(REDIS)
     client.flushdb()
@@ -222,8 +231,16 @@ def register(api: Any, install: str = INSTALL) -> dict[str, str]:
 RECORDING = "8a1d4c52-0f0e-4d55-9a44-2f1a7e6c3b10"
 
 
-def put_recording(api: Any, auth: dict[str, str], recording: str = RECORDING, duration_ms: int = 612_400) -> Any:
+def put_recording(
+    api: Any,
+    auth: dict[str, str],
+    recording: str = RECORDING,
+    duration_ms: int = 612_400,
+    recording_type: str | None = None,
+) -> Any:
     body = {"title": "Recording 2026-10-17 at 10.02.11", "durationMs": duration_ms, "createdAt": "2026-10-17T04:32:11Z"}
+    if recording_type is not None:
+        body["recordingType"] = recording_type
     return api.put(f"/v1/recordings/{recording}", json=body, headers=auth)
 
 
@@ -238,15 +255,19 @@ def upload_audio(api: Any, auth: dict[str, str], data: bytes, recording: str = R
     return answer
 
 
-def upload(api: Any, auth: dict[str, str], data: bytes, body: dict[str, Any], recording: str) -> tuple[str, Any]:
-    import httpx
+# The tests' own requests to S3's presigned URLs, on one pooled client. S3 now and then resets a new TLS
+# connection ("Connection reset by peer"); the transport asks again only when the connect failed, before a byte of
+# the request was sent, so no answer a test checks is ever retried.
+S3_HTTP = httpx.Client(transport=httpx.HTTPTransport(retries=3), timeout=30)
 
+
+def upload(api: Any, auth: dict[str, str], data: bytes, body: dict[str, Any], recording: str) -> tuple[str, Any]:
     started = api.post(f"/v1/recordings/{recording}/uploads", json=body, headers=auth).json()
     size = started["partSize"]
     parts = []
     for item in started["urls"]:
         n = item["n"]
-        put = httpx.put(item["url"], content=data[(n - 1) * size : n * size])
+        put = S3_HTTP.put(item["url"], content=data[(n - 1) * size : n * size])
         parts.append({"n": n, "etag": put.headers["etag"]})
     done = api.post(f"/v1/uploads/{started['uploadId']}/complete", json={"parts": parts}, headers=auth)
     return started["uploadId"], done
@@ -277,12 +298,10 @@ def upload_share(
 def share_live(api: Any, auth: dict[str, str], video: bytes = b"mp4 video", poster: bytes | None = b"jpeg") -> Any:
     """A recording shared end to end, as the app does it: the recording, the share, the poster, the video; the
     create answer."""
-    import httpx
-
     put_recording(api, auth)
     made = create_share(api, auth).json()
     if poster is not None:
-        httpx.put(made["posterUploadUrl"], content=poster, headers={"Content-Type": "image/jpeg"})
+        S3_HTTP.put(made["posterUploadUrl"], content=poster, headers={"Content-Type": "image/jpeg"})
     upload_share(api, auth, made["shareId"], video)
     return made
 
@@ -349,8 +368,29 @@ def start_worker(cloud: dict[str, str], monkeypatch: pytest.MonkeyPatch) -> Iter
 
     yield start
     if "loop" in running:
+        # The cancel below must not land on a task mid-transaction: its connection would stay checked out with the
+        # transaction open, and the next test's TRUNCATE would wait on it forever. Wait for the queue and the
+        # in-flight jobs to empty first (a Retry defers by seconds at most).
+        client = redis.Redis.from_url(REDIS)
+        eventually(
+            lambda: (client.zcard("arq:queue"), client.hlen("arq:in_progress")),
+            lambda counts: counts == (0, 0),
+            within_s=10,
+        )
         running["loop"].call_soon_threadsafe(running["task"].cancel)
         running["thread"].join(10)
+        # And whatever the cancel still caught mid-rollback: the worker's engine dies with its loop, so its
+        # connections are closed here, server-side, or the next test's TRUNCATE would wait on them forever.
+        url = os.environ.get("DATABASE_URL", "")
+        if url:
+            name = url.rsplit("/", 1)[-1]
+            with contextlib.suppress(Exception):
+                asyncio.run(
+                    admin(
+                        "SELECT pg_terminate_backend(pid) FROM pg_stat_activity"
+                        f" WHERE datname = '{name}' AND pid <> pg_backend_pid()"
+                    )
+                )
 
 
 def follow(api: Any, auth: dict[str, str], job: str) -> dict[str, Any]:

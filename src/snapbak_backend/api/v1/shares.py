@@ -29,7 +29,9 @@ def answer(share: Share, base: str, poster_upload_url: str | None = None) -> Sha
     """The share as every share route answers it; `posterUploadUrl` only from create."""
     named = ref(share, base).model_dump()
     state = page_state(share, datetime.now(UTC))
-    made = ShareResponse(**named, pageState=state, expiresAt=share.expires_at, posterUploadUrl=poster_upload_url)
+    made = ShareResponse(
+        **named, pageState=state, expiresAt=share.expires_at, posterUploadUrl=poster_upload_url, type=share.type
+    )
     return made
 
 

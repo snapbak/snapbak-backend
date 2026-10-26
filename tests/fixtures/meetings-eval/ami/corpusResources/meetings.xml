@@ -1,0 +1,6 @@
+<nite:root xmlns:nite="http://nite.sourceforge.net/">
+<meeting observation="ES2004a">
+<speaker nxt_agent="B" role="PM"/><speaker nxt_agent="A" role="UI"/>
+</meeting>
+<meeting observation="ES2004b"><speaker nxt_agent="B" role="ME"/></meeting>
+</nite:root>

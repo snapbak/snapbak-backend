@@ -1,0 +1,7 @@
+<nite:root xmlns:nite="http://nite.sourceforge.net/">
+<dact nite:id="ES2004a.B.dialog-act.s9553330.12">
+<nite:pointer role="da-aspect" href="da-types.xml#id(ami_da_4)"/>
+<nite:child href="ES2004a.B.words.xml#id(ES2004a.B.words68)..id(ES2004a.B.words74)"/></dact>
+<dact nite:id="ES2004a.B.dialog-act.s9553330.13">
+<nite:child href="ES2004a.B.words.xml#id(ES2004a.B.wordsx74)..id(ES2004a.B.words82)"/></dact>
+</nite:root>

@@ -75,6 +75,18 @@ def test_the_error_fixture_is_one_code() -> None:
         ("share-update.request.json", cloud.ShareUpdateRequest),
         ("share-complete.response.json", cloud.ShareCompleteResponse),
         ("upload-share.request.json", cloud.ShareUploadRequest),
+        ("meeting.request.json", cloud.MeetingRequest),
+        ("meeting.response.json", cloud.MeetingAccepted),
+        ("meeting-detail.response.json", cloud.MeetingResponse),
+        ("minutes-edit.request.json", cloud.MinutesEditRequest),
+        ("minutes-edit.response.json", cloud.MeetingResponse),
+        ("minutes-regenerate.request.json", cloud.RegenerateRequest),
+        ("pin.request.json", cloud.PinRequest),
+        ("pin.response.json", cloud.PinOut),
+        ("ask.request.json", cloud.AskRequest),
+        ("ask.response.json", cloud.AskResponse),
+        ("meetings-search.request.json", cloud.SearchRequest),
+        ("meetings-search.response.json", cloud.SearchResponse),
     ],
 )
 def test_each_cloud_fixture_is_exactly_its_model(fixture: str, model: type[BaseModel]) -> None:

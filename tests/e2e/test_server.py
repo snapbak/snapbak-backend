@@ -58,8 +58,11 @@ def test_the_server_keeps_a_connection_open_longer_than_any_hold() -> None:
 
 
 def test_healthz(server: str) -> None:
+    from snapbak_backend.config.settings import code_version
+
     response = httpx.get(f"{server}/healthz")
-    assert (response.status_code, response.json()) == (200, {"ok": True})
+    # The served code is this checkout's, as a server started from it must be.
+    assert (response.status_code, response.json()) == (200, {"ok": True, "code": code_version()})
 
 
 def test_polish_over_http(server: str) -> None:

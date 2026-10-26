@@ -216,3 +216,22 @@ def test_a_run_reasons_at_the_servers_default_effort_unless_told(
     # R7 (15 Oct): the server polishes without reasoning, so the bench does too by default.
     run_main(monkeypatch, Priced(), 1, tmp_path / "spend.jsonl", 40)
     assert "effort none," in capsys.readouterr().out
+
+
+def test_a_paid_run_without_a_budget_is_refused_with_its_own_words() -> None:
+    """The one guard every paid script shares (grading 4): no budget, no run."""
+    with pytest.raises(SystemExit, match="The smoke run costs money: pass --budget-usd"):
+        bench.require_budget(None, "The smoke run")
+    assert bench.require_budget(2.5, "The smoke run") == 2.5
+
+
+def test_a_run_s_spend_is_appended_to_the_ledger_as_one_line(tmp_path: Path) -> None:
+    ledger = tmp_path / "deep" / "spend.jsonl"
+    bench.append_ledger(ledger, 0.25, 3, "eval-x openai:gpt-6-luna", "ok")
+    bench.append_ledger(ledger, 0.5, 1, "eval-y fake:echo")
+    lines = [json.loads(line) for line in ledger.read_text().splitlines()]
+    assert lines == [
+        {"usd": 0.25, "items": 3, "spec": "eval-x openai:gpt-6-luna", "note": "ok"},
+        {"usd": 0.5, "items": 1, "spec": "eval-y fake:echo"},
+    ]
+    assert bench.ledger_total(ledger) == 0.75

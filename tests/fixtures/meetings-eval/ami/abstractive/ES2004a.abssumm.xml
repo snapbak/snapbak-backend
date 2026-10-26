@@ -1,0 +1,6 @@
+<nite:root xmlns:nite="http://nite.sourceforge.net/">
+<abstract><sentence nite:id="ES2004a.JP.s.1">The Project Manager presented the agenda.</sentence></abstract>
+<actions><sentence nite:id="ES2004a.JP.s.8">The group will do some stuff for the next meeting.</sentence></actions>
+<decisions><sentence nite:id="ES2004a.JP.s.9">NA.</sentence></decisions>
+<problems><sentence nite:id="ES2004a.JP.s.10">Nobody knew the agenda.</sentence></problems>
+</nite:root>

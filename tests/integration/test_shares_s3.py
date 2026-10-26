@@ -5,8 +5,18 @@ import threading
 import uuid
 from typing import Any
 
-import httpx
-from conftest import RECORDING, VIDEO_SIZE, Sql, create_share, failure, put_recording, register, s3, upload_share
+from conftest import (
+    RECORDING,
+    S3_HTTP,
+    VIDEO_SIZE,
+    Sql,
+    create_share,
+    failure,
+    put_recording,
+    register,
+    s3,
+    upload_share,
+)
 
 VIDEO_HEADERS = ("video/mp4", "public, max-age=31536000, immutable")
 
@@ -20,7 +30,7 @@ def tags(api: Any, key: str) -> list[dict[str, str]]:
 
 
 def put_poster(made: dict[str, Any], data: bytes = b"jpeg") -> int:
-    return httpx.put(made["posterUploadUrl"], content=data, headers={"Content-Type": "image/jpeg"}).status_code
+    return S3_HTTP.put(made["posterUploadUrl"], content=data, headers={"Content-Type": "image/jpeg"}).status_code
 
 
 def share_row(sql: Sql) -> dict[str, Any]:
@@ -106,7 +116,7 @@ def test_shr01_a_video_keeps_its_own_size_when_a_newer_create_lands_before_it_co
     size = {"durationMs": 4_321, "width": 640, "height": 360}
     body = {"kind": "share", "bytes": 9, "contentType": "video/mp4", "shareId": share, **size}
     started = start_body(api, auth, body).json()
-    etag = httpx.put(started["urls"][0]["url"], content=b"version 1").headers["etag"]
+    etag = S3_HTTP.put(started["urls"][0]["url"], content=b"version 1").headers["etag"]
     create_share(api, auth, title="Re-exported")
     parts = {"parts": [{"n": 1, "etag": etag}]}
     assert api.post(f"/v1/uploads/{started['uploadId']}/complete", json=parts, headers=auth).status_code == 200
@@ -162,7 +172,7 @@ def test_shr01_a_second_upload_aborts_the_first_so_the_later_re_export_wins(api:
     put_recording(api, auth)
     share = create_share(api, auth).json()["shareId"]
     first = start(api, auth, share).json()
-    etag = httpx.put(first["urls"][0]["url"], content=b"ten bytes!").headers["etag"]
+    etag = S3_HTTP.put(first["urls"][0]["url"], content=b"ten bytes!").headers["etag"]
     second = start(api, auth, share).json()
     late = api.post(f"/v1/uploads/{first['uploadId']}/complete", json={"parts": [{"n": 1, "etag": etag}]}, headers=auth)
     assert failure(late) == (409, "upload_state")
@@ -252,7 +262,7 @@ def test_shr01_parallel_starts_leave_one_open_upload_and_the_losers_complete_is_
     assert sorted(row["state"] for row in rows) == ["aborted", "uploading"]
     loser = next(str(row["id"]) for row in rows if row["state"] == "aborted")
     url = next(item["urls"][0]["url"] for item in started if item["uploadId"] == loser)
-    etag = httpx.put(url, content=b"ten bytes!").headers.get("etag", '"x"')
+    etag = S3_HTTP.put(url, content=b"ten bytes!").headers.get("etag", '"x"')
     late = api.post(f"/v1/uploads/{loser}/complete", json={"parts": [{"n": 1, "etag": etag}]}, headers=auth)
     assert failure(late) == (409, "upload_state")
 
@@ -268,7 +278,7 @@ def test_shr01_a_complete_racing_a_newer_start_is_409_and_never_completes(api: A
     put_recording(api, auth)
     share = create_share(api, auth).json()["shareId"]
     first = start(api, auth, share).json()
-    etag = httpx.put(first["urls"][0]["url"], content=b"ten bytes!").headers["etag"]
+    etag = S3_HTTP.put(first["urls"][0]["url"], content=b"ten bytes!").headers["etag"]
     real = recordings.lock
 
     async def newer_start_lands_first(session: Any, recording_id: Any) -> Any:
@@ -368,7 +378,7 @@ def test_shr01_a_start_during_a_complete_waits_and_takes_the_next_version(api: A
     put_recording(api, auth)
     share = create_share(api, auth).json()["shareId"]
     first = start(api, auth, share).json()
-    etag = httpx.put(first["urls"][0]["url"], content=b"ten bytes!").headers["etag"]
+    etag = S3_HTTP.put(first["urls"][0]["url"], content=b"ten bytes!").headers["etag"]
     storage, entered = slowed(api, "complete")
     try:
         with ThreadPoolExecutor(2) as pool:
@@ -399,7 +409,7 @@ def test_shr01_two_completes_of_one_upload_adopt_it_once(api: Any, sql: Sql) -> 
     share = create_share(api, auth).json()["shareId"]
     upload_share(api, auth, share, b"first video")
     second = start(api, auth, share).json()
-    etag = httpx.put(second["urls"][0]["url"], content=b"ten bytes!").headers["etag"]
+    etag = S3_HTTP.put(second["urls"][0]["url"], content=b"ten bytes!").headers["etag"]
     complete = f"/v1/uploads/{second['uploadId']}/complete"
     storage, _ = slowed(api, "complete")
     try:
@@ -435,7 +445,7 @@ def test_cld04_trashing_a_recording_while_its_share_video_completes_waits_its_tu
     put_recording(api, auth)
     share = create_share(api, auth).json()["shareId"]
     first = start(api, auth, share).json()
-    etag = httpx.put(first["urls"][0]["url"], content=b"ten bytes!").headers["etag"]
+    etag = S3_HTTP.put(first["urls"][0]["url"], content=b"ten bytes!").headers["etag"]
     complete = f"/v1/uploads/{first['uploadId']}/complete"
     storage, entered = slowed(api, "complete")
     try:
@@ -497,7 +507,7 @@ def test_shr01_a_complete_after_its_share_was_deleted_is_not_found_and_changes_n
     put_recording(api, auth)
     made = create_share(api, auth).json()
     first = start(api, auth, made["shareId"]).json()
-    etag = httpx.put(first["urls"][0]["url"], content=b"ten bytes!").headers["etag"]
+    etag = S3_HTTP.put(first["urls"][0]["url"], content=b"ten bytes!").headers["etag"]
     api.delete(f"/v1/shares/{made['slug']}", headers=auth)
     late = api.post(f"/v1/uploads/{first['uploadId']}/complete", json={"parts": [{"n": 1, "etag": etag}]}, headers=auth)
     assert failure(late) == (404, "not_found")
@@ -524,7 +534,7 @@ def test_shr01_turning_a_share_on_while_its_first_video_completes_waits_and_succ
     put_recording(api, auth)
     made = create_share(api, auth).json()
     first = start(api, auth, made["shareId"]).json()
-    etag = httpx.put(first["urls"][0]["url"], content=b"ten bytes!").headers["etag"]
+    etag = S3_HTTP.put(first["urls"][0]["url"], content=b"ten bytes!").headers["etag"]
     api.patch(f"/v1/shares/{made['slug']}", json={"state": "disabled"}, headers=auth)
     storage, entered = slowed(api, "complete")
     try:

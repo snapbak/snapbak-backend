@@ -1,0 +1,188 @@
+{
+  "meetingId": "3f9c2a64-7b1e-4d8a-9c33-2e5f6a7b8c9d",
+  "recordingId": "8a1d4c52-0f0e-4d55-9a44-2f1a7e6c3b10",
+  "title": "Pricing page launch and the new tiers",
+  "state": "ready",
+  "minutes": {
+    "title": "Pricing page launch and the new tiers",
+    "summary": "Priya and Amit agreed to ship the pricing page on Friday with the new tiers. Finance still has to sign off on the tiers, and the FAQ copy is not final.",
+    "mom": "### Launch date\n\nPriya said the pricing page ships **Friday**; Amit agreed after billing confirmed proration.\n\n### Tiers\n\nThe page leads with the free tier. Finance sign-off is still open.",
+    "actionItems": [
+      {
+        "id": "act_1",
+        "text": "Ship the pricing page with the new tiers",
+        "owner": "Priya",
+        "due": "2026-10-30",
+        "derivedFrom": [
+          {
+            "lineId": "6d1f0b3e-2c4a-4f9b-8e77-3a2b5c8d1e0f",
+            "speaker": "Priya",
+            "atMs": 812000,
+            "quote": "we ship the pricing page Friday"
+          }
+        ],
+        "byUser": false
+      }
+    ],
+    "decisions": [
+      {
+        "id": "dec_1",
+        "text": "The pricing page ships Friday",
+        "rationale": "Billing confirmed proration works",
+        "alternatives": ["Ship monthly plans first"],
+        "derivedFrom": [
+          {
+            "lineId": "6d1f0b3e-2c4a-4f9b-8e77-3a2b5c8d1e0f",
+            "speaker": "Priya",
+            "atMs": 812000,
+            "quote": "we ship the pricing page Friday"
+          }
+        ],
+        "byUser": false
+      }
+    ],
+    "openQuestions": [
+      {
+        "id": "q_1",
+        "text": "Do the tiers need finance sign-off?",
+        "derivedFrom": [
+          {
+            "lineId": "6d1f0b3e-2c4a-4f9b-8e77-3a2b5c8d1e0f",
+            "speaker": "Amit",
+            "atMs": 903000,
+            "quote": "does finance need to sign off"
+          }
+        ],
+        "byUser": false
+      }
+    ],
+    "risks": [
+      {
+        "id": "risk_1",
+        "kind": "dependency",
+        "text": "Launch depends on finance signing off the tiers",
+        "owner": "Amit",
+        "derivedFrom": [
+          {
+            "lineId": "6d1f0b3e-2c4a-4f9b-8e77-3a2b5c8d1e0f",
+            "speaker": "Amit",
+            "atMs": 903000,
+            "quote": "does finance need to sign off"
+          }
+        ],
+        "byUser": false
+      }
+    ],
+    "followUps": [
+      {
+        "id": "fu_1",
+        "text": "Check with finance about the tiers",
+        "owner": "Amit",
+        "due": null,
+        "derivedFrom": [
+          {
+            "lineId": "6d1f0b3e-2c4a-4f9b-8e77-3a2b5c8d1e0f",
+            "speaker": "Amit",
+            "atMs": 903000,
+            "quote": "does finance need to sign off"
+          }
+        ],
+        "byUser": false
+      }
+    ],
+    "nextAgenda": [
+      {
+        "id": "next_1",
+        "topic": "Finance sign-off on the tiers",
+        "derivedFrom": [
+          {
+            "lineId": "6d1f0b3e-2c4a-4f9b-8e77-3a2b5c8d1e0f",
+            "speaker": "Amit",
+            "atMs": 903000,
+            "quote": "does finance need to sign off"
+          }
+        ],
+        "byUser": false
+      }
+    ],
+    "agenda": [
+      {
+        "id": "ag_1",
+        "topic": "Launch date",
+        "status": "covered",
+        "derivedFrom": [
+          {
+            "lineId": "6d1f0b3e-2c4a-4f9b-8e77-3a2b5c8d1e0f",
+            "speaker": "Priya",
+            "atMs": 812000,
+            "quote": "we ship the pricing page Friday"
+          }
+        ],
+        "byUser": false
+      },
+      {
+        "id": "ag_2",
+        "topic": "Tier pricing",
+        "status": "unresolved",
+        "derivedFrom": [
+          {
+            "lineId": "6d1f0b3e-2c4a-4f9b-8e77-3a2b5c8d1e0f",
+            "speaker": "Amit",
+            "atMs": 903000,
+            "quote": "does finance need to sign off"
+          }
+        ],
+        "byUser": false
+      }
+    ],
+    "contradictions": [
+      {
+        "id": "con_1",
+        "text": "Priya said the page ships Friday; Amit later said it waits for finance",
+        "derivedFrom": [
+          {
+            "lineId": "6d1f0b3e-2c4a-4f9b-8e77-3a2b5c8d1e0f",
+            "speaker": "Priya",
+            "atMs": 812000,
+            "quote": "we ship the pricing page Friday"
+          },
+          {
+            "lineId": "7e2a1c4f-3d5b-4a0c-9f88-4b3c6d9e2f10",
+            "speaker": "Amit",
+            "atMs": 951000,
+            "quote": "it waits for finance"
+          }
+        ],
+        "byUser": false
+      }
+    ],
+    "pinned": [
+      {
+        "pinId": "9a8b7c6d-5e4f-4a3b-2c1d-0e9f8a7b6c5d",
+        "atMs": 812000,
+        "note": "decided pricing"
+      }
+    ],
+    "userEdited": [],
+    "pending": [],
+    "incomplete": [
+      {
+        "section": "followUps",
+        "code": "provider"
+      }
+    ],
+    "notCommitments": []
+  },
+  "minutesFailure": null,
+  "stale": false,
+  "version": 3,
+  "pins": [
+    {
+      "id": "9a8b7c6d-5e4f-4a3b-2c1d-0e9f8a7b6c5d",
+      "atMs": 812000,
+      "note": "decided pricing"
+    }
+  ],
+  "startedAt": "2026-10-24T02:02:11Z",
+  "endedAt": "2026-10-24T03:04:31Z"
+}

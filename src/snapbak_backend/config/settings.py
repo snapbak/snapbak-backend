@@ -2,10 +2,29 @@
 
 import base64
 import binascii
+import functools
+import hashlib
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal, get_args
+
+
+@functools.cache
+def code_version() -> str:
+    """A hash of the package's Python source, the first 12 hex digits: the server answers it at /healthz and the
+    server and worker log it at start, so a process left running on old code shows (docs/api.md). Worked out once,
+    on first use, never on import."""
+    digest = hashlib.sha256()
+    for path in sorted(Path(__file__).resolve().parents[1].rglob("*.py")):
+        digest.update(path.read_bytes())
+    return digest.hexdigest()[:12]
+
+
+# An edited minutes document's sanity cap: there is no length limit on any part of it (minutes v2).
+MAX_MINUTES_BYTES = 2 * 1024 * 1024
+
 
 KEYS = {
     "groq": "GROQ_API_KEY",
@@ -31,6 +50,12 @@ SHARE_MAX_BYTES = 1_073_741_824
 SHARES_PER_DEVICE = 100
 # Caption lines a device may translate a UTC day (CLD-03, 16-caption-translation LLD): about 130 ten-minute talks.
 DAILY_TRANSLATED_LINES = 20_000
+# The meetings' LLM surfaces a device may use a UTC day (MEETINGS.md, D33): one question or search each.
+DAILY_QA_QUESTIONS = 50
+DAILY_SEARCH_QUERIES = 50
+# The embeddings model (MEETINGS.md, D38) and the width it is pinned to; fake:hashed is the tests' stand-in.
+EMBED = "openai:text-embedding-3-small"
+EMBED_DIM = 1536
 # Default early-access spot pool when the waitlist status is first read and no row exists yet.
 WAITLIST_SPOTS_DEFAULT = 100
 
@@ -58,6 +83,8 @@ class CloudConfig:
     webhook_secret: str
     voiceprint_keys: dict[int, bytes]
     waitlist_token: str
+    # The meetings' embeddings model (MEETINGS.md); openai:text-embedding-3-small unless overridden.
+    embed: str = EMBED
 
 
 @dataclass(frozen=True)
@@ -138,6 +165,7 @@ def cloud(env: Mapping[str, str]) -> CloudConfig | None:
         share_url=share_url,
         home_url=home_url,
         transcription=transcription,
+        embed=env.get("SNAPBAK_EMBEDDINGS") or EMBED,
         assemblyai_key=vendor(env, "ASSEMBLYAI_API_KEY"),
         pyannote_key=vendor(env, "PYANNOTE_API_KEY"),
         pyannote_webhook_secret=vendor(env, "PYANNOTE_WEBHOOK_SECRET"),

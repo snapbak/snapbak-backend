@@ -49,6 +49,29 @@ async def fail(session: AsyncSession, job: TranscriptionJob, reason: Failure, **
     return won
 
 
+async def live(session: AsyncSession, recording_id: UUID) -> TranscriptionJob | None:
+    """The recording's queued, processing or ready job, or None; one that is ready lets its meeting's minutes run."""
+    job = await session.scalar(
+        select(TranscriptionJob).where(
+            TranscriptionJob.recording_id == recording_id,
+            TranscriptionJob.state.in_(("queued", "processing", "ready")),
+            TranscriptionJob.deleted_at.is_(None),
+        )
+    )
+    return job
+
+
+async def latest(session: AsyncSession, recording_id: UUID) -> TranscriptionJob | None:
+    """The recording's most recent job, in any state: what a retry asks for again."""
+    job = await session.scalar(
+        select(TranscriptionJob)
+        .where(TranscriptionJob.recording_id == recording_id, TranscriptionJob.deleted_at.is_(None))
+        .order_by(TranscriptionJob.created_at.desc())
+        .limit(1)
+    )
+    return job
+
+
 async def enqueue_start(redis: ArqRedis, job_id: UUID) -> None:
     await redis.enqueue_job("start_transcription", job_id, _job_id=f"start:{job_id}")
 

@@ -88,3 +88,13 @@ def test_a_refused_answer_is_corrected_on_the_correction_model_with_its_answer_a
     corrected = request + answer + replay.CORRECTION_TOKENS
     one = replay.billed("openai:gpt-4.1", corrected, answer + replay.REASONED_TOKENS, 0)
     assert english["correction $"] == pytest.approx(9000 * replay.RETRY_SHARE * one)
+
+
+def test_a_minutes_run_prices_the_whole_transcript_in_each_section_s_call_plus_the_repair_share() -> None:
+    # MEETINGS.md 11.5: the minutes' cost per meeting, priced offline from the prompts the server sends.
+    half_hour = replay.minutes_run(["ship it today"], 1800, "openai:gpt-6-luna")
+    two_hours = replay.minutes_run(["ship it today"], 7200, "openai:gpt-6-luna")
+    assert half_hour["output"] == replay.SECTION_OUTPUT * 10
+    assert two_hours["input"] > 3 * half_hour["input"]
+    # Ten calls each resend the transcript (minutes v2): about 4 cents for 30 min, 11 for two hours.
+    assert 0 < half_hour["$"] < 0.05 < two_hours["$"] < 0.15

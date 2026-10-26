@@ -19,10 +19,17 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.types import UserDefinedType
+
+from snapbak_backend.config.settings import EMBED_DIM
 
 type JobState = Literal["queued", "processing", "ready", "failed"]
 type Stage = Literal["transcribing", "diarizing", "merging"]
 type Script = Literal["native", "roman"]
+type RecordingType = Literal["video", "audio"]
+type MeetingState = Literal["awaiting_transcript", "generating", "ready", "failed"]
+type ChunkKind = Literal["summary", "action", "question"]
+type ShareType = Literal["video", "audio", "meeting"]
 type Failure = Literal[
     "unsupported_language",
     "too_long",
@@ -48,6 +55,19 @@ class Base(DeclarativeBase):
         dict[str, Any]: JSONB,
         list[dict[str, Any]]: JSONB,
     }
+
+
+class Vector(UserDefinedType):
+    """pgvector's column, named without the helper package (no new deps, CLAUDE.md rule 7). Values cross the
+    boundary only through SQL with a `::vector` cast, so the type exists for the DDL alone."""
+
+    cache_ok = True
+
+    def __init__(self, dimensions: int = EMBED_DIM) -> None:
+        self.dimensions = dimensions
+
+    def get_col_spec(self, **kw: Any) -> str:
+        return f"vector({self.dimensions})"
 
 
 class WaitlistEntry(Base):
@@ -95,6 +115,7 @@ class Recording(Base):
     device_id: Mapped[UUID] = mapped_column(ForeignKey("devices.id"))
     title: Mapped[str]
     duration_ms: Mapped[int]
+    recording_type: Mapped[RecordingType] = mapped_column(Text, server_default="video")
     created_at: Mapped[datetime]
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
     deleted_at: Mapped[datetime | None]
@@ -219,12 +240,82 @@ class CaptionTrack(Base):
     )
 
 
+class Meeting(Base):
+    """The meeting envelope over a recording (MEETINGS.md): the minutes document and its state. One live meeting per
+    recording; `transcript_version` counts transcript edits, `minutes_transcript_version` the version the minutes were
+    built from, so the app can mark them stale."""
+
+    __tablename__ = "meetings"
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    recording_id: Mapped[UUID] = mapped_column(ForeignKey("recordings.id"))
+    title: Mapped[str]
+    # True once the user named the meeting (a rename, a promote title of their own, an edit of the minutes' title):
+    # the minutes' title then never replaces it.
+    title_set_by_user: Mapped[bool] = mapped_column(server_default="false")
+    state: Mapped[MeetingState] = mapped_column(Text, server_default="awaiting_transcript")
+    minutes: Mapped[dict[str, Any] | None]
+    minutes_failure: Mapped[str | None]
+    minutes_model: Mapped[str | None]
+    minutes_generated_at: Mapped[datetime | None]
+    transcript_version: Mapped[int] = mapped_column(server_default="0")
+    minutes_transcript_version: Mapped[int | None]
+    # The running minutes job's token: only the run holding it may write (a stalled one restarted by the sweep gets a
+    # new one); `minutes_clicked` when a regenerate started it, so its success is not counted as unattended (D39).
+    minutes_run: Mapped[UUID | None]
+    minutes_clicked: Mapped[bool] = mapped_column(server_default="false")
+    # The runs started for the current minutes (a click starts the count again): the sweep restarts a stalled run,
+    # and starts a provider failure again, only while this is under meetings.MAX_ATTEMPTS.
+    minutes_attempts: Mapped[int] = mapped_column(server_default="0")
+    version: Mapped[int] = mapped_column(server_default="1")
+    started_at: Mapped[datetime | None]
+    ended_at: Mapped[datetime | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+    deleted_at: Mapped[datetime | None]
+    __table_args__ = (
+        Index("meetings_one_per_recording", "recording_id", unique=True, postgresql_where=text("deleted_at IS NULL")),
+        # A minutes run stuck here (a lost enqueue, a worker that died) is started again by the sweep.
+        Index("meetings_generating", "updated_at", postgresql_where=text("state = 'generating'")),
+    )
+
+
+class MeetingPin(Base):
+    """A moment the user marked during the meeting (D7), synced idempotently by its client-made ID."""
+
+    __tablename__ = "meeting_pins"
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    meeting_id: Mapped[UUID] = mapped_column(ForeignKey("meetings.id"))
+    at_ms: Mapped[int] = mapped_column(BigInteger)
+    note: Mapped[str | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    deleted_at: Mapped[datetime | None]
+    __table_args__ = (Index("meeting_pins_meeting", "meeting_id"),)
+
+
+class MeetingChunk(Base):
+    """One embedded section of the minutes (D38): the summary, or a single action item or open question. Transcript
+    lines are never embedded. Rows are replaced wholesale on every re-embed, so they carry no `updated_at`."""
+
+    __tablename__ = "meeting_chunks"
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    meeting_id: Mapped[UUID] = mapped_column(ForeignKey("meetings.id"))
+    kind: Mapped[ChunkKind] = mapped_column(Text)
+    idx: Mapped[int]
+    text: Mapped[str]
+    embedding: Mapped[list[float]] = mapped_column(Vector())
+    deleted_at: Mapped[datetime | None]
+    # No vector index: the search scans a device's own sections exactly (services/meeting_index.py).
+    __table_args__ = (Index("meeting_chunks_meeting", "meeting_id"),)
+
+
 class UsageDaily(Base):
     __tablename__ = "usage_daily"
     device_id: Mapped[UUID] = mapped_column(ForeignKey("devices.id"), primary_key=True)
     day: Mapped[date] = mapped_column(primary_key=True)
     audio_seconds: Mapped[int] = mapped_column(server_default="0")
     translated_lines: Mapped[int] = mapped_column(server_default="0")
+    qa_questions: Mapped[int] = mapped_column(server_default="0")
+    search_queries: Mapped[int] = mapped_column(server_default="0")
     deleted_at: Mapped[datetime | None]
 
 
@@ -239,6 +330,9 @@ class Share(Base):
     s3_key: Mapped[str | None]
     poster_s3_key: Mapped[str | None]
     state: Mapped[ShareState] = mapped_column(Text, server_default="uploading")
+    # What the page shows: a plain recording's video or audio, or a meeting's minutes and transcript (D20). Derived
+    # from the recording when the share is made; never sent by the app.
+    type: Mapped[ShareType] = mapped_column(Text, server_default="video")
     expires_at: Mapped[datetime | None]
     title: Mapped[str]
     version: Mapped[int] = mapped_column(server_default="0")

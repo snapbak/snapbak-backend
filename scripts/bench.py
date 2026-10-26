@@ -611,6 +611,23 @@ def ledger_total(path: Path) -> float:
     return spent
 
 
+def require_budget(budget_usd: float | None, what: str) -> float:
+    """The budget a paid run was given, or the refusal every paid script shares: `what` costs money."""
+    if budget_usd is None:
+        raise SystemExit(f"{what} costs money: pass --budget-usd, the most the ledger may reach.")
+    return budget_usd
+
+
+def append_ledger(path: Path, usd: float, items: int, spec: str, note: str | None = None) -> None:
+    """One run's line in the spend ledger every paid script shares (`ledger_total` reads them)."""
+    entry: dict[str, float | int | str] = {"usd": usd, "items": items, "spec": spec}
+    if note is not None:
+        entry["note"] = note
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as written:
+        written.write(json.dumps(entry) + "\n")
+
+
 @dataclass(frozen=True)
 class Knobs:
     """What a run sets as the server's environment would (docs/bench.md): the polish model's temperature (models that
@@ -1210,9 +1227,7 @@ def main() -> int:
 def spent(options: argparse.Namespace, budget: Budget, note: str) -> None:
     """Appends the run's line to the ledger, when there is one, and prints what the run and the ledger spent."""
     if options.ledger is not None:
-        entry = {"usd": budget.spent, "items": budget.items, "spec": " ".join(options.specs), "note": note}
-        with options.ledger.open("a", encoding="utf-8") as ledger:
-            ledger.write(json.dumps(entry) + "\n")
+        append_ledger(options.ledger, budget.spent, budget.items, " ".join(options.specs), note)
     print(f"$ this run: {budget.spent:.4f}; ledger total: {budget.before + budget.spent:.4f}")
 
 

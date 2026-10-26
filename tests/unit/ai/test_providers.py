@@ -50,12 +50,12 @@ def test_a_provider_without_its_key_is_refused() -> None:
 
 def polish_turns(text: str, prior: str = "") -> list[tuple[str, str]]:
     request = {"text": text, "prior": prior, "terms": [], "app": "", "style": "chat"}
-    return [("system", "rules"), ("user", json.dumps(request))]
+    return [("system", "rules; answer JSON"), ("user", json.dumps(request))]
 
 
 def command_turns(selection: str) -> list[tuple[str, str]]:
     request = {"selection": selection, "instruction": "shout", "app": ""}
-    return [("system", "rules"), ("user", json.dumps(request))]
+    return [("system", "rules; answer JSON"), ("user", json.dumps(request))]
 
 
 async def answer(mode: str, turns: list[tuple[str, str]]) -> dict[str, object]:
@@ -150,5 +150,6 @@ async def test_fake_edit_swaps_the_last_word_before_any_correction_cue(text: str
 @pytest.mark.anyio
 async def test_trx09_fake_marks_each_word_of_a_transliteration_request() -> None:
     request = {"lines": [{"i": 0, "words": ["तो", "dashboard"]}]}
-    output, _ = await Fake("echo").complete([("user", json.dumps(request, ensure_ascii=False))], 100, 1.0)
+    turns = [("system", "Answer only JSON."), ("user", json.dumps(request, ensure_ascii=False))]
+    output, _ = await Fake("echo").complete(turns, 100, 1.0)
     assert json.loads(output) == {"lines": [{"i": 0, "words": ["r:तो", "r:dashboard"]}]}

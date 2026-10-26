@@ -4,7 +4,8 @@ name: snapbak-backend
 
 services:
   postgres:
-    image: postgres:17-alpine
+    # pgvector's image: the meetings' embedding column needs the vector extension (MEETINGS.md).
+    image: pgvector/pgvector:pg17
     environment:
       POSTGRES_USER: snapbak
       POSTGRES_PASSWORD: dev

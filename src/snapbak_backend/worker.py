@@ -2,6 +2,7 @@
 IDs only, reads the row, and returns early when the row is already past its step, so a duplicate or a re-run is a
 no-op. A vendor's 5xx or a dropped network retries the task; a vendor's 4xx fails the job."""
 
+import asyncio
 import contextlib
 import logging
 import os
@@ -9,21 +10,42 @@ import tempfile
 import time
 import uuid
 from datetime import UTC, datetime, timedelta
+from functools import partial
 from pathlib import Path
 from typing import Any
 from uuid import UUID
 
 import sqlalchemy
-from arq import Retry, cron
+from arq import Retry, cron, func
 from arq.connections import RedisSettings
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from snapbak_backend.ai.chain import ProviderFailed
 from snapbak_backend.ai.providers.factory import make_tiers
-from snapbak_backend.config.settings import MAX_JOB_SECONDS, load
-from snapbak_backend.db.models import Device, Failure, Recording, Speaker, TranscriptionJob, TranscriptLine, Upload
-from snapbak_backend.services import jobs, recordings, sealing, transliteration
+from snapbak_backend.config.settings import MAX_JOB_SECONDS, code_version, load
+from snapbak_backend.db.models import (
+    Device,
+    Failure,
+    Meeting,
+    Recording,
+    Speaker,
+    TranscriptionJob,
+    TranscriptLine,
+    Upload,
+)
+from snapbak_backend.schemas.cloud import MinutesOut, PinnedOut
+from snapbak_backend.services import (
+    jobs,
+    meeting_index,
+    meetings,
+    minutes,
+    purge,
+    qa,
+    recordings,
+    sealing,
+    transliteration,
+)
 from snapbak_backend.services.cloud import Cloud, open_cloud
 from snapbak_backend.services.events import publish
 from snapbak_backend.services.metrics import task_log
@@ -51,6 +73,16 @@ VOICEPRINT_CHECK_S = 60
 # The vendors are asked directly if no webhook came by then, and again every minute.
 FIRST_CHECK_S = 120
 CHECK_EVERY_S = 60
+# A minutes run that stopped moving (a lost enqueue, a worker that died) is started again after this long.
+STALLED_MINUTES = timedelta(minutes=5)
+# A minutes run marks itself alive this often while a section's call runs (up to its tries and its repair).
+HEARTBEAT_S = 60
+# A provider failure waits this long before the sweep starts the minutes again (an outage outlasted the run's own
+# retries, about 11 minutes).
+RETRY_FAILED = timedelta(minutes=15)
+# A minutes run's whole time: ten sections, each normally under a minute. Past it arq cancels the task; the sweep
+# then hands the meeting a new run, which resumes at the first section still pending.
+MINUTES_TIMEOUT_S = 1800
 AUDIO_URL_S = 7200
 CLIP_URL_S = 3600
 # AssemblyAI's own duration may pass 2 h by this much before the job fails `too_long`.
@@ -87,9 +119,15 @@ async def fail_and_publish(
     started = time.monotonic()
     await recordings.lock(db, job.recording_id)
     won = await jobs.fail(db, job, reason, **values)
+    # A meeting waiting on this transcript would wait forever: it fails with the job's code.
+    waiting = await meetings.fail_waiting(db, job.recording_id, reason) if won else None
     # Ends the transaction either way, so the recording's lock goes now: a sweep fails many jobs, and a vendor
     # cleanup may follow. A lost fail wrote nothing, and a commit keeps `job` readable.
     await db.commit()
+    if waiting is not None:
+        await publish(cloud_of(ctx).redis, *waiting)
+        # The meeting's own verdict line, so the unattended count sees a meeting that ended before its minutes.
+        task_log("generate_minutes", str(waiting[0]), "-", elapsed(started), f"failed:{reason}")
     if won:
         await publish(cloud_of(ctx).redis, job.id, job.version)
         if job.vendor_refs:
@@ -324,7 +362,165 @@ async def merge_and_store(ctx: Ctx, job_id: UUID) -> None:
         await cloud.redis.enqueue_job("create_voiceprints", job_id, _job_id=f"voiceprints:{job_id}")
     if job.script == "roman":
         await cloud.redis.enqueue_job("transliterate", job.recording_id, _job_id=f"translit:{job.recording_id}")
+    await start_minutes(cloud, job.recording_id)
     task_log("merge_and_store", str(job_id), "-", elapsed(started), "ready")
+
+
+async def start_minutes(cloud: Cloud, recording_id: UUID) -> None:
+    """The meeting whose transcript just landed starts its minutes (D13); none, or one already generating, is a
+    no-op. A session of its own: the merge's is closed by now, and reusing it would leave a transaction open."""
+    async with cloud.sessions() as db:
+        meeting = await meetings.live_meeting(db, recording_id)
+        if meeting is not None:
+            await meetings.begin(db, cloud.redis, meeting.id, clicked=False)
+
+
+async def fail_minutes(cloud: Cloud, meeting_id: UUID, run: UUID, reason: str, started: float) -> None:
+    """The meeting failed its minutes for good (the retries are over), committed and published; the app shows the
+    reason and a retry."""
+    async with cloud.sessions() as db:
+        version = await meetings.fail_minutes(db, meeting_id, run, reason)
+        await db.commit()
+    if version is not None:
+        await publish(cloud.redis, meeting_id, version)
+    task_log("generate_minutes", str(meeting_id), "-", elapsed(started), f"failed:{reason}")
+
+
+async def claimed(cloud: Cloud, meeting_id: UUID, run: UUID) -> bool:
+    """The run marks the meeting alive, if it still holds its token."""
+    async with cloud.sessions() as db:
+        held = await meetings.claim(db, meeting_id, run)
+        await db.commit()
+    return held
+
+
+class Lost(Exception):
+    """The run's token was taken (the sweep replaced it, or the meeting moved on): it writes nothing more."""
+
+
+async def saving(cloud: Cloud, meeting_id: UUID, run: UUID, pinned: list[PinnedOut], doc: MinutesOut) -> None:
+    """One section's progress stored and published while the run holds its token; Lost when it no longer does."""
+    body = stored(doc, pinned)
+    async with cloud.sessions() as db:
+        version = await meetings.save_minutes(db, meeting_id, run, body)
+        await db.commit()
+    if version is None:
+        raise Lost
+    await publish(cloud.redis, meeting_id, version)
+
+
+async def heartbeat(cloud: Cloud, meeting_id: UUID, run: UUID) -> None:
+    """Marks the run alive every HEARTBEAT_S while one section's call (up to its tries and repair) runs long, so the
+    sweep never takes a run that is still working."""
+    while True:
+        await asyncio.sleep(HEARTBEAT_S)
+        await claimed(cloud, meeting_id, run)
+
+
+def stored(doc: MinutesOut, pinned: list[PinnedOut]) -> dict[str, Any]:
+    """The minutes as the meeting stores them: the pins go in as they are, beside the model's sections (MEETINGS.md
+    7.1): no model judges a pin."""
+    return doc.model_copy(update={"pinned": pinned}).model_dump(mode="json")
+
+
+async def generate_minutes(ctx: Ctx, meeting_id: UUID, run: UUID) -> None:
+    """Minutes one section call at a time, each stored and published as it lands, then the embedding task
+    (MEETINGS.md 5.1, minutes v2), for the run holding `run`. The run claims the meeting before the model runs (a
+    duplicate, a replaced run or a meeting that moved on returns at once) and resumes from the sections still
+    pending, so a crashed run picks up where it stopped. A section that fails is marked and the rest go on; only
+    when neither the summary nor the MoM could be written does the task retry (the model down) or fail."""
+    started = time.monotonic()
+    cloud = cloud_of(ctx)
+    if not await claimed(cloud, meeting_id, run):
+        return
+    async with cloud.sessions() as db:
+        meeting = await db.get_one(Meeting, meeting_id)
+        recording_id, title = meeting.recording_id, meeting.title
+        # The version the minutes are built from, read before the model runs, so an edit landing mid-call leaves
+        # the minutes stale rather than silently current (D29).
+        snapshot = meeting.transcript_version
+        # The day the meeting was held, so "Friday" resolves to a real date (UTC: the recording's own clock).
+        day = meeting.started_at.date().isoformat() if meeting.started_at else None
+        doc = meetings.minutes_of(meeting) or minutes.empty(list(minutes.CALLS))
+        job = await jobs.live(db, recording_id)
+        ready = job is not None and job.state == "ready"
+        lines = await recordings.live_lines(db, recording_id) if ready else []
+        speakers = await recordings.speakers_of(db, recording_id)
+        pins = await meetings.pins(db, meeting_id)
+    if not lines:
+        await fail_minutes(cloud, meeting_id, run, "no_speech" if ready else "no_transcript", started)
+        return
+    marked = [{"atMs": pin.at_ms, "note": pin.note} for pin in pins]
+    # The pins go in as they are, beside the model's sections (MEETINGS.md 7.1): no model judges a pin.
+    pinned = [PinnedOut(pinId=pin.id, atMs=pin.at_ms, note=pin.note) for pin in pins]
+    alive = asyncio.create_task(heartbeat(cloud, meeting_id, run))
+    try:
+        saved = partial(saving, cloud, meeting_id, run, pinned)
+        doc, engine = await minutes.run(ctx["tiers"], title, marked, lines, speakers, doc, saved, day)
+    except Lost:
+        task_log("generate_minutes", str(meeting_id), "-", elapsed(started), "lost")
+        return
+    finally:
+        alive.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await alive
+    # Neither text written: the run fails with the summary's code; a provider outage is the sweep's to retry.
+    code = minutes.failure(doc)
+    if code:
+        await fail_minutes(cloud, meeting_id, run, code, started)
+        return
+    body = stored(doc, pinned)
+    async with cloud.sessions() as db:
+        written = await meetings.finish(db, meeting_id, run, body, engine, snapshot)
+        await db.commit()
+    if written is None:
+        return
+    version, clicked = written
+    await publish(cloud.redis, meeting_id, version)
+    await cloud.redis.enqueue_job("embed_minutes_task", meeting_id, _job_id=f"embed:{meeting_id}:{version}")
+    # Minutes no click asked for count toward unattended success (D39); a regenerate's are `clicked`. A section
+    # left incomplete still counts the run as ready: its count goes in the verdict.
+    left = f":incomplete:{len(doc.incomplete)}" if doc.incomplete else ""
+    reached = ("ready:clicked" if clicked else "ready:unattended") + left
+    task_log("generate_minutes", str(meeting_id), engine, elapsed(started), reached)
+
+
+async def embed_minutes_task(ctx: Ctx, meeting_id: UUID) -> None:
+    """The minutes' sections as vectors (D38): read, then embedded with no transaction open, then written unless
+    newer minutes landed meanwhile (their own task embeds them). A failure retries and then gives up: the meeting
+    stays ready, only search misses it."""
+    started = time.monotonic()
+    cloud = cloud_of(ctx)
+    engine = cloud.embeddings.engine
+    try:
+        async with cloud.sessions() as db:
+            meeting = await db.get(Meeting, meeting_id)
+            if meeting is None or meeting.state != "ready" or meeting.minutes is None:
+                return
+            doc = MinutesOut.model_validate(meeting.minutes)
+            # The search's sections, and Ask's (kind `ask`, never a search hit), embedded once here.
+            made_at, sections = meeting.minutes_generated_at, [*minutes.chunks_of(doc), *qa.ask_chunks(doc)]
+        vectors = await cloud.embeddings.embed([body for _, _, body in sections])
+        async with cloud.sessions() as db:
+            meeting = await db.get(Meeting, meeting_id)
+            if meeting is None or meeting.minutes_generated_at != made_at:
+                return
+            await meeting_index.write_sections(db, meeting_id, sections, vectors)
+            await db.commit()
+    except Exception as error:
+        if ctx["job_try"] < MAX_TRIES:
+            task_log("embed_minutes", str(meeting_id), engine, elapsed(started), "retry")
+            raise Retry(defer=2 ** ctx["job_try"]) from error
+        task_log("embed_minutes", str(meeting_id), engine, elapsed(started), "gave_up")
+        return
+    task_log("embed_minutes", str(meeting_id), engine, elapsed(started), f"chunks:{len(sections)}")
+
+
+async def purge_expired(ctx: Ctx) -> None:
+    """The undo window's end (D28), daily at 03:00 UTC; idempotent, so a slow pass costs nothing."""
+    started = time.monotonic()
+    count = await purge.purge_all(cloud_of(ctx))
+    task_log("purge_expired", "-", "-", elapsed(started), f"recordings:{count}")
 
 
 REMEMBER_VOICEPRINT = sqlalchemy.text(
@@ -514,14 +710,45 @@ async def sweep_waiting_jobs(ctx: Ctx) -> None:
         for job, duration_ms in late.all():
             if now > deadline(job, duration_ms) + SWEEP_MARGIN:
                 await fail_and_publish(ctx, db, job, "vendor_timeout", "sweep_waiting_jobs")
+        # A minutes run that stopped moving gets a new token and its task again; the old token can't write.
+        stuck_minutes = await db.scalars(select(Meeting.id).where(meetings.stalled(STALLED_MINUTES)))
+        for meeting_id in list(stuck_minutes):
+            await meetings.rerun(db, cloud_of(ctx).redis, meeting_id, STALLED_MINUTES)
+        # A meeting waiting on a transcript that landed a while ago, or failed before a newer one landed (the
+        # worker died between the merge and the minutes' start), starts them now.
+        waited = (Meeting.state == "awaiting_transcript") | (
+            (Meeting.state == "failed") & (TranscriptionJob.updated_at > Meeting.updated_at)
+        )
+        orphaned = await db.scalars(
+            select(Meeting.id)
+            .join(TranscriptionJob, TranscriptionJob.recording_id == Meeting.recording_id)
+            .where(
+                waited,
+                Meeting.deleted_at.is_(None),
+                TranscriptionJob.state == "ready",
+                TranscriptionJob.deleted_at.is_(None),
+                TranscriptionJob.updated_at < now - STALLED_MINUTES,
+            )
+        )
+        for meeting_id in list(orphaned):
+            await meetings.begin(db, cloud_of(ctx).redis, meeting_id, clicked=False)
+        # Sections a provider outage failed (the whole run, or some sections of ready minutes) are written again, as
+        # no click, a few times: the sweep is the one owner of minutes re-runs.
+        down = await db.execute(select(Meeting.id, Meeting.minutes).where(meetings.retryable(RETRY_FAILED)))
+        for meeting_id, stored_minutes in list(down):
+            marked = (stored_minutes or {}).get("incomplete") or []
+            sections = [item["section"] for item in marked if item["code"] == "provider"]
+            await meetings.begin(db, cloud_of(ctx).redis, meeting_id, clicked=False, sections=sections or None)
 
 
 async def startup(ctx: Ctx) -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
+    # The code this worker runs, so one left running on old code shows beside the server's /healthz.
+    logging.getLogger("snapbak_backend").info("code=%s", code_version())
     config = load(os.environ)
     if config.cloud is None:
         raise ValueError("Set DATABASE_URL: the worker needs the cloud settings (see .env.example).")
-    cloud = await open_cloud(config.cloud)
+    cloud = await open_cloud(config.cloud, config.keys)
     ctx["cloud"] = cloud
     ctx["strategy"] = make_strategy(config.cloud, cloud.storage, ctx["redis"].enqueue_job)
     ctx["tiers"] = make_tiers(config)
@@ -543,12 +770,18 @@ FUNCTIONS = (
     create_voiceprints,
     on_voiceprint,
     transliterate,
+    func(generate_minutes, name="generate_minutes", timeout=MINUTES_TIMEOUT_S),
+    embed_minutes_task,
+    purge_expired,
 )
 
 
 class WorkerSettings:
     functions = FUNCTIONS
-    cron_jobs = (cron(sweep_waiting_jobs, minute=set(range(0, 60, 5))),)
+    cron_jobs = (
+        cron(sweep_waiting_jobs, minute=set(range(0, 60, 5))),
+        cron(purge_expired, hour=3, minute=0),
+    )
     redis_settings = RedisSettings.from_dsn(os.environ.get("REDIS_URL") or "redis://127.0.0.1:16379/0")
     on_startup = startup
     on_shutdown = shutdown

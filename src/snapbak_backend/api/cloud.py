@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from snapbak_backend.api import share_page, waitlist
 from snapbak_backend.api.v1 import (
     devices,
+    meetings,
     recordings,
     shares,
     transcript,
@@ -25,6 +26,7 @@ ROUTERS = (
     shares.router,
     transcription.router,
     transcript.router,
+    meetings.router,
     translations.router,
     webhooks.router,
     share_page.router,
@@ -32,12 +34,12 @@ ROUTERS = (
 )
 
 
-async def start(app: FastAPI, config: CloudConfig) -> None:
-    """Opens the database, Redis and S3, starts the long-poll listener, and adds the cloud routes after the dictation
-    ones, so those match first and pay nothing for them. A process starts once."""
+async def start(app: FastAPI, config: CloudConfig, keys: dict[str, str]) -> None:
+    """Opens the database, Redis, S3 and the embeddings client, starts the long-poll listener, and adds the cloud
+    routes after the dictation ones, so those match first and pay nothing for them. A process starts once."""
     for router in ROUTERS:
         app.router.routes.extend(router.routes)
-    app.state.cloud = await open_cloud(config)
+    app.state.cloud = await open_cloud(config, keys)
     app.state.events = Events(app.state.cloud.redis)
     await app.state.events.start()
 

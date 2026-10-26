@@ -153,3 +153,45 @@ def test_shr01_share_then_watch_over_http_with_the_real_server(cloud: dict[str, 
     assert "route=/v/{slug} provider=- model=- tier=- ms=" in logged
     for secret in (made["slug"], title, "GET /v"):
         assert secret not in logged, secret
+
+
+def test_mom04_a_meeting_to_minutes_ask_and_search_logs_no_word_over_the_real_processes(
+    cloud: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The meeting chain on the server and worker as `just serve` and `just worker` start them, on the fakes: their
+    own output holds no title, line, question or query, in any case (CLAUDE.md rule 3; grading round 2)."""
+    monkeypatch.setenv("SNAPBAK_POLISH", "fake:meetings")
+    monkeypatch.setenv("SNAPBAK_EMBEDDINGS", "fake:hashed")
+    output: list[str] = []
+    with running(output) as base:
+        token = httpx.post(f"{base}/v1/devices", json={"installId": RECORDING, "appVersion": "1.0.0"}).json()["token"]
+        auth = {"Authorization": f"Bearer {token}"}
+        title = "Quarterly Zebra Review"
+        said = {"title": title, "durationMs": 120_000, "createdAt": "2026-10-17T04:32:11Z", "recordingType": "audio"}
+        assert httpx.put(f"{base}/v1/recordings/{RECORDING}", json=said, headers=auth).status_code == 201
+        meeting = httpx.post(f"{base}/v1/recordings/{RECORDING}/meeting", json={"title": title}, headers=auth).json()
+        data = b"m4a" * 1000
+        upload = httpx.post(
+            f"{base}/v1/recordings/{RECORDING}/uploads",
+            json={"kind": "audio", "bytes": len(data), "contentType": "audio/mp4"},
+            headers=auth,
+        ).json()
+        etag = httpx.put(upload["urls"][0]["url"], content=data).headers["etag"]
+        complete = {"parts": [{"n": 1, "etag": etag}]}
+        httpx.post(f"{base}/v1/uploads/{upload['uploadId']}/complete", json=complete, headers=auth)
+        since, state = 0, ""
+        deadline = time.monotonic() + 30
+        while state not in ("ready", "failed") and time.monotonic() < deadline:
+            path = f"{base}/v1/recordings/{RECORDING}/meeting?wait=25&since={since}"
+            answer = httpx.get(path, headers=auth, timeout=35).json()
+            since, state = answer["version"], answer["state"]
+        assert state == "ready"
+        asked = httpx.post(
+            f"{base}/v1/meetings/{meeting['meetingId']}/ask", json={"question": "Which dashboard?"}, headers=auth
+        )
+        found = httpx.post(f"{base}/v1/meetings/search", json={"query": "zebra numbers"}, headers=auth)
+        assert (asked.status_code, found.status_code) == (200, 200)
+    logged = "".join(output).lower()
+    assert "task=generate_minutes" in logged and "verdict=ready:unattended" in logged
+    for secret in (*SECRETS, "zebra", "quarterly", "which dashboard", "summary of"):
+        assert secret not in logged, secret

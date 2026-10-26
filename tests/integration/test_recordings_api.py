@@ -3,7 +3,7 @@ import uuid
 from typing import Any
 
 import pytest
-from conftest import RECORDING, Sql, create_job, failure, put_recording, register, s3, upload_audio
+from conftest import RECORDING, S3_HTTP, Sql, create_job, failure, put_recording, register, s3, upload_audio
 
 BODY = {"title": "Recording 2026-10-17 at 10.02.11", "durationMs": 612_400, "createdAt": "2026-10-17T04:32:11Z"}
 
@@ -14,9 +14,15 @@ def test_cld02_put_creates_the_recording_then_updates_it(api: Any, sql: Sql) -> 
     updated = api.put(f"/v1/recordings/{RECORDING}", json={**BODY, "title": "Demo", "durationMs": 5}, headers=auth)
     assert (created.status_code, created.json()) == (
         201,
-        {"recordingId": RECORDING, "title": "Recording 2026-10-17 at 10.02.11", "durationMs": 612_400},
+        {
+            "recordingId": RECORDING,
+            "title": "Recording 2026-10-17 at 10.02.11",
+            "durationMs": 612_400,
+            "recordingType": "video",
+        },
     )
-    assert (updated.status_code, updated.json()) == (200, {"recordingId": RECORDING, "title": "Demo", "durationMs": 5})
+    expected = {"recordingId": RECORDING, "title": "Demo", "durationMs": 5, "recordingType": "video"}
+    assert (updated.status_code, updated.json()) == (200, expected)
     assert sql("SELECT title, duration_ms FROM recordings") == [{"title": "Demo", "duration_ms": 5}]
 
 
@@ -124,7 +130,6 @@ def raced(first: Any, then: Any, entered: threading.Event) -> list[int]:
 def test_cld04_trashing_a_recording_while_its_audio_completes_waits_its_turn(api: Any, monkeypatch: Any) -> None:
     """The complete holds the recording's lock while it moves the upload and starts the job; the delete waits for
     that lock, then trashes both."""
-    import httpx
 
     from snapbak_backend.services import jobs
 
@@ -133,7 +138,7 @@ def test_cld04_trashing_a_recording_while_its_audio_completes_waits_its_turn(api
     create_job(api, auth)
     body = {"kind": "audio", "bytes": 3, "contentType": "audio/mp4"}
     started = api.post(f"/v1/recordings/{RECORDING}/uploads", json=body, headers=auth).json()
-    etag = httpx.put(started["urls"][0]["url"], content=b"m4a").headers["etag"]
+    etag = S3_HTTP.put(started["urls"][0]["url"], content=b"m4a").headers["etag"]
     entered = slowed_service(monkeypatch, jobs, "advance", lambda *args, **kwargs: "upload_id" in kwargs)
     statuses = raced(
         lambda: api.post(

@@ -1,3 +1,5 @@
+/* Soft UI (docs/design/SOFT-UI.md in the app): an opaque ground, plates lit from the top left, wells pressed into
+   them, one lit purple primary. Light or dark by the viewer's system (tokens.css). */
 *,
 *::before,
 *::after {
@@ -13,11 +15,7 @@ body {
   font-size: var(--sb-font-size-md);
   line-height: 1.5;
   color: var(--sb-color-text);
-  background-color: var(--sb-color-background);
-  background-image:
-    radial-gradient(64rem 34rem at 50% -14rem, color-mix(in srgb, var(--sb-color-accent) 26%, transparent), transparent 70%),
-    radial-gradient(36rem 28rem at 100% 0, color-mix(in srgb, var(--sb-color-glow-end) 12%, transparent), transparent 70%);
-  background-repeat: no-repeat;
+  background: var(--sb-color-background);
   -webkit-font-smoothing: antialiased;
   -webkit-text-size-adjust: 100%;
 }
@@ -43,45 +41,55 @@ main {
 .brand svg {
   height: 26px;
   width: auto;
-  filter: drop-shadow(0 4px 14px color-mix(in srgb, var(--sb-color-accent) 50%, transparent));
 }
 main {
   flex: 1;
 }
 h1 {
   margin: 0;
-  font-weight: 650;
+  font-family: var(--sb-font-display);
+  font-weight: 600;
   letter-spacing: -0.015em;
   line-height: 1.2;
   overflow-wrap: anywhere;
 }
+/* A plate rises off the ground: a diagonal fill, a lit top edge and a tight drop shadow. */
+.plate {
+  border-radius: var(--sb-radius-card);
+  background: linear-gradient(160deg, var(--sb-color-plate-hi), var(--sb-color-plate-lo));
+  box-shadow:
+    inset 0 1px 0 var(--sb-color-edge-hi),
+    inset 0 -1px 0 var(--sb-color-edge-lo),
+    var(--sb-shadow-raised);
+}
+/* A well is pressed into a plate. */
+.well {
+  border-radius: var(--sb-radius-lg);
+  background: var(--sb-color-well);
+  box-shadow: var(--sb-shadow-inset);
+}
+/* The one primary: a lit purple plate, a small glow beneath. Its height comes from its text (2.8 for the hero). */
 .button {
   display: inline-flex;
   align-items: center;
-  gap: var(--sb-spacing-2);
-  height: 40px;
-  padding: 0 var(--sb-spacing-4);
+  gap: 0.5em;
+  height: 2.8em;
+  padding: 0 1.5em;
   border-radius: var(--sb-radius-pill);
-  font: 600 var(--sb-font-size-sm) / 1 var(--sb-font-family);
+  font: 600 var(--sb-font-size-md) / 1 var(--sb-font-family);
   white-space: nowrap;
   text-decoration: none;
   color: var(--sb-color-on-accent);
-  background: linear-gradient(135deg, var(--sb-color-accent-strong), var(--sb-color-accent-indigo-strong));
-  box-shadow:
-    0 10px 28px -10px color-mix(in srgb, var(--sb-color-accent) 80%, transparent),
-    inset 0 1px 0 var(--sb-color-border);
-  transition:
-    transform var(--sb-duration-fast) ease,
-    box-shadow var(--sb-duration-base) ease;
+  background: linear-gradient(160deg, var(--sb-color-accent-top), var(--sb-color-accent-bottom));
+  box-shadow: var(--sb-shadow-primary);
+  transition: box-shadow var(--sb-duration-base) var(--sb-easing-out);
 }
 .button:hover {
-  transform: translateY(-1px);
-  box-shadow:
-    0 14px 34px -10px color-mix(in srgb, var(--sb-color-accent) 95%, transparent),
-    inset 0 1px 0 var(--sb-color-border);
+  box-shadow: var(--sb-shadow-primary-hover);
 }
 .button:active {
-  transform: translateY(0);
+  background: linear-gradient(160deg, var(--sb-color-accent-bottom), var(--sb-color-accent-top));
+  box-shadow: var(--sb-shadow-primary-pressed);
 }
 a:focus-visible {
   outline: 2px solid var(--sb-color-accent);
@@ -115,10 +123,7 @@ footer a:hover span {
   text-underline-offset: 3px;
 }
 @media (prefers-reduced-motion: reduce) {
-  .button {
-    transition: none;
-  }
-  .button:hover {
-    transform: none;
+  * {
+    transition: none !important;
   }
 }
