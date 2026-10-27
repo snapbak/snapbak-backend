@@ -50,14 +50,14 @@ class RecordingRequest(Wire):
     title: str = Field(max_length=300)
     durationMs: int = Field(ge=0, le=2**31 - 1)
     createdAt: AwareDatetime
-    recordingType: Literal["video", "audio"] = "video"
+    recordingType: Literal["video", "audio", "gif"] = "video"
 
 
 class RecordingResponse(Wire):
     recordingId: UUID
     title: str
     durationMs: int
-    recordingType: Literal["video", "audio"] = "video"
+    recordingType: Literal["video", "audio", "gif"] = "video"
 
 
 class UploadRequest(Wire):
@@ -78,7 +78,19 @@ class ShareUploadRequest(Wire):
     height: int = Field(ge=1, le=16_384)
 
 
-type AnyUpload = Annotated[UploadRequest | ShareUploadRequest, Field(discriminator="kind")]
+class GifUploadRequest(Wire):
+    """The share's GIF, already animated, uploaded as-is (GIFS-AND-REPLAY-60, G7): no length, but a size the
+    page's unfurl and player use."""
+
+    kind: Literal["gif"]
+    bytes: int = Field(gt=0)
+    contentType: Literal["image/gif"]
+    shareId: UUID
+    width: int = Field(ge=1, le=16_384)
+    height: int = Field(ge=1, le=16_384)
+
+
+type AnyUpload = Annotated[UploadRequest | ShareUploadRequest | GifUploadRequest, Field(discriminator="kind")]
 
 
 class PartUrl(Wire):
@@ -159,7 +171,8 @@ class SpeakerOut(Wire):
     id: UUID
     label: str
     name: str | None
-    nameSource: Literal["vendor", "user"] | None
+    # `guessed`: named by the speaker identification loop from what was said (MOM-08), undoable.
+    nameSource: Literal["vendor", "user", "guessed"] | None
     colorIdx: int
 
 
@@ -182,6 +195,8 @@ class TranscriptResponse(Wire):
     script: Literal["native", "roman"]
     speakers: list[SpeakerOut]
     lines: list[LineOut]
+    # The speaker identification loop's state and changes, or null before it ever ran (MOM-08).
+    speakerPass: SpeakerPass | None = None
 
 
 class LineRequest(Wire):
@@ -207,6 +222,8 @@ class SpeakerRequest(Wire):
     label: str = Field(min_length=1, max_length=50)
     name: str | None = Field(default=None, min_length=1, max_length=100)
     colorIdx: int = Field(ge=0, le=7)
+    # Only on an Undo that puts a name back as it was (MOM-08): its earlier source; otherwise a name is the user's.
+    nameSource: Literal["vendor", "guessed"] | None = None
 
 
 class TransliterateRequest(Wire):
@@ -249,7 +266,7 @@ class ShareResponse(ShareRef):
     expiresAt: Utc | None
     posterUploadUrl: str | None
     # What the page shows (D20): `video`, `audio` (live at once, on the recording's own audio) or `meeting`.
-    type: Literal["video", "audio", "meeting"]
+    type: Literal["video", "audio", "meeting", "gif"]
 
 
 class ShareUpdateRequest(Wire):
@@ -418,6 +435,55 @@ class PinOut(Wire):
     note: str | None
 
 
+class Cue(Wire):
+    """Evidence for a speaker change: a transcript line's `i` and its words, verbatim."""
+
+    i: int
+    quote: str
+
+
+class Change(Wire):
+    """One change the speaker identification loop made or offers (MEETINGS.md D42, MOM-08). `name`: `speakerId` takes
+    `name` (`before` the name it had). `merge`: `speakerId` (`before` its name or label) joins `intoId`, its `lineIds`
+    moving with it. `move`: the
+    line `lineIds[0]` moves from `speakerId` to `intoId`. `applied` changes are in the transcript, `suggested` ones
+    wait for the user; `undone` and `rejected` are history."""
+
+    id: str
+    kind: Literal["name", "merge", "move"]
+    # `gone`: an undone change the transcript no longer allows back (renamed or merged since); never offered again.
+    state: Literal["applied", "suggested", "undone", "rejected", "gone"]
+    speakerId: UUID
+    name: str | None = None
+    before: str | None = None
+    intoId: UUID | None = None
+    lineIds: list[UUID] = Field(default_factory=list)
+    cues: list[Cue] = Field(default_factory=list)
+
+
+class SpeakerChangeRequest(Wire):
+    """The user's answer to one change of the speaker loop: undo an applied one or redo an undone one, accept or
+    reject a suggestion."""
+
+    action: Literal["undo", "redo", "accept", "reject"]
+
+
+class SpeakerPass(Wire):
+    """The loop's state on a recording: `rev` moves with every change applied, undone, accepted or rejected, so the
+    app knows to read the transcript again; `stage` is where the run is, `round` how many rounds applied."""
+
+    rev: int = 0
+    stage: Literal["reading", "listening", "naming", "rewriting", "done"] = "reading"
+    round: int = 0
+    # Whether this run heard the recording again (so the live story says so only when it did), and whether the
+    # loop broke (its draft stands; the app says so rather than "nothing found").
+    listened: bool = False
+    failed: bool = False
+    # Where this run's changes start in `changes`: the live story tells only what this run found.
+    start: int = 0
+    changes: list[Change] = Field(default_factory=list)
+
+
 class MeetingResponse(Wire):
     meetingId: UUID
     recordingId: UUID
@@ -430,6 +496,8 @@ class MeetingResponse(Wire):
     pins: list[PinOut]
     startedAt: Utc | None
     endedAt: Utc | None
+    # The recording's speaker identification loop: its stage while the minutes are made, and its changes (MOM-08).
+    speakerPass: SpeakerPass | None = None
 
 
 class MeetingAccepted(Wire):

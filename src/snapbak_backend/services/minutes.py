@@ -32,7 +32,7 @@ from snapbak_backend.schemas.cloud import (
     Section,
     TopicOut,
 )
-from snapbak_backend.services import details
+from snapbak_backend.services import details, people
 from snapbak_backend.services.folding import DEVANAGARI, quoted
 from snapbak_backend.services.recordings import speaker_of
 
@@ -135,17 +135,14 @@ def keep_derivations(
 
 
 def body_of(lines: list[TranscriptLine], speakers: dict[UUID, Speaker]) -> list[dict[str, Any]]:
-    """The lines as every call sends them."""
-    return [
-        {
-            "i": line.idx,
-            "s": line.start_ms,
-            "e": line.end_ms,
-            "sname": speaker_of(speakers.get(line.speaker_id)),
-            "text": line.text,
-        }
-        for line in lines
-    ]
+    """The lines as every call sends them, each with its speaker's `p`, which the words write them by (D41)."""
+    made = []
+    for line in lines:
+        speaker = speakers.get(line.speaker_id)
+        p = people.number_of(speaker) if speaker else None
+        said = {"i": line.idx, "s": line.start_ms, "e": line.end_ms, "p": p, "sname": speaker_of(speaker)}
+        made.append({**said, "text": line.text})
+    return made
 
 
 def checked_items(
@@ -164,6 +161,8 @@ def checked_items(
                 problems.append(f"{section} {item_id} had too few derivations that are real lines")
                 continue
             fields = {name: item[name] for name in model.model_fields if name in item and name != "byUser"}
+            where = f"{section} {item_id}"
+            fields |= people.item_words(fields.get, lambda said, at=where: people.checked(said, speakers, problems, at))
             written = [fields.get(name) for name in ("text", "topic", "rationale", "due")] + [
                 *(fields.get("alternatives") or [])
             ]
@@ -172,6 +171,9 @@ def checked_items(
                 continue
             if "due" in fields:
                 fields["due"] = due_of(fields["due"])
+            # The prompt glosses covered as "settled", and the model sometimes answers with the gloss.
+            if fields.get("status") == "settled":
+                fields["status"] = "covered"
             if not real_date(fields.get("due")):
                 problems.append(f"{section} {item_id} had a due that looks like a date but is none")
                 continue
@@ -193,10 +195,12 @@ def parse_section(
     try:
         said = json.loads(answer)
         if section == "summary":
-            value = {"title": text_of(said.get("title")) or None, "summary": text_of(said["summary"])}
+            # The title is shown where no chip can be (lists, notifications): its people are words.
+            title = people.rendered(text_of(said.get("title")), speakers) or None
+            value = {"title": title, "summary": people.checked(text_of(said["summary"]), speakers, problems, section)}
             ok = bool(value["summary"])
         elif section == "mom":
-            value = {"mom": text_of(said["mom"])}
+            value = {"mom": people.checked(text_of(said["mom"]), speakers, problems, section)}
             ok = bool(value["mom"])
         else:
             value = {section: checked_items(section, said["items"], by_index, speakers, problems)}
@@ -337,10 +341,15 @@ async def complete(
     """The detail guard: when the minutes keep fewer than DETAIL_TARGET of the transcript's details, a commitment is
     uncovered, or an agenda topic has no section, one completion call works the missing ones in (its new action
     items checked as any), and one more answers for any commitment the first left."""
+
+    # The guard reads words: each person by their name, not their token.
+    def plain(minutes: MinutesOut) -> MinutesOut:
+        return people.rendered_doc(minutes, speakers)
+
     units = details.inventory(lines, speakers)
-    before = details.recall(doc, units, lines)
-    left = details.missing(doc, units, lines)
-    topics = details.topics_missing(doc)
+    before = details.recall(plain(doc), units, lines)
+    left = details.missing(plain(doc), units, lines)
+    topics = details.topics_missing(plain(doc))
     # Every commitment must end an action item or a judgment that it is none, whatever the overall recall.
     promised = {unit.idx for unit in left if unit.kind == "commitment"}
     if before >= DETAIL_TARGET and not promised and not topics:
@@ -349,11 +358,11 @@ async def complete(
     asked_for += [{"i": None, "kind": "topic", "text": topic} for topic in topics]
     better = await completed(tiers, doc, asked_for, promised, lines, speakers, calls) or doc
     # A long meeting's first answer may leave commitments unanswered: one more pass asks for those alone.
-    still = [unit for unit in details.missing(better, units, lines) if unit.kind == "commitment"]
+    still = [unit for unit in details.missing(plain(better), units, lines) if unit.kind == "commitment"]
     if still and better is not doc:
         again = [{"i": unit.idx, "kind": unit.kind, "text": unit.text} for unit in still]
         better = await completed(tiers, better, again, {unit.idx for unit in still}, lines, speakers, calls) or better
-    after, left_topics = details.recall(better, units, lines), len(details.topics_missing(better))
+    after, left_topics = details.recall(plain(better), units, lines), len(details.topics_missing(plain(better)))
     # Only ever forward: neither measure worse, and one of them better.
     worse = after < before or left_topics > len(topics)
     if worse or (after, -left_topics) == (before, -len(topics)):
@@ -378,7 +387,7 @@ async def completed(
         by_index = {line.idx: line for line in lines}
         added = checked_items("actionItems", said.get("actionItems") or [], by_index, speakers, [])
         # A text that isn't English (MOM-05) or is empty leaves the one it would replace standing.
-        texts = {name: text_of(said.get(name)) for name in ("summary", "mom")}
+        texts = {name: people.checked(text_of(said.get(name)), speakers, [], name) for name in ("summary", "mom")}
         texts = {name: text for name, text in texts.items() if text and english(text)}
         judged = judgments(said.get("notCommitments"), promised, by_index)
     except ProviderFailed, ValueError, AttributeError, TypeError:
@@ -389,7 +398,8 @@ async def completed(
     update = {"actionItems": unique_ids([*doc.actionItems, *fresh]), "notCommitments": kept}
     better = merged(doc, texts).model_copy(update=update)
     # New text that loses a topic's `### ` heading is left out; the answer's items still count.
-    if len(details.topics_missing(better)) > len(details.topics_missing(doc)):
+    lost = details.topics_missing(people.rendered_doc(better, speakers))
+    if len(lost) > len(details.topics_missing(people.rendered_doc(doc, speakers))):
         return doc.model_copy(update=update)
     return better
 

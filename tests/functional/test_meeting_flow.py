@@ -750,7 +750,10 @@ def test_mom05_a_speaker_rename_marks_the_minutes_stale(route: str, meetings_api
         method, url, json=body if method == "PUT" else {"name": "Priya Sharma"}, headers=auth
     )
     assert renamed.status_code == 200, renamed.json()
-    assert meeting_detail(meetings_api, auth)["stale"] is True
+    detail = meeting_detail(meetings_api, auth)
+    assert detail["stale"] is True
+    # The minutes are embedded again at the rename's version, so search names each person as they are now (D41).
+    await_tasks(f"embed:{detail['meetingId']}:{detail['version']}")
 
 
 def test_mom05_an_edit_landing_during_the_minutes_call_leaves_them_stale(

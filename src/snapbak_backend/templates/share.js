@@ -1,5 +1,7 @@
 (() => {
   const media = document.querySelector("video, audio");
+  // A GIF page plays an img and needs none of this.
+  if (!media) return;
   let refreshed = 0;
   media.addEventListener("error", async () => {
     // The signed URL lasts an hour: past it, a seek fails. Sign a fresh one, at most once a minute, and resume.

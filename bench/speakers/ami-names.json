@@ -1,0 +1,10 @@
+{
+  "about": "AMI participants' names as they introduce themselves (\"I'm Sarah, the Project Manager\") in the test meetings, by series and speaker letter (a letter keeps its role across a series). Read by Claude on 27 Oct 2026 from the AMI annotations (CC BY 4.0). A speaker missing here never says their name: a name the loop gives them is unverifiable, not wrong.",
+  "series": {
+    "ES2004": { "B": ["Sarah"] },
+    "ES2014": { "A": ["Alastair"], "B": ["Nick"], "C": ["Louisa"], "D": ["Robin"] },
+    "IS1009": { "A": ["Betty"], "B": ["Francina"], "C": ["Jeanne"], "D": ["Eileen"] },
+    "TS3003": { "A": ["Bart"], "D": ["Freek"] },
+    "TS3007": { "A": ["Danny", "Daniel"], "B": ["Juergen"], "D": ["Tim"] }
+  }
+}

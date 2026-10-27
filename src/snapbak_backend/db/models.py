@@ -24,12 +24,12 @@ from sqlalchemy.types import UserDefinedType
 from snapbak_backend.config.settings import EMBED_DIM
 
 type JobState = Literal["queued", "processing", "ready", "failed"]
-type Stage = Literal["transcribing", "diarizing", "merging"]
+type Stage = Literal["transcribing", "diarizing", "merging", "identifying"]
 type Script = Literal["native", "roman"]
-type RecordingType = Literal["video", "audio"]
+type RecordingType = Literal["video", "audio", "gif"]
 type MeetingState = Literal["awaiting_transcript", "generating", "ready", "failed"]
 type ChunkKind = Literal["summary", "action", "question"]
-type ShareType = Literal["video", "audio", "meeting"]
+type ShareType = Literal["video", "audio", "meeting", "gif"]
 type Failure = Literal[
     "unsupported_language",
     "too_long",
@@ -119,6 +119,8 @@ class Recording(Base):
     created_at: Mapped[datetime]
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
     deleted_at: Mapped[datetime | None]
+    # The speaker identification loop's state and changes (schemas/cloud.py `SpeakerPass`, MOM-08).
+    speaker_pass: Mapped[dict[str, Any] | None]
     __table_args__ = (Index("recordings_device", "device_id", postgresql_where=text("deleted_at IS NULL")),)
 
 
@@ -187,7 +189,7 @@ class Speaker(Base):
     label: Mapped[str]
     vendor_label: Mapped[str]
     name: Mapped[str | None]
-    name_source: Mapped[Literal["vendor", "user"] | None] = mapped_column(Text)
+    name_source: Mapped[Literal["vendor", "user", "guessed"] | None] = mapped_column(Text)
     color_idx: Mapped[int] = mapped_column(SmallInteger)
     voiceprint: Mapped[bytes | None] = mapped_column(LargeBinary)
     voiceprint_key_id: Mapped[int | None] = mapped_column(SmallInteger)

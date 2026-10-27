@@ -106,14 +106,16 @@ async def live_count(session: AsyncSession, device_id: UUID) -> int:
     return count or 0
 
 
-async def share_type(session: AsyncSession, recording: Recording) -> Literal["video", "audio", "meeting"]:
-    """What a share of this recording shows (D20): the meeting's minutes and transcript when it has a live meeting;
-    else its audio or video. Derived here, never sent by the app."""
+async def share_type(session: AsyncSession, recording: Recording) -> Literal["video", "audio", "meeting", "gif"]:
+    """What a share of this recording shows (D20, GIFS-AND-REPLAY-60 G7): the meeting's minutes and transcript when
+    it has a live meeting; else its audio, video, or the GIF itself. Derived here, never sent by the app."""
     meeting = await session.scalar(
         select(Meeting.id).where(Meeting.recording_id == recording.id, Meeting.deleted_at.is_(None))
     )
     if meeting is not None:
         return "meeting"
+    if recording.recording_type == "gif":
+        return "gif"
     if recording.recording_type == "audio":
         return "audio"
     return "video"
@@ -175,7 +177,7 @@ async def abort_open_uploads(session: AsyncSession, storage: Storage, share: Sha
     still_open = await session.scalars(
         select(Upload).where(
             Upload.recording_id == share.recording_id,
-            Upload.kind == "share",
+            Upload.kind.in_(("share", "gif")),
             Upload.state == "uploading",
             Upload.share_id == share.id,
         )

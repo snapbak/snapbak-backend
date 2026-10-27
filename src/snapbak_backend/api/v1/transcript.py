@@ -24,7 +24,7 @@ from snapbak_backend.schemas.cloud import (
     TransliterateResponse,
     WordOut,
 )
-from snapbak_backend.services import meetings, recordings, transliteration
+from snapbak_backend.services import meetings, recordings, speaker_loop, transliteration
 from snapbak_backend.services.events import publish
 from snapbak_backend.services.failures import CloudFailure
 
@@ -70,7 +70,7 @@ async def ready_job(db: Session, recording_id: UUID) -> TranscriptionJob:
 
 @router.get("/v1/recordings/{recording_id}/transcript")
 async def transcript(recording_id: UUID, device: Caller, db: Session) -> TranscriptResponse:
-    await recordings.owned(db, device.id, recording_id)
+    recording = await recordings.owned(db, device.id, recording_id)
     job = await ready_job(db, recording_id)
     speakers = (await recordings.speakers_of(db, recording_id)).values()
     lines = await recordings.live_lines(db, recording_id)
@@ -96,6 +96,7 @@ async def transcript(recording_id: UUID, device: Caller, db: Session) -> Transcr
         script=job.script,
         speakers=speakers_out,
         lines=lines_out,
+        speakerPass=speaker_loop.pass_or_none(recording),
     )
     return answer
 
@@ -142,6 +143,17 @@ async def publish_bumped(request: Request, bumped: tuple[UUID, int] | None) -> N
     await publish(cloud.redis, meeting_id, version)
 
 
+async def publish_renamed(request: Request, bumped: tuple[UUID, int] | None) -> None:
+    """A rename's new version, and the minutes embedded again, so search shows each person by the name they have
+    now (D41: the sections are embedded as words)."""
+    await publish_bumped(request, bumped)
+    if bumped is None:
+        return
+    meeting_id, version = bumped
+    redis = request.app.state.cloud.redis
+    await redis.enqueue_job("embed_minutes_task", meeting_id, _job_id=f"embed:{meeting_id}:{version}")
+
+
 @router.patch("/v1/speakers/{speaker_id}")
 async def rename_speaker(
     speaker_id: UUID, body: SpeakerNameRequest, device: Caller, db: Session, request: Request
@@ -153,7 +165,7 @@ async def rename_speaker(
     speaker.name_source = "user"
     bumped = await meetings.bump(db, speaker.recording_id)
     await db.commit()
-    await publish_bumped(request, bumped)
+    await publish_renamed(request, bumped)
     return speaker_out(speaker)
 
 
@@ -167,7 +179,8 @@ async def put_speaker(
     request: Request,
     response: Response,
 ) -> SpeakerOut:
-    """A speaker made on the Mac, idempotent by its ID. A label another speaker of the recording has is invalid."""
+    """A speaker made or renamed on the Mac, idempotent by its ID: its name the user's, unless an Undo puts back the
+    source it had (`nameSource`). A label another speaker of the recording has is invalid."""
     await recordings.locked(db, device.id, recording_id)
     await ready_job(db, recording_id)
     taken = await db.scalar(
@@ -184,15 +197,18 @@ async def put_speaker(
     if speaker is None:
         speaker = Speaker(id=speaker_id, recording_id=recording_id, vendor_label="user")
         db.add(speaker)
-    # A resent PUT that changes nothing (the outbox's retries) is no transcript edit: no stale mark (D29).
-    changed = (speaker.label, speaker.name, speaker.color_idx) != (body.label, body.name, body.colorIdx)
+    source = (body.nameSource or "user") if body.name else None
+    # A resent PUT that changes nothing (the outbox's retries) is no transcript edit: no stale mark (D29). A name's
+    # source counts only when one is sent (an Undo restoring Snapbak's guess), so a plain resend stays no edit.
+    words = (speaker.label, speaker.name, speaker.color_idx) != (body.label, body.name, body.colorIdx)
+    changed = words or (body.nameSource is not None and speaker.name_source != source)
     speaker.label = body.label
     speaker.name = body.name
-    speaker.name_source = "user" if body.name else None
+    speaker.name_source = source
     speaker.color_idx = body.colorIdx
     bumped = await meetings.bump(db, recording_id) if changed else None
     await db.commit()
-    await publish_bumped(request, bumped)
+    await publish_renamed(request, bumped)
     return speaker_out(speaker)
 
 

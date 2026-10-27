@@ -242,3 +242,54 @@ async def test_trx01_a_garbled_vendor_answer_is_an_outage_that_keeps_the_other_v
             await strategy().submit(JOB, {})
     assert failed.value.refs["assemblyai"] == {"id": "t-1", "status": "running"}
     assert "pyannote" not in failed.value.refs
+
+
+@pytest.mark.anyio
+async def test_mom08_a_rerun_asks_pyannote_for_the_voices_counted_and_reads_its_turns_when_done() -> None:
+    with respx.mock() as mock:
+        asked = mock.post("https://api.pyannote.ai/v1/diarize").respond(200, json={"jobId": "p-2", "status": "created"})
+        job = await strategy().rediarize(JOB.audio_url, 4)
+    assert job == "p-2"
+    assert json.loads(asked.calls[0].request.content) == {
+        "url": JOB.audio_url,
+        "model": "precision-2",
+        "exclusive": True,
+        "numSpeakers": 4,
+    }
+    turns = [{"speaker": "SPEAKER_01", "start": 0.5, "end": 1.0}]
+    with respx.mock() as mock:
+        polled = mock.get("https://api.pyannote.ai/v1/jobs/p-2")
+        polled.respond(200, json={"status": "running"})
+        assert await strategy().rediarization("p-2") is None
+        polled.respond(200, json={"status": "succeeded", "output": {"exclusiveDiarization": turns}})
+        assert await strategy().rediarization("p-2") == turns
+        polled.respond(200, json={"status": "failed"})
+        with pytest.raises(VendorRefused):
+            await strategy().rediarization("p-2")
+
+
+@pytest.mark.anyio
+async def test_mom08_identify_sends_every_speaker_s_voiceprint_and_reads_turns_and_confidences() -> None:
+    with respx.mock() as mock:
+        asked = mock.post("https://api.pyannote.ai/v1/identify").respond(
+            200, json={"jobId": "p-3", "status": "created"}
+        )
+        job = await strategy().identify(JOB.audio_url, {"p1": "vp-one", "p4": "vp-four"})
+    assert job == "p-3"
+    assert json.loads(asked.calls[0].request.content) == {
+        "url": JOB.audio_url,
+        "model": "precision-2",
+        "exclusive": True,
+        "voiceprints": [{"label": "p1", "voiceprint": "vp-one"}, {"label": "p4", "voiceprint": "vp-four"}],
+        "matching": {"exclusive": False, "threshold": 0},
+    }
+    output = {
+        "exclusiveDiarization": [{"speaker": "SPEAKER_00", "start": 0.5, "end": 1.0}],
+        "voiceprints": [{"speaker": "SPEAKER_00", "match": "p1", "confidence": {"p1": 86, "p4": 81}}],
+    }
+    with respx.mock() as mock:
+        polled = mock.get("https://api.pyannote.ai/v1/jobs/p-3")
+        polled.respond(200, json={"status": "running"})
+        assert await strategy().identification("p-3") is None
+        polled.respond(200, json={"status": "succeeded", "output": output})
+        assert await strategy().identification("p-3") == output

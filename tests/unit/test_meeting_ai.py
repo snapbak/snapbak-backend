@@ -489,9 +489,10 @@ def test_mom06_ask_s_own_ranking_of_a_2_hour_transcript_stays_inside_its_share_o
         )
         for n in range(2_500)
     ]
+    # This process's CPU time, not the wall clock: other suites running beside it (hooks, CI) only slow the clock.
     times = []
     for _ in range(5):
-        started = time.perf_counter()
+        started = time.process_time()
         qa.by_words(lines, "when does the pricing page ship and who owns billing")
-        times.append(time.perf_counter() - started)
+        times.append(time.process_time() - started)
     assert statistics.median(times) < 0.25

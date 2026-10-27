@@ -27,7 +27,7 @@ def entry(path: Path) -> dict[str, str]:
 
 def answer(derivation: dict[str, object]) -> str:
     made = {
-        "summary": "The Project Manager presented the agenda.",
+        "summary": "{{p:1}} presented the agenda.",
         "mom": "Minutes.",
         "actionItems": [{"id": "act_1", "text": "Do some stuff", "derivedFrom": [derivation]}],
         "openQuestions": [],

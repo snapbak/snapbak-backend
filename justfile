@@ -72,6 +72,14 @@ eval-minutes *args:
 eval-minutes-live *args:
     uv run scripts/eval_minutes.py --live {{ args }}
 
+# The speaker loop (MOM-08) on AMI with a broken diarization and on hand-made named meetings, recorded answers (free)
+eval-speakers *args:
+    uv run scripts/eval_speakers.py {{ args }}
+
+# The same on the polish model (`--budget-usd`; about $0.11 a run)
+eval-speakers-live *args:
+    uv run scripts/eval_speakers.py --live {{ args }}
+
 # MOM-04 end to end on real vendors and the real model: P95 stop to minutes for a 30 min meeting (costs money).
 stop-to-minutes *args:
     uv run scripts/stop_to_minutes.py {{ args }}

@@ -31,14 +31,14 @@ the report prints that share as "timed out" next to p50 and p95.
 Each knob sets what the server's environment sets (`providers.md`), so a run
 measures one server setup. The run prints its knobs before the results.
 
-| Flag                               | Server setting                | Default      | Does                                                                                                                       |
-| ---------------------------------- | ----------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| SPEC                               | `SNAPBAK_POLISH`              |              | the polish model                                                                                                           |
-| `+correction` in the SPEC          | `SNAPBAK_CORRECTION`          | the polish model | the model that corrects a refused answer once, at medium effort; `none` turns the retry off                                |
-| `--temperature T`                  | `SNAPBAK_POLISH_TEMPERATURE`  | 0            | the polish model's temperature, with seed 7, on models that take one (`providers.md`); others ignore it                    |
-| `--effort E`                       | `SNAPBAK_POLISH_EFFORT`       | `none`       | the polish model's `reasoning_effort` on models that reason; others ignore it                                              |
-| `--examples all\|per_module\|none` | `SNAPBAK_EXAMPLES_POLICY`     | `all`        | the worked examples before the request (`api.md`)                                                                          |
-| `--features PATH`                  | the request's `features`      | every module | a JSONL file of `{"id": ..., "features": [...]}` lines; each row gets its id's features, a row not in the file gets them all |
+| Flag                               | Server setting               | Default          | Does                                                                                                                         |
+| ---------------------------------- | ---------------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| SPEC                               | `SNAPBAK_POLISH`             |                  | the polish model                                                                                                             |
+| `+correction` in the SPEC          | `SNAPBAK_CORRECTION`         | the polish model | the model that corrects a refused answer once, at medium effort; `none` turns the retry off                                  |
+| `--temperature T`                  | `SNAPBAK_POLISH_TEMPERATURE` | 0                | the polish model's temperature, with seed 7, on models that take one (`providers.md`); others ignore it                      |
+| `--effort E`                       | `SNAPBAK_POLISH_EFFORT`      | `none`           | the polish model's `reasoning_effort` on models that reason; others ignore it                                                |
+| `--examples all\|per_module\|none` | `SNAPBAK_EXAMPLES_POLICY`    | `all`            | the worked examples before the request (`api.md`)                                                                            |
+| `--features PATH`                  | the request's `features`     | every module     | a JSONL file of `{"id": ..., "features": [...]}` lines; each row gets its id's features, a row not in the file gets them all |
 
 The polish model is also the fallback that joins a slow answer or correction, as
 the server's `SNAPBAK_FALLBACK` is set in `.env.example`. A chunked twin keeps
@@ -92,6 +92,127 @@ calibration smoke (`--per-slice 2`, both lunas, 11 Oct) sent 78 items for
 $0.0256, about $0.00033 an item, so $40 buys roughly 120,000 items and the
 in-flight overshoot (16 items) is about half a cent on average.
 
+## Speaker loop eval, 27 Oct 2026
+
+`just eval-speakers` (`scripts/eval_speakers.py`) scores the speaker loop
+(MEETINGS.md D42, PRD MOM-08) through the real rules (`speakers.proposal_of`,
+`speakers.decide`) on the answers recorded live in
+`bench/speakers/recorded.json`; it is free. `just eval-speakers-live
+--budget-usd USD` asks the polish model (about $0.11 a run) and records again.
+
+**Data.** Every speaker is anonymised to "Speaker N".
+
+- `ami`: the minutes eval's 20 AMI test meetings with the diarization broken as
+  it breaks: the speaker who talks most split in two at their middle line, and
+  5% of the lines given to another speaker (seed 7). The pyannote rerun is
+  simulated from the truth (3% of lines heard wrong): this scores the rules end
+  to end, not pyannote's voices. Gold names come from the participants' own
+  introductions ("I'm Sarah, the Project Manager"), by series and role
+  (`bench/speakers/ami-names.json`); a name on a speaker who never says theirs
+  is unverifiable, not wrong.
+- `ami voiceprints`: the same, with simulated voiceprints through the real merge
+  rule (`speakers.voice_groups`): pyannote identify's confidence for each true
+  voice against each speaker's print, around 86 for that voice's own speakers
+  and 16 for another's (pyannote's documented example) with a spread of 12, so a
+  split can be missed and two people joined wrongly.
+- `names`: eight hand-made meetings (`bench/speakers/names.json`) with gold
+  names and traps: a name said once, someone mentioned who never speaks, a host
+  handing over, a caller not in the room, a third-person mention, no names.
+- `earnings`: 33 Earnings-21 calls (Rev, CC BY-SA 4.0,
+  `bench/speakers/earnings21.json`; fetched once into
+  `~/.snapbak-bench/earnings21/`, never copied here), one line a turn. Gold: the
+  analyst the operator names as asking next ("Our next question comes from the
+  line of Jane Doe") is the next turn's speaker, when that is their first turn
+  (129 names); an executive's name is unverifiable.
+
+**Gates.** Name precision ≥ 0.98 and no false name on every slice (after the
+DiarizationLM and REPERE findings: a wrong name is worse than none, and a right
+name on the wrong speaker is the common error); move precision ≥ 0.9, measured,
+on `ami`; merge precision ≥ 0.95 and split recall ≥ 0.8 on `ami voiceprints`;
+cue validity ≥ 0.95 before the rules on `ami` and `names`; a recall floor on the
+names said on two lines or more, 0.5 on `names` and 0.12 on `earnings`, and
+cue validity ≥ 0.7 on `earnings`. The `earnings` floors sit below the lowest of
+their live runs (recall 0.230, 0.150 and 0.170 in three runs; cues 0.769 and
+0.815 in the two that reported them), for the model's spread. The `names` recall
+floor has no margin: it was set on the first 8 meetings, and the 16 now measure
+exactly 0.500 (n 14). A rate with nothing to count is n/a, never 1.0, and each
+rate prints its n. The model mis-quotes more on long calls; an invalid cue is
+dropped before any rule, costing recall, never precision.
+
+**Results** (gpt-6-luna, the last of four live runs on 27 Oct, after the
+`names` slice grew from 8 to 16 hand-made meetings with more traps: a name said
+on someone's behalf, a corrected spelling, two similar names, a sign-off, a
+pet's name; $0.78 for the eval in all). The speakers call's p95 was 11.4 s
+(gate 40 s: what MOM-04's 3 minutes leave after the minutes' own 140 s).
+
+| Metric                          | ami          | ami voiceprints | names        | earnings      |
+| ------------------------------- | ------------ | --------------- | ------------ | ------------- |
+| name precision                  | 1.000 (n 2)  | 1.000 (n 2)     | 1.000 (n 7)  | 1.000 (n 17)  |
+| false names                     | 0            | 0               | 0            | 0             |
+| recall, names said on two lines | n/a          | n/a             | 0.500 (n 14) | 0.170 (n 100) |
+| suggestion precision            | 0.941 (n 17) | 0.941 (n 17)    | 1.000 (n 3)  | 0.969 (n 64)  |
+| merge precision                 | 1.000 (n 1)  | 1.000 (n 17)    | n/a          | n/a           |
+| split recall                    | 0.050 (n 20) | 0.850 (n 20)    | n/a          | n/a           |
+| move precision                  | 0.982 (n 56) | 0.983 (n 58)    | n/a          | n/a           |
+| flip recall                     | 0.051        | 0.054           | n/a          | n/a           |
+| cue validity (before the rules) | 0.977        | 0.977           | 0.969 (n 32) | 0.815 (n 593) |
+
+The names slice's recall sits on its 0.5 floor: the two-cue rule leaves a name
+said once, or only in a greeting to two people, as a suggestion. It is reported,
+not lowered.
+
+The run before it (same rules) applied 23 earnings names at precision 1.000 with
+recall 0.230: the spread between runs is the model's.
+
+The first rules took any two verbatim cues: three of ten AMI names were wrong,
+each a name the speaker said about or to someone else. A cue now names a speaker
+only as their own introduction; as a handover or a call on them ("over to our
+CFO, Brian", "Arjun, you're up") on the line just before theirs; as thanks
+opening the line just after theirs ("Thank you, Brett, and"); or as an address
+with them the one other voice around it. A cue may hold just the first name, and
+one the model numbered by the line beside the one it quotes is kept at its own
+line: without these the earnings calls applied no name at all (cue validity
+0.653). Text alone never finds the split voice (split recall 0 without
+voiceprints, as DiarizationLM reports), so merges rest on voiceprints. Moves:
+asked for the signs that show a line went to the wrong speaker, the model puts
+back about 4% of the flipped lines with the rerun agreeing; every wrong move
+before the three-word floor was a misheard fragment ("yeah.", "Nice.").
+
+## Minutes with people tokens, 27 Oct 2026
+
+The minutes now write each speaker as `{{p:N}}` (MEETINGS.md D41), so
+`just eval-minutes` labels the AMI and hand-made speakers "Speaker N" as
+diarization does (their role or name stays their name) and scores the minutes as
+the app shows them, each token rendered as a name. Two metrics and two gates are
+new: **token validity %**, the model's first answers' tokens that name a speaker
+of the meeting or are well formed (gate ≥ 95), and **served bad tokens**, any
+that reaches the served minutes (gate 0).
+
+Two live runs ($3.00 and $2.93). The first labelled the hand-made speakers by
+name, so every `{{p:N}}` there was invalid (token validity 66.67% and 25.71%),
+and the correction turn emptied the contradictions (recall 33.33%). With the
+labels as in production, token validity was 100% in every slice and no bad token
+was served; a speaker with no number now writes as `{{n:Name}}` (the prompt
+says so). Replaying the second run also found the agenda's status answered with
+the prompt's own gloss "settled": parsed as `covered`, the slices' repairs fell
+to 20% (probes), 0% (contradictions) and 0% (Hinglish), from 60%, 25% and 0%.
+
+| Gate (minutes)       | run 2   |
+| -------------------- | ------- |
+| served fabricated    | 0       |
+| served bad tokens    | 0       |
+| token validity %     | 100     |
+| citation precision % | 95.65   |
+| action coverage %    | 73.33   |
+| minutes p95 ms       | 132,752 |
+| first section p95 ms | 8,277   |
+
+Action coverage missed its gate (75) by one gold action of fifteen: the misses
+are wording (our "Marketing will complete the meeting survey and questionnaire"
+against "All members will fill out a final evaluation questionnaire") within the
+26 Oct runs' spread (73.33 to 86.67), not tokens (the score is on rendered
+names). The gate stands; the baseline was not moved.
+
 ## Minutes v2 evals, 26 Oct 2026
 
 Minutes v2 writes one call per section and runs the detail guard (cloud.md,
@@ -138,19 +259,19 @@ report, which quotes the meeting, goes only to the owner.
 by the same code; "run 3" and "run 4" two v2 live runs; run 4, the recorded
 one, counts one commitment per line and makes the second completion pass).
 
-| Metric (AMI, 20 meetings) | v1 | run 3 | run 4 | Gate |
-| ------------------------- | ---: | ---: | ---: | ----- |
-| served fabricated | 0 | 0 | 0 | = 0 |
-| citation precision % | 95.73 | 94.64 | - | >= 90 |
-| gold items cited % | 50.00 | 95.57 | 91.77 | >= 85 |
-| action coverage % | 63.33 | 86.67 | 73.33 | >= 70 |
-| decision coverage % | 24.47 | 31.91 | 20.21 | >= 15 |
-| problem coverage % | 8.70 | 17.39 | 19.57 | >= 12 |
-| detail recall % | 21.94 | 59.39 | 73.69 | >= 65 |
-| commitments covered % | - | 78.85 | 98.08 | >= 95 |
-| topics covered % | - | 75.57 | 86.39 | >= 70 |
-| sections incomplete % | - | 0.00 | 0.00 | <= 2 |
-| failed % | 0 | 0 | 0 | <= 1 |
+| Metric (AMI, 20 meetings) |    v1 | run 3 | run 4 | Gate  |
+| ------------------------- | ----: | ----: | ----: | ----- |
+| served fabricated         |     0 |     0 |     0 | = 0   |
+| citation precision %      | 95.73 | 94.64 |     - | >= 90 |
+| gold items cited %        | 50.00 | 95.57 | 91.77 | >= 85 |
+| action coverage %         | 63.33 | 86.67 | 73.33 | >= 70 |
+| decision coverage %       | 24.47 | 31.91 | 20.21 | >= 15 |
+| problem coverage %        |  8.70 | 17.39 | 19.57 | >= 12 |
+| detail recall %           | 21.94 | 59.39 | 73.69 | >= 65 |
+| commitments covered %     |     - | 78.85 | 98.08 | >= 95 |
+| topics covered %          |     - | 75.57 | 86.39 | >= 70 |
+| sections incomplete %     |     - |  0.00 |  0.00 | <= 2  |
+| failed %                  |     0 |     0 |     0 | <= 1  |
 
 **Round 3, 26 Oct 2026.** The model bundled several decisions into one long
 item, so a short gold decision matched none, and left out the roles'
@@ -162,15 +283,15 @@ names its topics by them (topics covered had been 58 to 86 %). Two hybrid runs
 (the changed sections live, the rest replayed; $0.76 and $0.42) and one full
 live run ($2.30, the recorded one):
 
-| Metric (AMI) | run 4 | hybrid 1 | hybrid 2 | run 5 | Gate |
-| ------------ | ---: | ---: | ---: | ---: | ----- |
-| action coverage % | 73.33 | 83.33 | 86.67 | 83.33 | >= 75 |
-| decision coverage % | 20.21 | 40.43 | 48.94 | 44.68 | >= 35 |
-| action precision % | 17.61 | 24.05 | 24.21 | 17.54 | |
-| decision precision % | 10.56 | 20.35 | 22.71 | 22.08 | |
-| commitments covered % | 98.08 | 98.08 | 100.00 | 98.66 | >= 95 |
-| topics covered % | 86.39 | 57.82 | 70.75 | 100.00 | >= 70 |
-| detail recall % | 73.69 | 73.05 | 74.18 | 73.53 | >= 65 |
+| Metric (AMI)          | run 4 | hybrid 1 | hybrid 2 |  run 5 | Gate  |
+| --------------------- | ----: | -------: | -------: | -----: | ----- |
+| action coverage %     | 73.33 |    83.33 |    86.67 |  83.33 | >= 75 |
+| decision coverage %   | 20.21 |    40.43 |    48.94 |  44.68 | >= 35 |
+| action precision %    | 17.61 |    24.05 |    24.21 |  17.54 |       |
+| decision precision %  | 10.56 |    20.35 |    22.71 |  22.08 |       |
+| commitments covered % | 98.08 |    98.08 |   100.00 |  98.66 | >= 95 |
+| topics covered %      | 86.39 |    57.82 |    70.75 | 100.00 | >= 70 |
+| detail recall %       | 73.69 |    73.05 |    74.18 |  73.53 | >= 65 |
 
 Hybrid 1 found the guard taking answers that kept more details but lost
 headings; it now takes one only when neither measure gets worse. The founder's
@@ -245,12 +366,12 @@ and the times are made up, since Ask checks only a quote.
 
 **Free tier rows.**
 
-| Row            | What runs                                                                                                                                                                                                                                       |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Row            | What runs                                                                                                                                                                                                                                                                                                              |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `validator`    | up to 15 gold evidence lines per meeting (2,700 cases): good citations (the line's start, end and middle, and the quote recased without sentence marks) and one fabrication of each kind (wrong line, altered quote, wrong speaker, a time 1 ms outside the line, an unknown line) through the real `keep_derivations` |
-| `fake minutes` | the fake provider's `meetings` mode through the real `minutes.run`: its first action-items answer fabricates, that section's one repair is clean                                                                                                 |
-| `minutes`      | the recorded live answers (`bench/minutes/recorded/minutes.json`, each with its section) replayed through the real `minutes.run`                                                                                                                 |
-| `qa`           | the recorded answers (`recorded/qa.json`) replayed through the real `qa.answer`, Ask's one call                                                                                                                                                 |
+| `fake minutes` | the fake provider's `meetings` mode through the real `minutes.run`: its first action-items answer fabricates, that section's one repair is clean                                                                                                                                                                       |
+| `minutes`      | the recorded live answers (`bench/minutes/recorded/minutes.json`, each with its section) replayed through the real `minutes.run`                                                                                                                                                                                       |
+| `qa`           | the recorded answers (`recorded/qa.json`) replayed through the real `qa.answer`, Ask's one call                                                                                                                                                                                                                        |
 
 Replaying the recorded answers measures a change to the validator, the prompts'
 parsing or the scorers without a model call. A run worse than
@@ -266,8 +387,7 @@ aggregates. It prints metrics and meeting IDs, never a quote or a line.
   validator.
 - `served fabricated`: served derivations (Ask: citations) that fail the eval's
   own check (a real line, its speaker, a time inside it, its words whole and in
-  order). That check is separate from the validator's normalization. It must be
-  0.
+  order). That check is separate from the validator's normalization. It must be 0.
 - `gold items cited %`: gold action and decision sentences with evidence whose
   evidence lines one of our derivations cites.
 - `action coverage %`, `decision coverage %`: gold sentences matched by one of
@@ -443,15 +563,15 @@ server writes lists for that style (`in_style` in `ai/guardrail/shape.py`).
 `platform.jsonl.gz` gives every style a list, two counted and two announced (12
 Oct 2026: every row exact over two live runs).
 
-| File                    | Slice                                                |
-| ----------------------- | ---------------------------------------------------- |
-| `backtracking.jsonl.gz` | corrections and trap cases, 504 items                |
-| `dictionary.jsonl.gz`   | protected terms, 500 items                           |
-| `formatting.jsonl.gz`   | punctuation, lists, numbers, addresses, 553          |
-| `grammar.jsonl.gz`      | grammar slips and correct sentences, 466             |
-| `platform.jsonl.gz`     | lists per app style, 4                               |
-| `founder.jsonl.gz`      | the founder's reported dictations, 18                |
-| `v2-*.jsonl.gz`         | the v2 corpus (below)                                |
+| File                    | Slice                                       |
+| ----------------------- | ------------------------------------------- |
+| `backtracking.jsonl.gz` | corrections and trap cases, 504 items       |
+| `dictionary.jsonl.gz`   | protected terms, 500 items                  |
+| `formatting.jsonl.gz`   | punctuation, lists, numbers, addresses, 553 |
+| `grammar.jsonl.gz`      | grammar slips and correct sentences, 466    |
+| `platform.jsonl.gz`     | lists per app style, 4                      |
+| `founder.jsonl.gz`      | the founder's reported dictations, 18       |
+| `v2-*.jsonl.gz`         | the v2 corpus (below)                       |
 
 `formatting.jsonl.gz` ends with hand-written list traps (kind "trap list
 words"): prose that sounds like a list, such as ordinals ("first in line and
@@ -806,11 +926,11 @@ back on the same 150 R7 rows (seed 15), both on priority. "Old" is
 `gpt-5.6-luna` at medium reasoning with every module and example, the old small
 tier that answered most chunks.
 
-| Setup                                | p50 ms | p90 ms | p95 ms | Exact rows | $ / 1,000 |
-| ------------------------------------ | ------ | ------ | ------ | ---------- | --------- |
-| old: `gpt-5.6-luna`, medium          | 1920   | 2935   | 3464   | 136 / 150  | 2.65      |
-| new: `gpt-6-luna`, none              | 1550   | 2107   | 2292   | 130 / 150  | 0.28      |
-| new, every call sent twice at once   | 1467   | 1890   | 2160   | -          | 0.56      |
+| Setup                              | p50 ms | p90 ms | p95 ms | Exact rows | $ / 1,000 |
+| ---------------------------------- | ------ | ------ | ------ | ---------- | --------- |
+| old: `gpt-5.6-luna`, medium        | 1920   | 2935   | 3464   | 136 / 150  | 2.65      |
+| new: `gpt-6-luna`, none            | 1550   | 2107   | 2292   | 130 / 150  | 0.28      |
+| new, every call sent twice at once | 1467   | 1890   | 2160   | -          | 0.56      |
 
 The new setup is 19 % faster at p50 and 34 % at p95 at the same moment. Sending
 every call twice was not kept: 5 to 6 % for twice the price, where the app's
@@ -826,19 +946,19 @@ rows before and after). Before: three runs on the 14 Oct work-in-progress tree;
 after: two runs on the final tree, their outputs re-scored offline with
 `digits_as_said`. One value per run, or the range of the runs:
 
-| Gate                  | Before       | After       |
-| --------------------- | ------------ | ----------- |
-| sentence correctness  | 93.9 to 94.5 | 94.7 / 93.9 |
-| backtracking          | 98.3 to 98.9 | 99.4 / 98.3 |
-| grammar               | 88.9 to 92.6 | 92.6 / 94.4 |
-| punctuation           | 96.8 to 97.7 | 97.3 / 97.6 |
-| capitalization        | 99.8 to 100  | 99.8 / 99.7 |
-| list shape            | 100          | 100 / 100   |
-| clean text unchanged  | 97.4 to 98.2 | 97.4 / 98.2 |
-| words not over-fixed  | 99.1         | 98.3 / 99.1 |
-| no unheard content    | 1.3 to 1.5   | 0.9 / 1.5   |
-| dictionary terms kept | 100          | 100 / 100   |
-| false rejects         | 0            | 0 / 0       |
+| Gate                  | Before       | After        |
+| --------------------- | ------------ | ------------ |
+| sentence correctness  | 93.9 to 94.5 | 94.7 / 93.9  |
+| backtracking          | 98.3 to 98.9 | 99.4 / 98.3  |
+| grammar               | 88.9 to 92.6 | 92.6 / 94.4  |
+| punctuation           | 96.8 to 97.7 | 97.3 / 97.6  |
+| capitalization        | 99.8 to 100  | 99.8 / 99.7  |
+| list shape            | 100          | 100 / 100    |
+| clean text unchanged  | 97.4 to 98.2 | 97.4 / 98.2  |
+| words not over-fixed  | 99.1         | 98.3 / 99.1  |
+| no unheard content    | 1.3 to 1.5   | 0.9 / 1.5    |
+| dictionary terms kept | 100          | 100 / 100    |
+| false rejects         | 0            | 0 / 0        |
 | p50 ms                | 1561 to 1705 | 1499 to 1602 |
 | p95 ms                | 2573 to 2964 | 2447 to 2656 |
 
@@ -860,12 +980,12 @@ their outputs replayed through the new shaping rules (`api.md`, English bench,
 14 Oct), with no model call. Rows exactly right per feature, the final runs
 before → after the rules:
 
-| Feature                               | Rows | Final run 1 | Final run 2 |
-| ------------------------------------- | ---- | ----------- | ----------- |
-| Corrections (backtracking, chunked)   | 200  | 192 → 192   | 190 → 190   |
-| Formatting                            | 100  | 88 → 93     | 89 → 91     |
-| Grammar                               | 99   | 95 → 95     | 96 → 96     |
-| Dictionary                            | 100  | 97 → 97     | 96 → 96     |
+| Feature                             | Rows | Final run 1 | Final run 2 |
+| ----------------------------------- | ---- | ----------- | ----------- |
+| Corrections (backtracking, chunked) | 200  | 192 → 192   | 190 → 190   |
+| Formatting                          | 100  | 88 → 93     | 89 → 91     |
+| Grammar                             | 99   | 95 → 95     | 96 → 96     |
+| Dictionary                          | 100  | 97 → 97     | 96 → 96     |
 
 Over all 11 runs, 20 rows became exact and none got worse. The cue set grew by
 "delete that" and "no, don't do this" (or "that"); no corpus row says either,

@@ -748,3 +748,55 @@ def test_mom05_a_user_s_item_kept_beside_a_new_one_with_its_id_takes_the_positio
     merged = minutes.merged(done, {"actionItems": [done.actionItems[0]]})
     merged = minutes.merged(merged.model_copy(update={"actionItems": [mine]}), {"actionItems": [done.actionItems[0]]})
     assert [item.id for item in merged.actionItems] == [mine.id, f"{mine.id}_1"]
+
+
+def test_mom06_each_line_carries_its_speaker_s_p_the_number_of_their_label() -> None:
+    who = speaker("Priya")
+    who.label = "Speaker 3"
+    body = minutes.body_of([line("We ship it.", who=who)], {who.id: who})
+    assert body[0]["p"] == 3 and body[0]["sname"] == "Priya"
+
+
+def test_mom06_the_words_name_people_as_tokens_and_a_token_for_no_speaker_is_repaired() -> None:
+    """The summary, the minutes and every item's words and owner write a speaker as {{p:N}}; a token no speaker has
+    goes back in the section's one correction turn, and a speaker named by name is stored as their token."""
+    made_up = json.dumps({"title": "Shipping", "summary": "{{p:9}} ships it."})
+    fixed = json.dumps({"title": "Shipping", "summary": "{{p:1}} ships it with {{n:Speaker 1}} and {{n:Rabbi Ian}}."})
+    owned = json.dumps(
+        {
+            "items": [
+                {"id": "act_1", "text": "{{p:1}} will do it", "owner": "{{p:1}}", "due": None, "derivedFrom": [cite()]}
+            ]
+        }
+    )
+    provider = Sections({"summary": [made_up, fixed], "actionItems": [owned]})
+    doc, _ = run_with(provider)
+    repair = provider.turns[provider.asked.index("summary") + 1]
+    assert "{{p:9}}, who is no speaker" in repair[-1][1]
+    assert doc.summary == "{{p:1}} ships it with {{p:1}} and {{n:Rabbi Ian}}."
+    assert (doc.actionItems[0].text, doc.actionItems[0].owner) == ("{{p:1}} will do it", "{{p:1}}")
+
+
+def test_mom06_the_rules_tell_the_model_to_write_people_as_tokens() -> None:
+    system = minutes.prompt.system_of("summary")
+    assert "{{p:N}}" in system and "{{n:" in system and '"p"' in system
+
+
+def test_mom06_the_detail_guard_reads_a_speaker_s_token_as_their_name() -> None:
+    """A speaker's name the minutes give as a token is kept, so the guard asks for no completion over it."""
+    who = speaker("Priya")
+    provider = Sections()
+    tiers = Tiers(polish=provider, command=provider, fallback=None)  # type: ignore[arg-type]
+    lines = [line("We ship it.", who=who)]
+    doc = minutes.empty([]).model_copy(update={"summary": "{{p:1}} ships it.", "mom": "### Shipping\n\nYes."})
+    kept = asyncio.run(minutes.complete(tiers, doc, lines, {who.id: who}, []))
+    assert provider.asked == [] and kept is doc
+
+
+def test_mom05_an_agenda_topic_settled_is_covered_not_refused() -> None:
+    lines, who = lines_and_who()
+    cite = {"i": 0, "speaker": "Speaker 1", "atMs": 1_000, "quote": "We ship it."}
+    answer = json.dumps({"items": [{"id": "ag_1", "topic": "Shipping", "status": "settled", "derivedFrom": [cite]}]})
+    value, problems = minutes.parse_section("agenda", answer, {each.idx: each for each in lines}, {who.id: who})
+    assert problems == [] and value is not None
+    assert [item.status for item in value["agenda"]] == ["covered"]

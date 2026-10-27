@@ -39,14 +39,17 @@ type ExamplesPolicy = Literal["all", "per_module", "none"]
 POLISH = "openai:gpt-6-luna"
 EFFORT = "none"
 POLICIES: tuple[ExamplesPolicy, ...] = get_args(ExamplesPolicy.__value__)
-# The cloud transcript's limits (CLD-03, Q98): 2 h of audio a job, 120 minutes a device a UTC day.
+# The cloud transcript's limits (CLD-03, Q98): 2 h of audio a job, 4 h a device a UTC day (raised 27 Oct 2026: the
+# speaker loop's pyannote rerun counts too, MOM-08).
 MAX_JOB_SECONDS = 7200
-DAILY_SECONDS = 7200
+DAILY_SECONDS = 14400
 # An install ID alone mints a device token, so each address may register this many devices an hour (HLD risk table).
 REGISTRATIONS_PER_HOUR = 10
 VOICEPRINT_KEY_BYTES = 32
 # The share caps (Q98, HLD open question 1): a video's bytes, and the shares a device may have that are not deleted.
 SHARE_MAX_BYTES = 1_073_741_824
+# A GIF shares as it was exported (GIFS-AND-REPLAY-60, G7); past this the app asks for a narrower export.
+GIF_MAX_BYTES = 50_000_000
 SHARES_PER_DEVICE = 100
 # Caption lines a device may translate a UTC day (CLD-03, 16-caption-translation LLD): about 130 ten-minute talks.
 DAILY_TRANSLATED_LINES = 20_000

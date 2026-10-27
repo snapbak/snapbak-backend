@@ -32,7 +32,7 @@ from snapbak_backend.schemas.cloud import (
     SearchRequest,
     SearchResponse,
 )
-from snapbak_backend.services import jobs, meeting_index, meetings, minutes, qa, recordings, usage
+from snapbak_backend.services import jobs, meeting_index, meetings, minutes, people, qa, recordings, speaker_loop, usage
 from snapbak_backend.services.cloud import Cloud
 from snapbak_backend.services.embeddings import EmbedError
 from snapbak_backend.services.events import publish
@@ -46,9 +46,10 @@ def pin_out(pin: MeetingPin) -> PinOut:
     return made
 
 
-def response_of(meeting: Meeting, pins: list[MeetingPin]) -> MeetingResponse:
+async def response_of(db: Session, meeting: Meeting) -> MeetingResponse:
     # Served whenever stored: while a run writes them, the sections still to come are in `pending`.
     minutes = meetings.minutes_of(meeting)
+    pins = await meetings.pins(db, meeting.id)
     stale = (
         meeting.minutes_transcript_version is not None
         and meeting.minutes_transcript_version != meeting.transcript_version
@@ -65,6 +66,7 @@ def response_of(meeting: Meeting, pins: list[MeetingPin]) -> MeetingResponse:
         pins=[pin_out(pin) for pin in pins],
         startedAt=meeting.started_at,
         endedAt=meeting.ended_at,
+        speakerPass=speaker_loop.pass_or_none(await db.get_one(Recording, meeting.recording_id)),
     )
     return made
 
@@ -109,8 +111,7 @@ async def read(cloud: Cloud, device_id: UUID, recording_id: UUID) -> MeetingResp
     """The meeting as the app sees it, in a session of its own, so a long-poll holds no connection while it waits."""
     async with cloud.sessions() as db:
         meeting = await meetings.owned(db, device_id, Meeting.recording_id == recording_id)
-        pins = await meetings.pins(db, meeting.id)
-        made = response_of(meeting, pins)
+        made = await response_of(db, meeting)
     return made
 
 
@@ -154,8 +155,7 @@ async def patch_meeting(
     await db.commit()
     await publish(cloud_deps.cloud(request).redis, meeting.id, version)
     fresh = await meetings.owned(db, device.id, Meeting.id == meeting_id)
-    pins = await meetings.pins(db, fresh.id)
-    made = response_of(fresh, pins)
+    made = await response_of(db, fresh)
     return made
 
 
@@ -223,7 +223,7 @@ async def edit_minutes(
     await publish(cloud.redis, meeting.id, version)
     await cloud.redis.enqueue_job("embed_minutes_task", meeting.id, _job_id=f"embed:{meeting.id}:{version}")
     fresh = await meetings.owned(db, device.id, Meeting.id == meeting_id)
-    made = response_of(fresh, await meetings.pins(db, fresh.id))
+    made = await response_of(db, fresh)
     return made
 
 
@@ -290,7 +290,11 @@ async def search(body: SearchRequest, device: Caller, db: Session, request: Requ
     day = await reserve(db, device, "search_queries")
     try:
         vector = (await cloud.embeddings.embed([body.query]))[0]
-        rows = await meeting_index.candidates(db, device.id, vector, body.limit)
+        found = await meeting_index.candidates(db, device.id, vector, body.limit)
+        # An action's owner names its people by the name they have now (D41).
+        recordings_of = {row["recording_id"] for row in found if row["owner"]}
+        speakers = {rid: await recordings.speakers_of(db, rid) for rid in recordings_of}
+        rows = people.named_owners(found, speakers)
         await db.commit()
         hits = await meeting_index.reranked(deps.tiers(request), body.query, body.limit, rows)
     except Exception as error:

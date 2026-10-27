@@ -91,6 +91,9 @@ def answer_meetings(request: dict[str, Any], corrected: bool) -> dict[str, Any]:
             "answer": f"[{first['sname']}] {first['text']}",
             "citations": [{"i": first["i"], "quote": first["text"]}],
         }
+    if request.get("section") == "speakers":
+        # The speaker loop's call (MOM-08): nobody named, nothing merged or moved, so the transcript stays as it came.
+        return {"count": 0, "people": [], "moves": []}
     if request.get("section") == "details":
         # The detail guard's call: every missing detail worked into the minutes, as said.
         said = " ".join(item["text"] for item in request["missing"] if item["kind"] != "commitment")

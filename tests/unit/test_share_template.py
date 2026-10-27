@@ -632,3 +632,47 @@ def test_mom06_on_a_phone_the_waveform_draws_every_other_bar() -> None:
     """At 390 px 96 bars blurred into one smear (grading 4): under 480 px every other bar is left out."""
     page = share_page.SHARE.template
     assert "@media (max-width: 480px)" in page and ".wave rect:nth-child(2n)" in page
+
+
+# A GIF share's page (GIFS-AND-REPLAY-60, G7): the loop is the player and the unfurl at once.
+
+
+def render_gif(title: str = "Recording 2026-10-17 at 10.02.11") -> str:
+    gif = share(title)
+    gif.duration_ms = None
+    gif.width, gif.height = 600, 386
+    return share_page.render_page(gif, BASE, ANIMATION, None, "https://snapbak.app", "gif")
+
+
+ANIMATION = "https://s3.example/shares/v1/animation.gif?X-Amz-Signature=c&X-Amz-Expires=3600"
+
+
+def test_g7_the_gif_page_unfurls_the_animation_itself_and_plays_it_in_an_img() -> None:
+    tags = metas(render_gif())
+    assert tags["og:type"] == "website"
+    assert tags["og:image"] == f"{PAGE}/animation.gif"
+    assert tags["og:image:type"] == "image/gif"
+    assert tags["og:image:width"] == "600"
+    assert tags["og:image:height"] == "386"
+    assert tags["og:image:alt"] == "Recording 2026-10-17 at 10.02.11"
+    assert tags["twitter:image"] == f"{PAGE}/animation.gif"
+    assert "og:video" not in tags
+    img = [attrs for tag, attrs in parsed(render_gif()).tags if tag == "img"]
+    assert img == [
+        {
+            "src": ANIMATION,
+            "width": "600",
+            "height": "386",
+            "alt": "Recording 2026-10-17 at 10.02.11",
+        }
+    ]
+    assert ">Download GIF<" in render_gif()
+    assert "· GIF · Shared with Snapbak" in render_gif(), "no 0:00 in a GIF's summary"
+    assert "0:00" not in render_gif()
+
+
+def test_g7_the_gif_page_escapes_its_title_everywhere() -> None:
+    page = render_gif('Loop <script> & "quotes"')
+    assert 'alt="Loop &lt;script&gt; &amp; &quot;quotes&quot;"' in page
+    assert "&lt;script&gt;" in page
+    assert "Loop <script>" not in page

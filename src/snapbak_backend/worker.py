@@ -4,6 +4,7 @@ no-op. A vendor's 5xx or a dropped network retries the task; a vendor's 4xx fail
 
 import asyncio
 import contextlib
+import json
 import logging
 import os
 import tempfile
@@ -40,12 +41,16 @@ from snapbak_backend.services import (
     meeting_index,
     meetings,
     minutes,
+    people,
     purge,
     qa,
     recordings,
     sealing,
+    speaker_loop,
     transliteration,
+    usage,
 )
+from snapbak_backend.services import speakers as speaker_rules
 from snapbak_backend.services.cloud import Cloud, open_cloud
 from snapbak_backend.services.events import publish
 from snapbak_backend.services.metrics import task_log
@@ -53,7 +58,7 @@ from snapbak_backend.services.signatures import assemblyai_header
 from snapbak_backend.transcription import voiceprints
 from snapbak_backend.transcription.factory import make_strategy
 from snapbak_backend.transcription.languages import U35_PRO, base
-from snapbak_backend.transcription.merge import Merged, text
+from snapbak_backend.transcription.merge import Merged, text, turns_of
 from snapbak_backend.transcription.strategy import (
     VENDORS,
     JobInput,
@@ -83,6 +88,8 @@ RETRY_FAILED = timedelta(minutes=15)
 # A minutes run's whole time: ten sections, each normally under a minute. Past it arq cancels the task; the sweep
 # then hands the meeting a new run, which resumes at the first section still pending.
 MINUTES_TIMEOUT_S = 1800
+# A task that runs the speaker loop: up to two model rounds and a rerun polled for RERUN_DEADLINE_S.
+SPEAKER_LOOP_TIMEOUT_S = 900
 AUDIO_URL_S = 7200
 CLIP_URL_S = 3600
 # AssemblyAI's own duration may pass 2 h by this much before the job fails `too_long`.
@@ -92,6 +99,10 @@ UPLOAD_EXPIRES = timedelta(hours=24)
 STALLED_START = timedelta(minutes=5)
 # The sweep fails a processing job this long after the timeout check would have.
 SWEEP_MARGIN = timedelta(minutes=5)
+# Stages past the vendors: the transcript is merging or stored, so no timeout check asks them again.
+HELD = ("merging", "identifying")
+# A job held for its speaker loop this long is past the loop task's timeout: that loop is over.
+HELD_LOOP_OVER = timedelta(seconds=SPEAKER_LOOP_TIMEOUT_S) + SWEEP_MARGIN
 
 
 def cloud_of(ctx: Ctx) -> Cloud:
@@ -261,7 +272,7 @@ async def check_vendor_timeout(ctx: Ctx, job_id: UUID, n: int) -> None:
     cloud = cloud_of(ctx)
     async with cloud.sessions() as db:
         job = await load_job(db, job_id)
-        if job is None or job.state != "processing" or job.stage == "merging":
+        if job is None or job.state != "processing" or job.stage in HELD:
             return
         recording = await db.get_one(Recording, job.recording_id)
         if datetime.now(UTC) > deadline(job, recording.duration_ms):
@@ -271,7 +282,7 @@ async def check_vendor_timeout(ctx: Ctx, job_id: UUID, n: int) -> None:
             for vendor in VENDORS:
                 if job.state == "processing":
                     await settle(ctx, db, job, vendor)
-        if job.state == "processing" and job.stage != "merging":
+        if job.state == "processing" and job.stage not in HELD:
             await cloud.redis.enqueue_job(
                 "check_vendor_timeout", job_id, n + 1, _job_id=f"timeout:{job_id}:{n + 1}", _defer_by=CHECK_EVERY_S
             )
@@ -323,10 +334,34 @@ async def store(db: AsyncSession, job: TranscriptionJob, merged: Merged) -> None
         )
 
 
+async def resume_held(db: AsyncSession, job: TranscriptionJob) -> Device | None:
+    """A job held for its speaker loop resuming it: its clock starts again (the caller commits), so the sweep times
+    the loop that resumes now, not the first; the recording's device, or None when the job is not held."""
+    if job.stage != "identifying":
+        return None
+    await db.execute(
+        update(TranscriptionJob).where(TranscriptionJob.id == job.id).values(updated_at=sqlalchemy.func.now())
+    )
+    recording = await db.get_one(Recording, job.recording_id)
+    device = await db.get_one(Device, recording.device_id)
+    return device
+
+
 async def merge_and_store(ctx: Ctx, job_id: UUID) -> None:
     started = time.monotonic()
     cloud = cloud_of(ctx)
     strategy = strategy_of(ctx)
+    async with cloud.sessions() as db:
+        job = await load_job(db, job_id)
+        if job is None or job.state != "processing":
+            return
+        held = await resume_held(db, job)
+        await db.commit()
+    if held is not None:
+        # A run again (a restart, the sweep) of a merge already stored: storing again would give every line a new id
+        # under the loop's changes, so it only finishes the loop, outside any session (the loop runs for minutes).
+        await finished(ctx, job, held, studio=True, started=started)
+        return
     async with cloud.sessions() as db:
         job = await load_job(db, job_id)
         if job is None or job.state != "processing":
@@ -351,19 +386,50 @@ async def merge_and_store(ctx: Ctx, job_id: UUID) -> None:
             await fail_and_publish(ctx, db, job, "internal", "merge_and_store")
             return
         await store(db, job, merged)
-        if not await jobs.advance(db, job, state="ready", stage=None, language_detected=merged.language):
+        # A meeting's speaker loop runs after its draft; any other recording's runs now, before it is ready (MOM-08).
+        studio = await meetings.live_meeting(db, job.recording_id) is None
+        values: dict[str, Any] = {"stage": "identifying"} if studio else {"state": "ready", "stage": None}
+        if not await jobs.advance(db, job, language_detected=merged.language, **values):
             await db.rollback()
             raise Retry(defer=0.1)
         await db.commit()
         device = await db.get_one(Device, recording.device_id)
     await publish(cloud.redis, job_id, job.version)
-    await strategy.cleanup(job.vendor_refs)
+    await finished(ctx, job, device, studio=studio, started=started)
+
+
+async def finished(ctx: Ctx, job: TranscriptionJob, device: Device, studio: bool, started: float) -> None:
+    """After the store: a Studio transcript's loop and then ready, the vendors' copies deleted and the follow-on tasks
+    queued."""
+    cloud = cloud_of(ctx)
+    if studio and not await identified_then_ready(ctx, job.id, job.recording_id):
+        return
+    await strategy_of(ctx).cleanup(job.vendor_refs)
     if device.voiceprint_consent:
-        await cloud.redis.enqueue_job("create_voiceprints", job_id, _job_id=f"voiceprints:{job_id}")
+        await cloud.redis.enqueue_job("create_voiceprints", job.id, _job_id=f"voiceprints:{job.id}")
     if job.script == "roman":
         await cloud.redis.enqueue_job("transliterate", job.recording_id, _job_id=f"translit:{job.recording_id}")
     await start_minutes(cloud, job.recording_id)
-    task_log("merge_and_store", str(job_id), "-", elapsed(started), "ready")
+    task_log("merge_and_store", str(job.id), "-", elapsed(started), "ready")
+
+
+async def identified_then_ready(ctx: Ctx, job_id: UUID, recording_id: UUID) -> bool:
+    """A recording's speaker loop, then its transcript ready: the user chose to hold it until the loop is done
+    (MOM-08). A loop that fails leaves the transcript as it came; False when the job moved on meanwhile (trashed)."""
+    cloud = cloud_of(ctx)
+    # The transcript is never held by a loop that breaks: it goes ready as the vendors gave it.
+    await loop_or_none(ctx, recording_id, None, job_id, None)
+    with contextlib.suppress(Exception):
+        await speaker_progress(cloud, recording_id, None, "done")
+    async with cloud.sessions() as db:
+        job = await load_job(db, job_id)
+        if job is None or job.state != "processing":
+            return False
+        won = await jobs.advance(db, job, state="ready", stage=None)
+        await db.commit()
+    if won:
+        await publish(cloud.redis, job_id, job.version)
+    return won
 
 
 async def start_minutes(cloud: Cloud, recording_id: UUID) -> None:
@@ -423,6 +489,157 @@ def stored(doc: MinutesOut, pinned: list[PinnedOut]) -> dict[str, Any]:
     return doc.model_copy(update={"pinned": pinned}).model_dump(mode="json")
 
 
+# How often a rerun is polled, and how long it may take before the loop goes on without it (names only).
+RERUN_POLL_S = 3
+RERUN_DEADLINE_S = 150
+# The speaker loop's rerun kept on the transcription job, in one statement beside any voiceprint job written meanwhile.
+REMEMBER_RERUN = sqlalchemy.text(
+    "UPDATE transcription_jobs SET vendor_refs = vendor_refs || jsonb_build_object('rediarize', CAST(:rerun AS jsonb))"
+    " WHERE id = :job"
+)
+
+
+async def speaker_progress(
+    cloud: Cloud, recording_id: UUID, meeting_id: UUID | None, stage: str, failed: bool = False
+) -> None:
+    """The loop's stage stored on the recording (the rest as it is: a user's answer meanwhile stays), `failed` when
+    it broke; a meeting's version moves too, so the app's long-poll wakes and shows the stage (MOM-08's live
+    story)."""
+    async with cloud.sessions() as db:
+        await speaker_loop.restaged(db, recording_id, stage=stage, **({"failed": True} if failed else {}))
+        row = None if meeting_id is None else await meetings.changed(db, Meeting.id == meeting_id)
+        await db.commit()
+    if row is not None:
+        await publish(cloud.redis, row.id, row.version)
+
+
+async def voiceprints_of(cloud: Cloud, recording_id: UUID) -> dict[str, tuple[UUID, str]]:
+    """Each live speaker's ID and voiceprint, unsealed, by its identify label `p<N>` (only with the device's consent
+    are there any)."""
+    async with cloud.sessions() as db:
+        known = await recordings.speakers_of(db, recording_id)
+    prints = {}
+    for speaker in known.values():
+        n = people.number_of(speaker)
+        if speaker.voiceprint is not None and n is not None:
+            unsealed = sealing.unseal(cloud.config.voiceprint_keys, speaker.id, speaker.voiceprint)
+            prints[f"p{n}"] = (speaker.id, unsealed.decode())
+    return prints
+
+
+async def heard_again(
+    ctx: Ctx, recording_id: UUID, run: UUID, prints: dict[str, tuple[UUID, str]], count: int
+) -> speaker_loop.Heard | None:
+    """pyannote again for the speaker loop (MOM-08): identify against the speakers' voiceprints when two or more have
+    one, else a diarization at `count` voices. The day's audio is reserved first and the vendor's job kept on the
+    transcription job before it is awaited, so a resumed run (`run`) never pays twice. None when there is no quota
+    left, the vendor fails, or it takes past RERUN_DEADLINE_S: the loop then changes names only."""
+    cloud, strategy = cloud_of(ctx), strategy_of(ctx)
+    kind = "identify" if len(prints) >= 2 else "diarize"
+    async with cloud.sessions() as db:
+        job = await jobs.live(db, recording_id)
+        recording = await db.get_one(Recording, recording_id)
+        if job is None or job.upload_id is None:
+            return None
+        kept = job.vendor_refs.get("rediarize") or {}
+        same_run = kept.get("run") == str(run) and kept.get("kind") == kind
+        vendor_job = kept.get("jobId") if same_run else None
+        if vendor_job is None:
+            # The day's audio is reserved first and committed (the day's row is not held during the vendor's call);
+            # a vendor that fails gives it back, so nothing is charged for a rerun that never ran.
+            seconds, device = -(-recording.duration_ms // 1000), recording.device_id
+            if not await usage.reserve(db, device, seconds):
+                return None
+            await db.commit()
+            upload = await db.get_one(Upload, job.upload_id)
+            audio = cloud.storage.presign_get(upload.s3_key, AUDIO_URL_S)
+            try:
+                voiceprints = {label: print_ for label, (_, print_) in prints.items()}
+                identify = kind == "identify"
+                started = strategy.identify(audio, voiceprints) if identify else strategy.rediarize(audio, count)
+                vendor_job = await started
+                remembered = {"run": str(run), "kind": kind, "count": count, "jobId": vendor_job}
+                await db.execute(REMEMBER_RERUN, {"rerun": json.dumps(remembered), "job": job.id})
+                await db.commit()
+            except BaseException as error:
+                # Nothing kept, nothing charged: a vendor that fails, or a task cancelled mid-way, gives the day back.
+                # A rerun the vendor started but we never kept needs no cleanup: pyannoteAI deletes its output itself.
+                await db.rollback()
+                await usage.release(db, device, seconds)
+                await db.commit()
+                if isinstance(error, VendorError):
+                    return None
+                raise
+    labels = {label: speaker for label, (speaker, _) in prints.items()}
+    deadline = time.monotonic() + RERUN_DEADLINE_S
+    while time.monotonic() < deadline:
+        try:
+            found = await (
+                strategy.identification(vendor_job) if kind == "identify" else rediarization(strategy, vendor_job)
+            )
+        except VendorError:
+            return None
+        if found is not None:
+            same = speaker_rules.voice_groups(found.get("voiceprints"), labels)
+            return speaker_loop.Heard(turns_of(found.get("exclusiveDiarization") or []), same)
+        await asyncio.sleep(RERUN_POLL_S)
+    return None
+
+
+async def rediarization(strategy: TranscriptionStrategy, vendor_job: str) -> dict[str, Any] | None:
+    """A diarization rerun's turns in identify's shape, so both reruns read alike."""
+    turns = await strategy.rediarization(vendor_job)
+    return None if turns is None else {"exclusiveDiarization": turns}
+
+
+async def identified(
+    ctx: Ctx, recording_id: UUID, meeting_id: UUID | None, run: UUID, draft: MinutesOut | None
+) -> speaker_loop.Outcome | None:
+    """The speaker loop for the recording (MOM-08), `run` its token: the same token again carries on (services/
+    speaker_loop.py). None, asking nothing, when the loop is done and no whole run asked for it again (a whole run
+    and Identify speakers set its stage back to `reading`): a sections-only rewrite after an undo never runs it."""
+    cloud = cloud_of(ctx)
+    async with cloud.sessions() as db:
+        recording = await db.get_one(Recording, recording_id)
+    stored = None if recording.speaker_pass is None else speaker_loop.pass_of(recording)
+    if stored is not None and stored.stage == "done" and stored.run != str(run):
+        return None
+    # A loop found mid-way (the run died; the sweep handed it a new token) goes on as the same run: it asks nothing
+    # it already asked and reuses the rerun it already paid for.
+    if stored is not None and stored.stage not in ("reading", "done") and stored.run is not None:
+        run = UUID(stored.run)
+    prints = await voiceprints_of(cloud, recording_id)
+    progress = partial(speaker_progress, cloud, recording_id, meeting_id)
+    rerun = speaker_loop.Rerun(voiceprints=len(prints) >= 2, run=partial(heard_again, ctx, recording_id, run, prints))
+    outcome = await speaker_loop.run(ctx["tiers"], cloud.sessions, recording_id, run, draft, rerun, progress)
+    return outcome
+
+
+async def loop_or_none(
+    ctx: Ctx, recording_id: UUID, meeting_id: UUID | None, run: UUID, draft: MinutesOut | None
+) -> speaker_loop.Outcome | None:
+    """The speaker loop (after a meeting's draft, or on a transcript alone); a loop that breaks never holds anything
+    back: its stage goes done, marked failed, and what it applied before the break still counts (its merges are
+    retold). The log names the error's type only, never its message (no words in logs)."""
+    started = time.monotonic()
+    try:
+        outcome = await identified(ctx, recording_id, meeting_id, run, draft)
+    except Lost:
+        raise
+    except Exception as error:
+        task_log(
+            "speaker_loop", str(meeting_id or recording_id), "-", elapsed(started), f"failed:{type(error).__name__}"
+        )
+        with contextlib.suppress(Exception):
+            await speaker_progress(cloud_of(ctx), recording_id, meeting_id, "done", failed=True)
+        # A round may have merged before the break: its tokens are still retold, so no one reads "someone". No section
+        # is written again for its moves.
+        async with cloud_of(ctx).sessions() as db:
+            outcome = await speaker_loop.outcome_of(db, recording_id)
+        outcome.moved = set()
+    return outcome
+
+
 async def generate_minutes(ctx: Ctx, meeting_id: UUID, run: UUID) -> None:
     """Minutes one section call at a time, each stored and published as it lands, then the embedding task
     (MEETINGS.md 5.1, minutes v2), for the run holding `run`. The run claims the meeting before the model runs (a
@@ -436,12 +653,19 @@ async def generate_minutes(ctx: Ctx, meeting_id: UUID, run: UUID) -> None:
     async with cloud.sessions() as db:
         meeting = await db.get_one(Meeting, meeting_id)
         recording_id, title = meeting.recording_id, meeting.title
+        # The model that wrote the stored minutes, for a run that writes no section (Identify speakers' run).
+        written_by = meeting.minutes_model or ctx["tiers"].polish.engine
         # The version the minutes are built from, read before the model runs, so an edit landing mid-call leaves
         # the minutes stale rather than silently current (D29).
         snapshot = meeting.transcript_version
         # The day the meeting was held, so "Friday" resolves to a real date (UTC: the recording's own clock).
         day = meeting.started_at.date().isoformat() if meeting.started_at else None
         doc = meetings.minutes_of(meeting) or minutes.empty(list(minutes.CALLS))
+        # A run of some sections (a retry, Identify speakers, an undo's rewrite) leaves the minutes as stale as they
+        # were: what made them stale is still not in them. A whole run's start cleared the version (meetings.begin),
+        # so it is current as of its snapshot, however much of it was left when it was picked up.
+        if meeting.minutes_transcript_version is not None:
+            snapshot = meeting.minutes_transcript_version
         job = await jobs.live(db, recording_id)
         ready = job is not None and job.state == "ready"
         lines = await recordings.live_lines(db, recording_id) if ready else []
@@ -456,7 +680,26 @@ async def generate_minutes(ctx: Ctx, meeting_id: UUID, run: UUID) -> None:
     alive = asyncio.create_task(heartbeat(cloud, meeting_id, run))
     try:
         saved = partial(saving, cloud, meeting_id, run, pinned)
-        doc, engine = await minutes.run(ctx["tiers"], title, marked, lines, speakers, doc, saved, day)
+        engine = written_by
+        if doc.pending:
+            doc, engine = await minutes.run(ctx["tiers"], title, marked, lines, speakers, doc, saved, day)
+        # The draft, then who the speakers are (MOM-08): a merge retells its people tokens, and only the sections that
+        # cite a moved line are written again. Names need nothing: tokens show each speaker as they are now.
+        outcome = None if minutes.failure(doc) else await loop_or_none(ctx, recording_id, meeting_id, run, doc)
+        if outcome is not None:
+            doc = people.retold(doc, outcome.merges)
+            again = speaker_rules.touched(doc, outcome.moved)
+            if again:
+                # Stored pending before the stage says so: a run that dies mid-rewrite writes these sections when it
+                # picks up (a resumed run past `rewriting` writes nothing again itself).
+                doc = doc.model_copy(update={"pending": again})
+                await saved(doc)
+                await speaker_progress(cloud, recording_id, meeting_id, "rewriting")
+                async with cloud.sessions() as db:
+                    lines = await recordings.live_lines(db, recording_id)
+                    speakers = await recordings.speakers_of(db, recording_id)
+                doc, engine = await minutes.run(ctx["tiers"], title, marked, lines, speakers, doc, saved, day)
+            await speaker_progress(cloud, recording_id, meeting_id, "done")
     except Lost:
         task_log("generate_minutes", str(meeting_id), "-", elapsed(started), "lost")
         return
@@ -497,7 +740,9 @@ async def embed_minutes_task(ctx: Ctx, meeting_id: UUID) -> None:
             meeting = await db.get(Meeting, meeting_id)
             if meeting is None or meeting.state != "ready" or meeting.minutes is None:
                 return
-            doc = MinutesOut.model_validate(meeting.minutes)
+            speakers = await recordings.speakers_of(db, meeting.recording_id)
+            # Embedded as words: each person by the name they have now (D41).
+            doc = people.rendered_doc(MinutesOut.model_validate(meeting.minutes), speakers)
             # The search's sections, and Ask's (kind `ask`, never a search hit), embedded once here.
             made_at, sections = meeting.minutes_generated_at, [*minutes.chunks_of(doc), *qa.ask_chunks(doc)]
         vectors = await cloud.embeddings.embed([body for _, _, body in sections])
@@ -663,13 +908,24 @@ def deadline(job: TranscriptionJob, duration_ms: int) -> datetime:
     return submitted + allowed
 
 
+async def finish_held(ctx: Ctx, job: TranscriptionJob) -> None:
+    """A Studio job whose speaker loop stopped (its task timed out or died): the loop ends failed, so the merge, run
+    once more under one arq ID per job, asks nothing and makes the stored transcript ready."""
+    with contextlib.suppress(Exception):
+        await speaker_progress(cloud_of(ctx), job.recording_id, None, "done", failed=True)
+    # One arq ID per stall (a resumed loop restarts the clock), so a merge that failed never blocks the next one.
+    held = f"merge:{job.id}:held:{int(job.updated_at.timestamp())}"
+    await cloud_of(ctx).redis.enqueue_job("merge_and_store", job.id, _job_id=held)
+
+
 async def sweep_waiting_jobs(ctx: Ctx) -> None:
     """The backstop for every way a task can end without moving its job (arq drops a task on any error but Retry):
     - queued for 24 h with no audio: failed `upload_expired`;
     - queued with its audio for 5 min (start crashed, or its enqueue was lost): started again, and failed
       `internal` once that has gone on for 24 h;
-    - processing past its deadline plus a margin, in any stage (a timeout chain or a merge that ended): failed
-      `vendor_timeout`.
+    - processing past its deadline plus a margin (a timeout chain or a merge that ended): failed `vendor_timeout`;
+    - held for its speaker loop past the loop's own timeout (that loop is over): made ready, never failed, since its
+      transcript is stored;
     Failures refund the minutes and delete the vendors' copies."""
     now = datetime.now(UTC)
     async with cloud_of(ctx).sessions() as db:
@@ -708,6 +964,10 @@ async def sweep_waiting_jobs(ctx: Ctx) -> None:
             .where(TranscriptionJob.state == "processing")
         )
         for job, duration_ms in late.all():
+            if job.stage == "identifying":
+                if job.updated_at < now - HELD_LOOP_OVER:
+                    await finish_held(ctx, job)
+                continue
             if now > deadline(job, duration_ms) + SWEEP_MARGIN:
                 await fail_and_publish(ctx, db, job, "vendor_timeout", "sweep_waiting_jobs")
         # A minutes run that stopped moving gets a new token and its task again; the old token can't write.
@@ -762,11 +1022,33 @@ async def shutdown(ctx: Ctx) -> None:
     await cloud_of(ctx).close()
 
 
+async def identify_speakers(ctx: Ctx, recording_id: UUID, run: UUID) -> None:
+    """The speaker loop asked for again on a recording that is no meeting (the app's Identify speakers, MOM-08),
+    under the route's run token, so a retried job carries on: the app reads the transcript again when its stage is
+    done."""
+    started = time.monotonic()
+    outcome = None
+    try:
+        async with cloud_of(ctx).sessions() as db:
+            job = await jobs.live(db, recording_id)
+        if job is not None and job.state == "ready":
+            outcome = await loop_or_none(ctx, recording_id, None, run, None)
+    finally:
+        # Done whatever happened (no transcript any more, a timeout): the route set `reading`, and a stage left there
+        # would refuse every later Identify.
+        with contextlib.suppress(Exception):
+            await speaker_progress(cloud_of(ctx), recording_id, None, "done")
+    changed = 0 if outcome is None else len(outcome.changes)
+    task_log("identify_speakers", str(recording_id), "-", elapsed(started), f"changes:{changed}")
+
+
 FUNCTIONS = (
     start_transcription,
     on_vendor_webhook,
     check_vendor_timeout,
-    merge_and_store,
+    # The speaker loop runs inside it for a recording that is no meeting: two model calls and a rerun (MOM-08).
+    func(merge_and_store, name="merge_and_store", timeout=SPEAKER_LOOP_TIMEOUT_S),
+    func(identify_speakers, name="identify_speakers", timeout=SPEAKER_LOOP_TIMEOUT_S),
     create_voiceprints,
     on_voiceprint,
     transliterate,

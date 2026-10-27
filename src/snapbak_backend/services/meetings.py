@@ -12,7 +12,8 @@ from typing import Any
 from uuid import UUID
 
 from arq import ArqRedis
-from sqlalchemy import ColumnElement, Row, case, func, select, update
+from sqlalchemy import ARRAY, ColumnElement, Row, Text, case, cast, func, select, update
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -144,9 +145,10 @@ async def launch(session: AsyncSession, redis: ArqRedis, meeting_id: UUID, versi
 
 def started(stored: dict[str, Any] | None, sections: Sequence[str] | None) -> dict[str, Any]:
     """The document a run starts from: what is stored (the user's work and the sections not asked for stay), with
-    `sections` pending in CALLS order (all of them when None) and their old failures cleared."""
+    `sections` pending in CALLS order (all of them when None, none when empty) and their old failures cleared."""
     doc = written.empty([]) if stored is None else MinutesOut.model_validate(stored)
-    asked = set(sections or written.CALLS)
+    # An empty list asks for no section: Identify speakers runs the loop alone, writing only what it changes.
+    asked = set(written.CALLS if sections is None else sections)
     pending = [name for name in written.CALLS if name in asked]
     left = [item for item in doc.incomplete if item.section not in asked]
     # New action items are judged again: an old "no commitment" would hide a line the guard should ask about.
@@ -164,6 +166,9 @@ async def begin(
     run = uuid.uuid4()
     stored = await session.scalar(select(Meeting.minutes).where(Meeting.id == meeting_id))
     startable = Meeting.state.in_(STARTERS) | stalled(CLICK_TAKES_OVER) if clicked else Meeting.state.in_(STARTERS)
+    # A whole run is current as of its own start (its snapshot, set when it finishes); a run of some sections keeps
+    # the version the minutes were written at, so what made them stale still shows.
+    whole = {"minutes_transcript_version": None} if sections is None else {}
     row = await changed(
         session,
         (Meeting.id == meeting_id) & startable,
@@ -173,9 +178,15 @@ async def begin(
         minutes_run=run,
         minutes_clicked=clicked,
         minutes_attempts=1 if clicked else Meeting.minutes_attempts + 1,
+        **whole,
     )
     if row is None:
         return None
+    if sections is None:
+        # A whole run (the first, or a regenerate) works out the speakers again (MOM-08); one section's retry doesn't.
+        restarted = func.jsonb_set(Recording.speaker_pass, cast("{stage}", ARRAY(Text)), cast('"reading"', JSONB))
+        recording = select(Meeting.recording_id).where(Meeting.id == meeting_id).scalar_subquery()
+        await session.execute(update(Recording).where(Recording.id == recording).values(speaker_pass=restarted))
     await launch(session, redis, meeting_id, row.version, run)
     return row.version
 

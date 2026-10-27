@@ -68,7 +68,7 @@ from snapbak_backend.config.pricing import PRICES
 from snapbak_backend.config.settings import EMBED, load
 from snapbak_backend.db.models import Speaker, TranscriptLine
 from snapbak_backend.schemas.cloud import AskResponse, DerivationOut, MinutesOut
-from snapbak_backend.services import details, meeting_index, minutes, qa, recordings
+from snapbak_backend.services import details, meeting_index, minutes, people, qa, recordings
 from snapbak_backend.services.embeddings import Embeddings, make_embeddings
 from snapbak_backend.services.minutes import RawDerivation
 from snapbak_backend.transcription.merge import Word, lines
@@ -116,6 +116,8 @@ HIGHER = {
     **{f"{kind} refused %": True for kind in FABRICATIONS},
     "citation precision %": True,
     "served fabricated": False,
+    "token validity %": True,
+    "served bad tokens": False,
     "claims kept %": True,
     "gold items cited %": True,
     "action coverage %": True,
@@ -154,6 +156,9 @@ GATES: dict[str, dict[str, Gate]] = {
     # 31.91). The detail and commitment gates are run 4's, the first with one commitment per line (73.69, 98.08).
     "minutes": {
         "served fabricated": ("<=", 0.0),
+        # Every people token served names a speaker (D41); the model's own tokens, before the correction turn.
+        "served bad tokens": ("<=", 0.0),
+        "token validity %": (">=", 95.0),
         "citation precision %": (">=", 90.0),
         "gold items cited %": (">=", 85.0),
         "action coverage %": (">=", 75.0),
@@ -251,10 +256,13 @@ class QMeeting:
 
 
 def made_speaker(meeting: str, label: str, name: str) -> Speaker:
+    """A speaker as the backend stores one: labelled "Speaker N" as diarization numbers them (so the minutes can write
+    their `{{p:N}}`), the corpus's own letter kept as the vendor's label, named `name`."""
+    numbered = f"Speaker {ord(label) - ord('A') + 1}" if len(label) == 1 and label.isupper() else label
     made = Speaker(
         id=uuid5(NAMESPACE_URL, f"{meeting}/speaker/{label}"),
         recording_id=uuid5(NAMESPACE_URL, meeting),
-        label=label,
+        label=numbered,
         vendor_label=label,
         name=name,
     )
@@ -544,8 +552,22 @@ def minutes_counts(meeting: Meeting, answers: list[Answer], doc: MinutesOut | No
             for entry in raw_entries(item):
                 add(counts, "raw citations", 1)
                 add(counts, "raw grounded", bool(minutes.keep_derivations([entry], by_index, meeting.speakers)))
+    # People tokens (MEETINGS.md D41): those the model wrote that name a speaker of the meeting, and any that reach the
+    # served minutes naming no one or written wrong ("{{p:3}", "{{ p:3 }}").
+    numbers = {n for speaker in meeting.speakers.values() if (n := people.number_of(speaker)) is not None}
+    for answer in firsts.values():
+        for found in people.WRITTEN.finditer(answer):
+            label, name = found.groups()
+            add(counts, "tokens written", 1)
+            add(counts, "tokens valid", name is not None or (label is not None and int(label) in numbers))
+    if doc:
+        for found in people.WRITTEN.finditer(doc.model_dump_json()):
+            label, name = found.groups()
+            add(counts, "served bad tokens", name is None and (label is None or int(label) not in numbers))
     add(counts, "sections", len(minutes.CALLS))
     add(counts, "sections incomplete", len(doc.incomplete) if doc else len(minutes.CALLS))
+    # Scored as the app shows them: each person by their name (D41), so a token never counts against the gold.
+    doc = people.rendered_doc(doc, meeting.speakers) if doc else None
     claims = items_of(doc) if doc else []
     served = [entry for claim in claims for entry in claim.derivedFrom]
     add(counts, "served claims", len(claims))
@@ -601,6 +623,9 @@ def minutes_rates(counts: Counts) -> dict[str, float]:
     rates = {
         "citation precision %": share(get("raw grounded", 0), get("raw citations", 0)),
         "served fabricated": get("served fabricated", 0),
+        # Nothing written is not 100%: it misses the gate as nan, as eval_speakers' n/a does.
+        "token validity %": share(get("tokens valid", 0), get("tokens written", 0), math.nan),
+        "served bad tokens": get("served bad tokens", 0),
         "claims kept %": share(get("served claims", 0), get("raw claims", 0)),
         "gold items cited %": share(get("gold cited", 0), get("gold items", 0), 100.0),
         "action coverage %": share(get("actions covered", 0), get("gold actions", 0), 100.0),
@@ -983,13 +1008,14 @@ def fixture_meetings(path: Path) -> list[Meeting]:
     for file in files:
         for made in json.loads(file.read_text(encoding="utf-8")):
             name = made["name"]
-            people = {who: made_speaker(name, who, who) for who in made["speakers"]}
+            # Numbered as diarization numbers them (the corpus letter A, B…), named as the fixture names them.
+            cast = {who: made_speaker(name, chr(ord("A") + n), who) for n, who in enumerate(made["speakers"])}
             said = [
-                made_line(name, n, people[who], start, end, text)
+                made_line(name, n, cast[who], start, end, text)
                 for n, (who, start, end, text) in enumerate(made["lines"])
             ]
             gold = [Gold(item["kind"], item["text"], frozenset(item["lines"])) for item in made.get("gold", [])]
-            speakers = {person.id: person for person in people.values()}
+            speakers = {person.id: person for person in cast.values()}
             found.append(Meeting(name=name, lines=said, speakers=speakers, gold=gold, slice=made["slice"]))
     return found
 

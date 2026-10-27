@@ -1,0 +1,525 @@
+{
+  "about": "Hand-made meetings for the speaker loop's names (MEETINGS.md D42, MOM-08), written by Claude on 27 Oct 2026. Each line is [speaker, words]; `gold` is each speaker's real name, null when the meeting never says it; `sure` the speakers named on two or more lines, so the loop may apply their name (fewer is a suggestion at most).",
+  "meetings": [
+    {
+      "name": "intro-both",
+      "lines": [
+        [
+          0,
+          "Hi everyone, I'm Joanne, thanks for coming over."
+        ],
+        [
+          1,
+          "Thanks Joanne, the place looks great."
+        ],
+        [
+          0,
+          "Noah, can you grab the mezuzah from the car?"
+        ],
+        [
+          1,
+          "Sure, I'll get it now."
+        ],
+        [
+          0,
+          "Great, thank you Noah."
+        ],
+        [
+          1,
+          "Joanne, where do you want it hung?"
+        ]
+      ],
+      "gold": [
+        "Joanne",
+        "Noah"
+      ],
+      "sure": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "once-only",
+      "lines": [
+        [
+          0,
+          "Okay, let's start with the budget."
+        ],
+        [
+          1,
+          "Thanks, Priya. I have the numbers here."
+        ],
+        [
+          0,
+          "Go ahead."
+        ],
+        [
+          1,
+          "We're about ten percent over on travel."
+        ],
+        [
+          0,
+          "That's fine for this quarter."
+        ]
+      ],
+      "gold": [
+        "Priya",
+        null
+      ],
+      "sure": []
+    },
+    {
+      "name": "absent-person",
+      "lines": [
+        [
+          0,
+          "Did Rabbi Ian confirm for Sunday?"
+        ],
+        [
+          1,
+          "Not yet, I'll call Rabbi Ian tonight."
+        ],
+        [
+          0,
+          "If he can't make it, ask Rabbi Eden."
+        ],
+        [
+          1,
+          "Okay, I'll ask Rabbi Eden as a backup."
+        ]
+      ],
+      "gold": [
+        null,
+        null
+      ],
+      "sure": []
+    },
+    {
+      "name": "no-names",
+      "lines": [
+        [
+          0,
+          "So the deploy failed again last night."
+        ],
+        [
+          1,
+          "Same error as Tuesday?"
+        ],
+        [
+          0,
+          "Yes, the migration timed out."
+        ],
+        [
+          1,
+          "Let's raise the timeout and retry."
+        ],
+        [
+          0,
+          "Agreed, I'll do it after lunch."
+        ]
+      ],
+      "gold": [
+        null,
+        null
+      ],
+      "sure": []
+    },
+    {
+      "name": "handover",
+      "lines": [
+        [
+          0,
+          "Welcome to the quarterly review. Over to you, Maya, for the sales numbers."
+        ],
+        [
+          1,
+          "Thanks. Sales grew twelve percent this quarter."
+        ],
+        [
+          2,
+          "Maya, how much of that is the new region?"
+        ],
+        [
+          1,
+          "About half of it, so six points."
+        ],
+        [
+          0,
+          "Great work, Maya. Arjun, you're up with hiring."
+        ],
+        [
+          2,
+          "Thanks. We hired four engineers and one designer."
+        ],
+        [
+          1,
+          "Arjun, are the designer's start dates set?"
+        ],
+        [
+          2,
+          "Yes, she starts on the first."
+        ]
+      ],
+      "gold": [
+        null,
+        "Maya",
+        "Arjun"
+      ],
+      "sure": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "caller-not-here",
+      "lines": [
+        [
+          0,
+          "Hi Noah, can you hear me? Noah is on the phone, he's stuck in traffic."
+        ],
+        [
+          1,
+          "Okay, let's start without him."
+        ],
+        [
+          0,
+          "Yes, Noah said to go ahead."
+        ],
+        [
+          1,
+          "First item is the lease renewal."
+        ]
+      ],
+      "gold": [
+        null,
+        null
+      ],
+      "sure": []
+    },
+    {
+      "name": "self-intro-panel",
+      "lines": [
+        [
+          0,
+          "Let's go around the room. I'm Sam, I run the platform team."
+        ],
+        [
+          1,
+          "I'm Lena, I'm on design."
+        ],
+        [
+          2,
+          "And I'm Omar from support."
+        ],
+        [
+          0,
+          "Thanks Lena. Omar, what are you hearing from customers?"
+        ],
+        [
+          2,
+          "Mostly questions about the new billing page."
+        ],
+        [
+          1,
+          "Sam, we could add a short explainer there."
+        ],
+        [
+          0,
+          "Good idea, Lena, let's do it."
+        ]
+      ],
+      "gold": [
+        "Sam",
+        "Lena",
+        "Omar"
+      ],
+      "sure": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "name": "third-person",
+      "lines": [
+        [
+          0,
+          "As Priya said yesterday, we can't ship on the fifth."
+        ],
+        [
+          1,
+          "Right, billing needs another week."
+        ],
+        [
+          0,
+          "Priya also wants the FAQ done first."
+        ],
+        [
+          1,
+          "I'll finish the FAQ by Friday then."
+        ]
+      ],
+      "gold": [
+        null,
+        null
+      ],
+      "sure": []
+    },
+    {
+      "name": "addressed-twice",
+      "lines": [
+        [
+          0,
+          "Okay, quick sync on the launch."
+        ],
+        [
+          1,
+          "Dana, is the landing page ready?"
+        ],
+        [
+          2,
+          "Almost, the copy is in review."
+        ],
+        [
+          0,
+          "Thanks Dana. What's left on the copy?"
+        ],
+        [
+          2,
+          "Two headlines and the pricing blurb."
+        ],
+        [
+          1,
+          "Let's ship it Friday then."
+        ]
+      ],
+      "gold": [
+        null,
+        null,
+        "Dana"
+      ],
+      "sure": [
+        2
+      ]
+    },
+    {
+      "name": "on-behalf",
+      "lines": [
+        [
+          0,
+          "Hi, I'm calling for Dr. Rao about the results."
+        ],
+        [
+          1,
+          "Sure, can I take your name?"
+        ],
+        [
+          0,
+          "It's Kofi, I'm her assistant."
+        ],
+        [
+          1,
+          "Thanks Kofi, she'll call you back after two."
+        ],
+        [
+          0,
+          "Great, thank you."
+        ]
+      ],
+      "gold": [
+        "Kofi",
+        null
+      ],
+      "sure": [
+        0
+      ]
+    },
+    {
+      "name": "corrected-name",
+      "lines": [
+        [
+          0,
+          "Welcome, John, glad you could make it."
+        ],
+        [
+          1,
+          "Thanks, it's Jon without the h, by the way."
+        ],
+        [
+          0,
+          "Sorry, Jon. Let's look at the roadmap."
+        ],
+        [
+          1,
+          "Sure. I think search should come first."
+        ],
+        [
+          0,
+          "Agreed, Jon, search first."
+        ]
+      ],
+      "gold": [
+        null,
+        "Jon"
+      ],
+      "sure": [
+        1
+      ]
+    },
+    {
+      "name": "similar-names",
+      "lines": [
+        [
+          0,
+          "Ana, can you take the notes today?"
+        ],
+        [
+          1,
+          "Sure. Anna is out, so I'll cover her items too."
+        ],
+        [
+          2,
+          "Ana, did Anna send the vendor list?"
+        ],
+        [
+          1,
+          "She did, I'll forward it."
+        ],
+        [
+          0,
+          "Thanks Ana."
+        ]
+      ],
+      "gold": [
+        null,
+        "Ana",
+        null
+      ],
+      "sure": [
+        1
+      ]
+    },
+    {
+      "name": "sign-off-only",
+      "lines": [
+        [
+          0,
+          "So the server move is Saturday night."
+        ],
+        [
+          1,
+          "Yes, I'll be on call."
+        ],
+        [
+          0,
+          "And the rollback plan is ready?"
+        ],
+        [
+          1,
+          "It is. Talk soon, this was Ravi from infra."
+        ]
+      ],
+      "gold": [
+        null,
+        "Ravi"
+      ],
+      "sure": []
+    },
+    {
+      "name": "group-greeting",
+      "lines": [
+        [
+          0,
+          "Morning Lucia, morning Tom."
+        ],
+        [
+          1,
+          "Morning! Tom, did the boxes arrive?"
+        ],
+        [
+          2,
+          "They did, Lucia, all twelve."
+        ],
+        [
+          0,
+          "Great, let's unpack after lunch."
+        ],
+        [
+          1,
+          "I'll grab the cutter."
+        ]
+      ],
+      "gold": [
+        null,
+        "Lucia",
+        "Tom"
+      ],
+      "sure": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "pet-name",
+      "lines": [
+        [
+          0,
+          "Max, sit. Good boy, Max."
+        ],
+        [
+          1,
+          "He's so well trained now."
+        ],
+        [
+          0,
+          "It took months. Anyway, how was the trip?"
+        ],
+        [
+          1,
+          "Long, but the hotel was lovely."
+        ]
+      ],
+      "gold": [
+        null,
+        null
+      ],
+      "sure": []
+    },
+    {
+      "name": "interview",
+      "lines": [
+        [
+          0,
+          "Thanks for joining us, Mei. Could you start with your background?"
+        ],
+        [
+          1,
+          "Sure. I spent five years building payment systems."
+        ],
+        [
+          0,
+          "Mei, what was the hardest outage you handled?"
+        ],
+        [
+          1,
+          "A double-charge bug on a holiday weekend."
+        ],
+        [
+          0,
+          "How did you find it?"
+        ],
+        [
+          1,
+          "We traced the retries in the logs."
+        ]
+      ],
+      "gold": [
+        null,
+        "Mei"
+      ],
+      "sure": [
+        1
+      ]
+    }
+  ]
+}

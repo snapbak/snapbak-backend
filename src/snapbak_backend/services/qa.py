@@ -16,7 +16,7 @@ from snapbak_backend.ai.chain import ProviderFailed, Tiers, ask
 from snapbak_backend.ai.prompts import ask as prompt
 from snapbak_backend.db.models import Meeting, Speaker, TranscriptLine
 from snapbak_backend.schemas.cloud import AgendaOut, AskResponse, CitationOut, MinutesOut, TopicOut
-from snapbak_backend.services import folding, meetings, recordings
+from snapbak_backend.services import folding, meetings, people, recordings
 from snapbak_backend.services.embeddings import Embeddings, EmbedError
 
 SHORTEST_WORD = 3
@@ -138,8 +138,9 @@ async def gather(session: AsyncSession, meeting: Meeting, question: str) -> Aske
     adds the sections by meaning once the transaction is over)."""
     doc = meetings.minutes_of(meeting)
     lines = await recordings.live_lines(session, meeting.recording_id)
-    sections = sections_of(doc)
     speakers = await recordings.speakers_of(session, meeting.recording_id)
+    # The notes are words: each person by the name they have now (D41).
+    sections = sections_of(None if doc is None else people.rendered_doc(doc, speakers, lines))
     notes = [section.text for section in sections]
     made = Asked(candidates(question, [], lines), speakers, notes, lines, sections)
     return made

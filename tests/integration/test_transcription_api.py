@@ -62,17 +62,17 @@ def test_cld03_a_recording_over_2_hours_is_refused(api: Any, sql: Sql) -> None:
     assert create_job(api, auth).status_code == 201
 
 
-def test_cld03_past_120_minutes_today_is_refused_with_the_reset_time(api: Any, auth: dict[str, str], sql: Sql) -> None:
+def test_cld03_past_240_minutes_today_is_refused_with_the_reset_time(api: Any, auth: dict[str, str], sql: Sql) -> None:
     device = sql("SELECT id FROM devices")[0]["id"]
     sql(
-        "INSERT INTO usage_daily (device_id, day, audio_seconds) VALUES ($1, (now() AT TIME ZONE 'UTC')::date, 6600)",
+        "INSERT INTO usage_daily (device_id, day, audio_seconds) VALUES ($1, (now() AT TIME ZONE 'UTC')::date, 14000)",
         device,
     )
     response = create_job(api, auth)
     tomorrow = (datetime.now(UTC) + timedelta(days=1)).strftime("%Y-%m-%dT00:00:00Z")
     assert (response.status_code, response.json()["error"]["code"]) == (429, "daily_limit")
     assert response.json()["resetsAt"] == tomorrow
-    assert sql("SELECT audio_seconds FROM usage_daily") == [{"audio_seconds": 6600}]
+    assert sql("SELECT audio_seconds FROM usage_daily") == [{"audio_seconds": 14000}]
 
 
 def test_trx01_unknown_recordings_and_bad_bodies(api: Any, auth: dict[str, str]) -> None:

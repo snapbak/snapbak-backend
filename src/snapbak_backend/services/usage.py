@@ -46,6 +46,16 @@ async def reserve(session: AsyncSession, device_id: UUID, seconds: int) -> bool:
     return row is not None
 
 
+async def release(session: AsyncSession, device_id: UUID, seconds: int) -> None:
+    """Seconds `reserve` took today given back, floored at 0: the work they were for never ran."""
+    today = cast(func.timezone("UTC", func.now()), Date)
+    await session.execute(
+        update(UsageDaily)
+        .where(UsageDaily.device_id == device_id, UsageDaily.day == today)
+        .values(audio_seconds=func.greatest(UsageDaily.audio_seconds - seconds, 0))
+    )
+
+
 def refund_of(job: TranscriptionJob) -> Update:
     """The job's seconds back to the UTC day it was made, floored at 0."""
     owner = select(Recording.device_id).where(Recording.id == job.recording_id).scalar_subquery()

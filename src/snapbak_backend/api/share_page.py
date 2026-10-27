@@ -24,7 +24,7 @@ from snapbak_backend.api.logged import LoggedRoute
 from snapbak_backend.api.minutes_page import Said, clock, meeting_sections, stamp
 from snapbak_backend.db.models import PageState, Recording, Share, Upload, page_state
 from snapbak_backend.schemas.cloud import UTC_FORMAT
-from snapbak_backend.services import meetings, recordings
+from snapbak_backend.services import meetings, people, recordings
 from snapbak_backend.services.recordings import speaker_of
 from snapbak_backend.services.shares import SIGNED_S, is_slug, link
 
@@ -122,6 +122,17 @@ VIDEO_PLAYER = Template(
     '<div class="player plate"><video controls playsinline preload="metadata"$poster_attr width="$width" '
     'height="$height" src="$url"></video></div>'
 )
+# A GIF page plays the GIF itself in an img, and its unfurl animates the GIF too, so og:image names the
+# animation route (GIFS-AND-REPLAY-60, G7): Slack, X and LinkedIn animate an image/gif og:image.
+GIF_TAGS = Template(
+    '<meta property="og:image" content="$page_url/animation.gif">\n'
+    '<meta property="og:image:type" content="image/gif">\n'
+    '<meta property="og:image:width" content="$width">\n'
+    '<meta property="og:image:height" content="$height">\n'
+    '<meta property="og:image:alt" content="$title">\n'
+    '<meta name="twitter:image" content="$page_url/animation.gif">\n'
+)
+GIF_PLAYER = Template('<div class="player plate"><img src="$url" width="$width" height="$height" alt="$title"></div>')
 # The audio page's own player: a round play button, a well whose lit level is the time played (a range input over
 # it seeks, keys included), and the time; share.js drives it from the element. A meeting's well holds its waveform
 # (`speech_bars`), drawn twice: muted, and lit inside the level, so the played part lights up as the mockup draws
@@ -170,8 +181,8 @@ def waveform(bars: list[float]) -> str:
     return made
 
 
-type Media = Literal["video", "audio"]
-EXTENSIONS: dict[Media, str] = {"video": "mp4", "audio": "m4a"}
+type Media = Literal["video", "audio", "gif"]
+EXTENSIONS: dict[Media, str] = {"video": "mp4", "audio": "m4a", "gif": "gif"}
 
 
 def render_page(
@@ -192,6 +203,8 @@ def render_page(
     created = share.created_at.astimezone(UTC)
     day = f"{created.day} {created:%b} {created.year}"
     duration = clock(share.duration_ms or 0)
+    if media == "gif":
+        duration = size_line(share.video_bytes)
     width, height = str(share.width or 16), str(share.height or 9)
     if poster_url is None:
         image_tags = fill(OG_CARD_TAGS, {}, base=base)
@@ -199,7 +212,12 @@ def render_page(
     else:
         image_tags = fill(POSTER_TAGS, {}, page_url=page_url, title=share.title)
         poster_attr = f' poster="{html.escape(poster_url)}"'
-    if media == "video":
+    if media == "gif":
+        image_tags = fill(GIF_TAGS, {}, page_url=page_url, title=share.title, width=width, height=height)
+        poster_attr = ""
+        video_tags = ""
+        player = fill(GIF_PLAYER, {}, url=media_url, width=width, height=height, title=share.title)
+    elif media == "video":
         video_tags = fill(VIDEO_TAGS, {}, page_url=page_url, width=width, height=height)
         player = fill(VIDEO_PLAYER, {"poster_attr": poster_attr}, url=media_url, width=width, height=height)
     else:
@@ -208,7 +226,8 @@ def render_page(
         trusted = {"wave": wave, "waved": " waved" if wave else ""}
         length = share.duration_ms or 0
         player = fill(AUDIO_PLAYER, trusted, url=media_url, max=str(length), total=stamp(length))
-    download = "Download" if media == "video" and not sections else f"Download {media}"
+    label = "Download GIF" if media == "gif" else f"Download {media}"
+    download = "Download" if media == "video" and not sections else label
     raw = {
         "image_tags": image_tags,
         "video_tags": video_tags,
@@ -241,6 +260,16 @@ def render_error(state: PageState, home_url: str) -> tuple[str, int]:
     raw = {"glyph": ICON.format(strokes), "refresh": REFRESH if state == "uploading" else ""}
     page = fill(ERROR, raw, message=message, hint=hint, home_url=home_url)
     return page, status
+
+
+def size_line(bytes: int | None) -> str:
+    """A GIF's size as Finder counts it ("4.2 MB"), for the summary line a length would sit in (G7)."""
+    if not bytes:
+        return "GIF"
+    if bytes >= 1e9:
+        return f"{bytes / 1e9:.1f} GB"
+    megabytes = bytes / 1e6
+    return f"{megabytes:.1f} MB" if megabytes < 10 else f"{round(megabytes)} MB"
 
 
 def attachment(title: str, extension: str = "mp4") -> str:
@@ -283,6 +312,8 @@ async def media_of(db: Session, share: Share) -> tuple[str | None, Media]:
     """The object the page plays: an audio recording's own completed audio upload (D12, D16), else the share's
     video; None while it isn't there yet."""
     recording = await db.get(Recording, share.recording_id)
+    if recording is not None and recording.recording_type == "gif":
+        return share.s3_key, "gif"
     if recording is None or recording.recording_type != "audio":
         return share.s3_key, "video"
     key = await db.scalar(
@@ -316,7 +347,8 @@ async def sections_of(db: Session, share: Share) -> tuple[str, str, list[float]]
     lines = await recordings.live_lines(db, share.recording_id)
     said = [(line.start_ms, speaker_of(speakers.get(line.speaker_id)), line.text) for line in lines]
     bars = speech_bars([(line.start_ms, line.end_ms) for line in lines], share.duration_ms or 0)
-    made = meeting_sections(minutes, said), speakers_in(said), bars
+    plain = None if minutes is None else people.rendered_doc(minutes, speakers, lines)
+    made = meeting_sections(plain, said), speakers_in(said), bars
     return made
 
 
@@ -356,6 +388,14 @@ async def redirect(
 
 @router.api_route("/v/{slug}/video.mp4", methods=READ)
 async def video(slug: str, db: Session, request: Request) -> Response:
+    answer = await redirect(db, request, slug, "video", "no-store")
+    return answer
+
+
+@router.api_route("/v/{slug}/animation.gif", methods=READ)
+async def animation(slug: str, db: Session, request: Request) -> Response:
+    """The GIF itself, for the page's img and the unfurl's og:image (GIFS-AND-REPLAY-60, G7). The share's key
+    is the animation, so this is the video route under a GIF name."""
     answer = await redirect(db, request, slug, "video", "no-store")
     return answer
 

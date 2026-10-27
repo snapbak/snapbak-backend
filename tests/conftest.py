@@ -32,9 +32,11 @@ def claim_redis_db() -> str:
     lapses after an hour if a run dies; `pytest_sessionfinish` gives it back."""
     for db in range(2, 16):
         try:
-            if redis.Redis.from_url(f"{REDIS_SERVER}/{db}").set(CLAIM, os.getpid(), nx=True, ex=3600):
+            # A short wait: a stack that accepts but never answers (a stuck Docker) fails fast, not after minutes.
+            client = redis.Redis.from_url(f"{REDIS_SERVER}/{db}", socket_connect_timeout=2, socket_timeout=2)
+            if client.set(CLAIM, os.getpid(), nx=True, ex=3600):
                 return f"{REDIS_SERVER}/{db}"
-        except redis.ConnectionError:
+        except redis.ConnectionError, redis.TimeoutError:
             break
     return f"{REDIS_SERVER}/2"
 
@@ -293,6 +295,26 @@ def upload_share(
     body = {"kind": "share", "bytes": len(data), "contentType": "video/mp4", "shareId": share_id, **VIDEO_SIZE, **size}
     answer = upload(api, auth, data, body, recording)
     return answer
+
+
+GIF_SIZE = {"width": 600, "height": 386}
+
+
+def upload_gif(
+    api: Any, auth: dict[str, str], share_id: str, data: bytes, recording: str = RECORDING, **size: int
+) -> tuple[str, Any]:
+    """The share's GIF as the app sends it (GIFS-AND-REPLAY-60, G7): every part PUT, then complete."""
+    body = {"kind": "gif", "bytes": len(data), "contentType": "image/gif", "shareId": share_id, **GIF_SIZE, **size}
+    answer = upload(api, auth, data, body, recording)
+    return answer
+
+
+def gif_live(api: Any, auth: dict[str, str], gif: bytes = b"GIF89a animation", recording: str = RECORDING) -> Any:
+    """A GIF shared end to end (G7): the gif recording, the share, the upload; the create answer."""
+    put_recording(api, auth, recording=recording, duration_ms=0, recording_type="gif")
+    made = create_share(api, auth, recording=recording, bytes=len(gif)).json()
+    upload_gif(api, auth, made["shareId"], gif, recording=recording)
+    return made
 
 
 def share_live(api: Any, auth: dict[str, str], video: bytes = b"mp4 video", poster: bytes | None = b"jpeg") -> Any:
