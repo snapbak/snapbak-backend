@@ -1,0 +1,439 @@
+[
+ {
+  "name": "probe-mic-check",
+  "slice": "probes",
+  "speakers": [
+   "Founder"
+  ],
+  "lines": [
+   [
+    "Founder",
+    300,
+    3300,
+    "Okay, testing the meeting recorder."
+   ],
+   [
+    "Founder",
+    4000,
+    7000,
+    "One, two, three, done."
+   ]
+  ]
+ },
+ {
+  "name": "probe-mic-check-hinglish",
+  "slice": "probes",
+  "speakers": [
+   "Founder"
+  ],
+  "lines": [
+   [
+    "Founder",
+    300,
+    3300,
+    "ठीक है, मीटिंग रिकॉर्डर टेस्ट कर रहे हैं।"
+   ],
+   [
+    "Founder",
+    4000,
+    7000,
+    "एक, दो, तीन, हो गया।"
+   ]
+  ]
+ },
+ {
+  "name": "probe-fillers",
+  "slice": "probes",
+  "speakers": [
+   "Asha",
+   "Ben"
+  ],
+  "lines": [
+   [
+    "Asha",
+    0,
+    3000,
+    "Um."
+   ],
+   [
+    "Ben",
+    3500,
+    6500,
+    "Uh, yeah."
+   ],
+   [
+    "Asha",
+    7000,
+    10000,
+    "Hmm, okay."
+   ],
+   [
+    "Ben",
+    10500,
+    13500,
+    "Yeah, yeah."
+   ]
+  ]
+ },
+ {
+  "name": "probe-hello",
+  "slice": "probes",
+  "speakers": [
+   "Asha",
+   "Ben"
+  ],
+  "lines": [
+   [
+    "Asha",
+    0,
+    3000,
+    "Hello? Can you hear me?"
+   ],
+   [
+    "Ben",
+    3500,
+    6500,
+    "Yes, I can hear you fine."
+   ],
+   [
+    "Asha",
+    7000,
+    10000,
+    "Great, the sound is clear."
+   ],
+   [
+    "Ben",
+    10500,
+    13500,
+    "Cool, okay, bye."
+   ]
+  ]
+ },
+ {
+  "name": "probe-small-talk",
+  "slice": "probes",
+  "speakers": [
+   "Asha",
+   "Ben"
+  ],
+  "lines": [
+   [
+    "Asha",
+    0,
+    3000,
+    "How was your weekend?"
+   ],
+   [
+    "Ben",
+    3500,
+    6500,
+    "Good, I went hiking near the lake."
+   ],
+   [
+    "Asha",
+    7000,
+    10000,
+    "Nice, the weather was lovely."
+   ],
+   [
+    "Ben",
+    10500,
+    13500,
+    "It really was."
+   ]
+  ]
+ },
+ {
+  "name": "contradiction-launch-day",
+  "slice": "contradictions",
+  "speakers": [
+   "Maya",
+   "Omar"
+  ],
+  "lines": [
+   [
+    "Maya",
+    0,
+    3000,
+    "The launch is on Friday the 14th."
+   ],
+   [
+    "Omar",
+    3500,
+    6500,
+    "The landing page is almost ready."
+   ],
+   [
+    "Maya",
+    7000,
+    10000,
+    "Design signed off yesterday."
+   ],
+   [
+    "Omar",
+    10500,
+    13500,
+    "No, the launch is on Monday the 17th, not Friday."
+   ]
+  ],
+  "gold": [
+   {
+    "kind": "contradiction",
+    "text": "Maya says the launch is Friday the 14th; Omar says Monday the 17th.",
+    "lines": [
+     0,
+     3
+    ]
+   }
+  ]
+ },
+ {
+  "name": "contradiction-budget",
+  "slice": "contradictions",
+  "speakers": [
+   "Maya",
+   "Omar"
+  ],
+  "lines": [
+   [
+    "Maya",
+    0,
+    3000,
+    "We have a budget of 5,000 dollars for ads."
+   ],
+   [
+    "Omar",
+    3500,
+    6500,
+    "Let's split it across two channels."
+   ],
+   [
+    "Maya",
+    7000,
+    10000,
+    "Search and social, then."
+   ],
+   [
+    "Maya",
+    10500,
+    13500,
+    "Actually our ads budget is only 3,000 dollars."
+   ]
+  ],
+  "gold": [
+   {
+    "kind": "contradiction",
+    "text": "Maya first says the ads budget is 5,000 dollars, then 3,000.",
+    "lines": [
+     0,
+     3
+    ]
+   }
+  ]
+ },
+ {
+  "name": "contradiction-none",
+  "slice": "contradictions",
+  "speakers": [
+   "Maya",
+   "Omar"
+  ],
+  "lines": [
+   [
+    "Maya",
+    0,
+    3000,
+    "The launch is on Friday."
+   ],
+   [
+    "Omar",
+    3500,
+    6500,
+    "Yes, Friday works for me."
+   ],
+   [
+    "Maya",
+    7000,
+    10000,
+    "The budget is 5,000 dollars."
+   ],
+   [
+    "Omar",
+    10500,
+    13500,
+    "Right, 5,000 is what we agreed."
+   ]
+  ]
+ },
+ {
+  "name": "contradiction-hinglish",
+  "slice": "contradictions",
+  "speakers": [
+   "Rahul",
+   "Harini"
+  ],
+  "lines": [
+   [
+    "Rahul",
+    0,
+    3000,
+    "Client meeting kal subah 10 baje hai."
+   ],
+   [
+    "Harini",
+    3500,
+    6500,
+    "Main slides bana rahi hoon."
+   ],
+   [
+    "Harini",
+    7000,
+    10000,
+    "Nahi Rahul, client meeting parso shaam 5 baje hai, kal nahi."
+   ]
+  ],
+  "gold": [
+   {
+    "kind": "contradiction",
+    "text": "Rahul says the client meeting is tomorrow at 10 a.m.; Harini says the day after at 5 p.m.",
+    "lines": [
+     0,
+     2
+    ]
+   }
+  ]
+ },
+ {
+  "name": "hinglish-delhi-shopping",
+  "slice": "hinglish",
+  "speakers": [
+   "Rahul",
+   "Harini"
+  ],
+  "lines": [
+   [
+    "Rahul",
+    0,
+    3000,
+    "Kal subah 11 baje Sarojini Nagar chalte hain."
+   ],
+   [
+    "Harini",
+    3500,
+    6500,
+    "Theek hai, mera flight Saturday raat 9 baje hai."
+   ],
+   [
+    "Rahul",
+    7000,
+    10000,
+    "Main cab book kar dunga, 500 rupaye lagenge."
+   ],
+   [
+    "Harini",
+    10500,
+    13500,
+    "Mujhe mummy ke liye saree leni hai, budget 3000 hai."
+   ],
+   [
+    "Rahul",
+    14000,
+    17000,
+    "Done, toh decide hua, pehle Sarojini Nagar phir Lajpat Nagar."
+   ],
+   [
+    "Harini",
+    17500,
+    20500,
+    "Main list bana ke aaj raat WhatsApp kar dungi."
+   ]
+  ],
+  "gold": [
+   {
+    "kind": "actions",
+    "text": "Rahul will book the cab for 500 rupees.",
+    "lines": [
+     2
+    ]
+   },
+   {
+    "kind": "actions",
+    "text": "Harini will make the list and send it on WhatsApp tonight.",
+    "lines": [
+     5
+    ]
+   },
+   {
+    "kind": "decisions",
+    "text": "They go to Sarojini Nagar first, then Lajpat Nagar.",
+    "lines": [
+     4
+    ]
+   }
+  ]
+ },
+ {
+  "name": "hinglish-standup",
+  "slice": "hinglish",
+  "speakers": [
+   "Priya",
+   "Arjun"
+  ],
+  "lines": [
+   [
+    "Priya",
+    0,
+    3000,
+    "आज का डेमो शाम 5 बजे है।"
+   ],
+   [
+    "Arjun",
+    3500,
+    6500,
+    "मैं लॉगिन वाला बग कल तक फिक्स कर दूंगा।"
+   ],
+   [
+    "Priya",
+    7000,
+    10000,
+    "ठीक है, तो हम रिलीज़ सोमवार को करेंगे।"
+   ],
+   [
+    "Arjun",
+    10500,
+    13500,
+    "क्लाइंट को ईमेल कौन भेजेगा?"
+   ],
+   [
+    "Priya",
+    14000,
+    17000,
+    "मैं आज रात ईमेल भेज दूंगी।"
+   ]
+  ],
+  "gold": [
+   {
+    "kind": "actions",
+    "text": "Arjun will fix the login bug by tomorrow.",
+    "lines": [
+     1
+    ]
+   },
+   {
+    "kind": "actions",
+    "text": "Priya will send the client the email tonight.",
+    "lines": [
+     3,
+     4
+    ]
+   },
+   {
+    "kind": "decisions",
+    "text": "The release is on Monday.",
+    "lines": [
+     2
+    ]
+   }
+  ]
+ }
+]

@@ -1,0 +1,171 @@
+{
+  "about": "Earnings-21 (Rev, CC BY-SA 4.0; github.com/revdotcom/speech-datasets): the earnings calls whose operator names the analyst who asks next (\"Our next question comes from Jane Doe with Acme\"), the speaker of the next turn: the gold names for the speaker loop's `earnings` slice (MOM-08). Fetched once into ~/.snapbak-bench/earnings21/, checked against these SHA-256s; never copied here.",
+  "license": "CC BY-SA 4.0",
+  "files": [
+    {
+      "file": "4320211.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4320211.nlp",
+      "sha256": "a7d2c1e7362cc6af5317f75c855a9270c8cbbf95e04c1fe3e4834c3848e66ffb"
+    },
+    {
+      "file": "4344338.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4344338.nlp",
+      "sha256": "12dae4fac7abb8e4954c156ceb51e9e53b1831404ca2f53596722dad48b4610f"
+    },
+    {
+      "file": "4344866.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4344866.nlp",
+      "sha256": "34eb9ec06ffde27dc7acf47a3157b3e54a3a61b166564f08347c4680cdd32405"
+    },
+    {
+      "file": "4346818.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4346818.nlp",
+      "sha256": "113a8af8df320b36b3e14466af684dd6e27c61a556a5c7dd030733573b71dc26"
+    },
+    {
+      "file": "4346923.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4346923.nlp",
+      "sha256": "7288fe3173997eb0e0ed85ffe5065e2555ac1a27748c63b6419beb944947b085"
+    },
+    {
+      "file": "4359732.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4359732.nlp",
+      "sha256": "cdbfef2738578bb4710f8556d408a88685b7d8fed6ee03e95ed1fe792a389138"
+    },
+    {
+      "file": "4359971.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4359971.nlp",
+      "sha256": "ad1f55e9030c0dc4546b4a18cb8c99a38dd4fee176746f1b6337a4193da5c563"
+    },
+    {
+      "file": "4360366.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4360366.nlp",
+      "sha256": "0cac4cb590416ef51352faef6cbc258931f239b07dab363865b7ca242b3a6613"
+    },
+    {
+      "file": "4360674.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4360674.nlp",
+      "sha256": "743a4ade3963154ff9d7c711164fcc071337f11e9a8b44183a7f0bf55b87271c"
+    },
+    {
+      "file": "4360717.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4360717.nlp",
+      "sha256": "04de8cab26747c13f88ea25f781b4fc3c40671358e18b5c7504f28b6e2c807b4"
+    },
+    {
+      "file": "4361631.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4361631.nlp",
+      "sha256": "ca6154474fb4a6a4a4ba912dcb91ee0652461cc782d9a54c822399d5182a85c2"
+    },
+    {
+      "file": "4363614.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4363614.nlp",
+      "sha256": "f966853948960fd6e85c8ec45407277fbaead34d9f30c2773da01b193a7d28d4"
+    },
+    {
+      "file": "4364366.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4364366.nlp",
+      "sha256": "fa151e23f333db2e9add97a6108b5c2ed7e604730526f8e0acac81d845a997ed"
+    },
+    {
+      "file": "4365024.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4365024.nlp",
+      "sha256": "3d924dd96ee956f150f85a7583b8030b522566c67d3644321e0d99974b88717c"
+    },
+    {
+      "file": "4366302.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4366302.nlp",
+      "sha256": "3a45801c45aca0db97529c1fae1bd0c33669b814a033461aece45f3c2f62f137"
+    },
+    {
+      "file": "4366429.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4366429.nlp",
+      "sha256": "be67a6177310e6280456e7d1edf16ad4e41ebfe637c93194085d0a69e6cb5571"
+    },
+    {
+      "file": "4366522.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4366522.nlp",
+      "sha256": "53eab8ef960f999d6fb0a55af583cdfb7210e1a17ae164b07c7855bffeebcbf8"
+    },
+    {
+      "file": "4366893.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4366893.nlp",
+      "sha256": "31545eaa1620055c3f4a2d7a50fe106f59bf392a5712c8abc139795a349b72ee"
+    },
+    {
+      "file": "4367535.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4367535.nlp",
+      "sha256": "244e06e79880f409989ce83e782c72702e1e325ce7f0a87c17914d5bb4b00154"
+    },
+    {
+      "file": "4368670.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4368670.nlp",
+      "sha256": "7a4385e8dea9fb196887d4834a35b126e532363b1e43fa914a5dc0b1f9103556"
+    },
+    {
+      "file": "4375653.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4375653.nlp",
+      "sha256": "c3918bbcca2660a4f1bba42a4436b630c30802117bb0b36e591587a3628380c5"
+    },
+    {
+      "file": "4382825.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4382825.nlp",
+      "sha256": "c415cf97c2e21ca169ee437deaee07164c650fe89c9a7879b9000d98b17ba909"
+    },
+    {
+      "file": "4383161.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4383161.nlp",
+      "sha256": "cbc9146a01ab95473ac9cebde644bc05caf4cfa552c774f1aa53e8f8cff5c25e"
+    },
+    {
+      "file": "4384198.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4384198.nlp",
+      "sha256": "5c1c71a1836991d44b7fab0ba6b4bff6bc59a5f83735363f025594a06dce6eea"
+    },
+    {
+      "file": "4384744.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4384744.nlp",
+      "sha256": "4254458e8ee90b954c7d4ca89e7ddc074f112c79a1ef1e2ed1773a2986f42871"
+    },
+    {
+      "file": "4385388.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4385388.nlp",
+      "sha256": "9dc885a36f49cde4d3b529b3b631c5fecfa21293e76ea75bbb0f9b938b5532d0"
+    },
+    {
+      "file": "4385939.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4385939.nlp",
+      "sha256": "2d79acf8e18e2b3eff8f09a64a2d9fd27e2d0c6a07eece87c8b0f5d58db2ede4"
+    },
+    {
+      "file": "4386541.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4386541.nlp",
+      "sha256": "4ba6c38d75974783e8ece62881b220b26053b5a0e8a22f9e6def48caff06a2e4"
+    },
+    {
+      "file": "4387332.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4387332.nlp",
+      "sha256": "4ff84afa4b0ca2d3b97b323bbf65134ebf4dd36f70b0b72fcb68e7b018762001"
+    },
+    {
+      "file": "4387383.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4387383.nlp",
+      "sha256": "3f640d3f33d6262269c5a429a26f5b0896afa80a4f51f8c2b503ca2396225e13"
+    },
+    {
+      "file": "4389907.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4389907.nlp",
+      "sha256": "bb92f2f5ede8aab79aac8235a7096a2ee5cc93802e634011c15e0551f74c470b"
+    },
+    {
+      "file": "4392809.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4392809.nlp",
+      "sha256": "57c036f33fc3a5fc2b03e9f3d39499e08885ec31a1dc3a4e6391fec5d1174b95"
+    },
+    {
+      "file": "4394084.nlp",
+      "url": "https://raw.githubusercontent.com/revdotcom/speech-datasets/main/earnings21/transcripts/nlp_references/4394084.nlp",
+      "sha256": "ba68cc0140c0922975a0e0a0bc8058b30673eb98947eccf850681d7c8c4b1fda"
+    }
+  ]
+}

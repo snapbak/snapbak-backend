@@ -80,11 +80,30 @@ unknown.
 | `SNAPBAK_CORRECTION`         | the model that corrects a refused polish answer once, at medium effort, or `none` for no retry (default the big model) |
 | `SNAPBAK_FALLBACK`           | tried once when a model errors or times out (optional; `.env.example` sets the polish model)                      |
 | `SNAPBAK_TRANSLATE`          | the caption translation model, `provider:model` (default the big model; TRX-07, needs a bench before launch)      |
+| `SNAPBAK_EMBEDDINGS`         | the meetings' embeddings, `openai:<model>` (default `openai:text-embedding-3-small`) or `fake:hashed` |
 
 The server refuses to start when the temperature is not a number from 0 to 2 or
 the examples policy is not one of the three. Until 15 Oct the settings were
 `SNAPBAK_SMALL` and `SNAPBAK_BIG`, the two tiers (`escalation.md`); the app's
 E2E harness must set `SNAPBAK_POLISH` now.
+
+## Embeddings
+
+The meetings' search (MEETINGS.md, D38) embeds each minutes section once and
+each search query, through `services/embeddings.py`. `SNAPBAK_EMBEDDINGS` names
+`openai:<model>`, by default `openai:text-embedding-3-small` pinned to 1,536
+dimensions on `OPENAI_API_KEY`, or `fake:hashed`: deterministic token-bag
+vectors with no network, for the tests. The OpenAI client is the chat
+providers' own (`Http` in `ai/providers/base.py`): pooled, with the same backoff
+on a 429 or 5xx, and any failure is an `EmbedError`, which a search answers as a
+502 `provider` and gives the day's search back.
+
+`text-embedding-3-small` lists at US$0.02 per million input tokens on OpenAI's
+pricing page; check it before you trust a cost report. A meeting's sections are
+a few hundred tokens and a query a dozen, so embedding costs a few millionths of
+a dollar a meeting; the re-rank call beside each search costs more
+(`replay.md`). Embeddings are not in `PRICES`, so the bench ledger does not
+count them.
 
 ## The prompt cache
 
@@ -117,7 +136,10 @@ a repeated prefix on its own, with nothing to send.
 
 ## The fake provider
 
-For the app's end-to-end tests, `fake:<mode>` answers without a model. A
+For the app's end-to-end tests, `fake:<mode>` answers without a model. Like
+OpenAI, every mode refuses a `reason` that is no reasoning effort, a JSON-mode
+call with no message saying "json", and a completion budget outside 1 to
+128,000 tokens, so a test catches a call the real API would answer with a 400. A
 correction reaches the model with the prior's last sentence in front of it (see
 `api.md`), so `edit` swaps that sentence's last word and the server hands the
 rest of the prior back as the revision. Words that end with a cue or a "no" are
@@ -132,6 +154,12 @@ no sentence to put right, so "no wait make it friday" gets the bang:
 | `slow`  | waits 5 s, then echoes, so a short deadline gives a 502                 | the same                  |
 | `reply` | "Sure, " and the text, which the guardrail rejects                      | the selection             |
 | `translate-drop` | `text` unchanged                                               | the selection             |
+| `junk`  | prose, never JSON: the meetings' parse and repair must end it (`bad_answer`) | the same              |
+
+In `meetings` mode the fake answers each minutes section from the request's
+first line (a contradiction from the first two), with the first action-items
+answer fabricating a word so the section's repair runs; the detail guard's call
+gets every missing detail appended to the MoM.
 
 In every mode but `fail` and `slow`, a caption translation answers each line as
 `[<target>] <text>`; `translate-drop` leaves the last line out, for the retry

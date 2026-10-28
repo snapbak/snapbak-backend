@@ -24,6 +24,8 @@ class BadParts(Exception):
 SUPERSEDED = {"Key": "superseded", "Value": "true"}
 # S3's answers to a part list that doesn't match the parts uploaded.
 BAD_PARTS = ("InvalidPart", "InvalidPartOrder", "EntityTooSmall")
+# S3's answers for a key with no object.
+MISSING = ("404", "NoSuchKey", "NotFound")
 
 
 def s3_client(config: CloudConfig) -> Any:
@@ -87,11 +89,16 @@ class Storage:
 
     async def supersede(self, keys: list[str]) -> None:
         """Tags each object `superseded=true`, which the bucket's rule deletes a day later (12 HLD)."""
+        await asyncio.gather(*[self.tag_superseded(key) for key in keys])
+
+    async def tag_superseded(self, key: str) -> None:
+        """A key with no object (an upload aborted before it completed) has nothing to delete, so it is skipped."""
         tags = {"TagSet": [SUPERSEDED]}
-        tagged = [
-            asyncio.to_thread(self.client.put_object_tagging, Bucket=self.bucket, Key=key, Tagging=tags) for key in keys
-        ]
-        await asyncio.gather(*tagged)
+        try:
+            await asyncio.to_thread(self.client.put_object_tagging, Bucket=self.bucket, Key=key, Tagging=tags)
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") not in MISSING:
+                raise
 
     async def complete(self, key: str, upload_id: str, parts: list[tuple[int, str]]) -> None:
         """Completes with the parts in ascending order, as S3 needs."""
@@ -117,7 +124,7 @@ class Storage:
         try:
             head = await asyncio.to_thread(self.client.head_object, Bucket=self.bucket, Key=key)
         except ClientError as error:
-            if error.response.get("Error", {}).get("Code") in ("404", "NoSuchKey", "NotFound"):
+            if error.response.get("Error", {}).get("Code") in MISSING:
                 return None
             raise
         return head["ContentLength"]

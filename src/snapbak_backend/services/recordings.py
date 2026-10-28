@@ -5,12 +5,23 @@ from uuid import UUID
 from sqlalchemy import ScalarSelect, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from snapbak_backend.db.models import CaptionTrack, Recording, Share, Speaker, TranscriptionJob, TranscriptLine, Upload
+from snapbak_backend.db.models import (
+    CaptionTrack,
+    Meeting,
+    MeetingChunk,
+    MeetingPin,
+    Recording,
+    Share,
+    Speaker,
+    TranscriptionJob,
+    TranscriptLine,
+    Upload,
+)
 from snapbak_backend.services import jobs, retention
 from snapbak_backend.services.failures import CloudFailure
 
 # Rows under a recording that its soft delete marks too.
-UNDER = (Upload, TranscriptionJob, Speaker, TranscriptLine, CaptionTrack)
+UNDER = (Upload, TranscriptionJob, Speaker, TranscriptLine, CaptionTrack, Meeting)
 
 
 async def owned(session: AsyncSession, device_id: UUID, recording_id: UUID) -> Recording:
@@ -80,6 +91,14 @@ async def live_lines(session: AsyncSession, recording_id: UUID) -> list[Transcri
     return list(lines)
 
 
+async def speakers_of(session: AsyncSession, recording_id: UUID) -> dict[UUID, Speaker]:
+    """The recording's live speakers by ID."""
+    rows = await session.scalars(
+        select(Speaker).where(Speaker.recording_id == recording_id, Speaker.deleted_at.is_(None))
+    )
+    return {speaker.id: speaker for speaker in rows}
+
+
 async def soft_delete(session: AsyncSession, recording_id: UUID) -> TranscriptionJob | None:
     """Marks the recording and every row under it in the caller's transaction; its share is disabled so the page
     answers 404. S3 objects stay (Q15). A job still queued fails `internal` here and gives its minutes back today;
@@ -100,6 +119,35 @@ async def soft_delete(session: AsyncSession, recording_id: UUID) -> Transcriptio
     for model in UNDER:
         live = model.recording_id == recording_id, model.deleted_at.is_(None)
         await session.execute(update(model).where(*live).values(deleted_at=now))
+    # A meeting's own rows hang off its meeting_id, not the recording.
+    meeting_ids = select(Meeting.id).where(Meeting.recording_id == recording_id)
+    for model in (MeetingPin, MeetingChunk):
+        await session.execute(
+            update(model).where(model.meeting_id.in_(meeting_ids), model.deleted_at.is_(None)).values(deleted_at=now)
+        )
     await session.execute(update(Share).where(*live_share).values(deleted_at=now, state="disabled"))
     await retention.on_recording_deleted(session, recording_id)
     return failed
+
+
+async def restore(session: AsyncSession, recording: Recording) -> None:
+    """Undoes `soft_delete` inside the undo window (D28): every row it marked, by the one time it marked them with,
+    is live again; a row deleted on its own before stays deleted. The share stays turned off, and a job the trash
+    failed stays failed. The caller holds the recording's lock and commits."""
+    marked = recording.deleted_at
+    meeting_ids = select(Meeting.id).where(Meeting.recording_id == recording.id)
+    for model in (*UNDER, Share):
+        trashed = model.recording_id == recording.id, model.deleted_at == marked
+        await session.execute(update(model).where(*trashed).values(deleted_at=None))
+    for model in (MeetingPin, MeetingChunk):
+        trashed = model.meeting_id.in_(meeting_ids), model.deleted_at == marked
+        await session.execute(update(model).where(*trashed).values(deleted_at=None))
+    await session.execute(update(Recording).where(Recording.id == recording.id).values(deleted_at=None))
+
+
+def speaker_of(speaker: Speaker | None) -> str:
+    """A speaker as the minutes, Ask and the share page name them: their chosen name, else their label."""
+    if speaker is None:
+        return ""
+    name = speaker.name or speaker.label
+    return name

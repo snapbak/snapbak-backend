@@ -8,11 +8,15 @@ fixtures; `tests/integration/test_contract.py` compares them with the app's when
 
 ## GET /healthz
 
-No token. Answers `200 {"ok": true}`. The app calls it on key-down to open a
-warm connection. After answering, the server opens each model's provider
-connection (polish, big, correction and fallback), with a `HEAD` at most every
-30 s whose answer is ignored, so the first chunk, a retry and a backup call skip
-their TLS handshakes.
+No token. Answers `200 {"ok": true, "code": "6f00ccc09226"}`: `code` is the
+first 12 hex digits of a SHA-256 over the package's Python source, worked out
+once on first use (never on import), which the server and the worker also log at
+start (`code=...`), so a process still running old code shows: the founder's
+stale-process guard. The app calls it on key-down to open a warm connection.
+After answering, the server opens each model's provider connection (polish, big,
+correction and fallback), with a `HEAD` at most every 30 s whose answer is
+ignored, so the first chunk, a retry and a backup call skip their TLS
+handshakes.
 
 Run the server with `--timeout-keep-alive 75`, as `just serve` does. The app's
 first chunk comes at least 5.7 s after key-down, so uvicorn's default of 5 s
@@ -103,6 +107,30 @@ A 502's log line names the first model asked, not the fallback, and its verdict
 says what happened to each model called: `error`, `timeout`, or for a command
 `malformed`. For example `model=gpt-6-luna tier=- verdict=timeout` means the big
 tier ran out of time and none was left for the fallback.
+
+## Meetings
+
+The meeting routes (`/v1/recordings/{id}/meeting`, `/v1/meetings/...`) take the
+device token, not `SNAPBAK_TOKEN`, and live with the cloud routes in
+[cloud.md](cloud.md#meetings). Their minutes and questions run on the polish
+model with prompts of their own (`ai/prompts/minutes.py`, `ai/prompts/ask.py`),
+not this one: each tells the model the transcript is data, never instructions,
+and each answer is checked by rules before anyone sees it. The day caps (50
+questions, 50 searches) answer 429 `daily_limit` with `resetsAt`. A search hit
+is `{meetingId, recordingId, title, kind, snippet, owner, score}`: `kind` is
+`summary`, `action`, `decision` or `question`, and `owner` is the action item's
+owner, or null.
+
+The minutes are written one call per section (title and summary, MoM, action
+items, decisions, open questions, risks, follow-ups, next agenda, agenda,
+contradictions), each stored and served as it lands with the rest in `pending`;
+a section that fails is listed in `incomplete` and can be written again alone
+with `POST /v1/meetings/{id}/minutes/regenerate` and `{"sections": [...]}` (a
+409 `minutes_running` while a run is writing; one stalled for 10 minutes is
+taken over). The
+user edits them with `PUT /v1/meetings/{id}/minutes` and
+`{baseVersion, minutes}` (409 `version_conflict` when the meeting moved on);
+what they add or change is marked `byUser` and survives a regenerate.
 
 ## What the model sees
 

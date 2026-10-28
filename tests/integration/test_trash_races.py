@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import pytest
-from conftest import RECORDING, Sql, admin_on, create_share, eventually, failure, put_recording, register
+from conftest import RECORDING, S3_HTTP, Sql, admin_on, create_share, eventually, failure, put_recording, register
 
 from snapbak_backend.config.settings import load
 from snapbak_backend.services import retention, transliteration
@@ -178,9 +178,10 @@ def test_trx09_roman_words_kept_while_the_recording_is_trashed_never_deadlock(
     monkeypatch.setattr(transliteration, "update", slow_second)
 
     async def keep() -> None:
-        config = load(os.environ).cloud
+        whole = load(os.environ)
+        config = whole.cloud
         assert config is not None
-        cloud = await open_cloud(config)
+        cloud = await open_cloud(config, whole.keys)
         try:
             async with cloud.sessions() as db:
                 lines = await transliteration.recordings.live_lines(db, uuid.UUID(RECORDING))
@@ -219,13 +220,12 @@ def test_trx08_another_devices_new_speaker_is_not_found_and_writes_nothing(api: 
 def test_cld04_an_audio_complete_during_the_trash_is_404_and_the_upload_stays_open(
     api: Any, sql: Sql, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import httpx
 
     auth = register(api)
     put_recording(api, auth)
     body = {"kind": "audio", "bytes": 3, "contentType": "audio/mp4"}
     started = api.post(f"/v1/recordings/{RECORDING}/uploads", json=body, headers=auth).json()
-    etag = httpx.put(started["urls"][0]["url"], content=b"m4a").headers["etag"]
+    etag = S3_HTTP.put(started["urls"][0]["url"], content=b"m4a").headers["etag"]
     parts = {"parts": [{"n": 1, "etag": etag}]}
     answer = while_trashing(
         api,
@@ -263,7 +263,6 @@ def test_shr01_a_share_create_queued_behind_a_complete_never_holds_up_the_device
     """A complete holds recording A's lock through S3; a share create on A queues behind it. It takes the recording
     first and the device after, so meanwhile the device's other requests (a token check that refreshes
     `last_seen_at`, a share on recording B) don't wait for A."""
-    import httpx
     from conftest import VIDEO_SIZE, eventually
 
     auth = register(api)
@@ -273,7 +272,7 @@ def test_shr01_a_share_create_queued_behind_a_complete_never_holds_up_the_device
     share = create_share(api, auth).json()["shareId"]
     upload = {"kind": "share", "bytes": 10, "contentType": "video/mp4", "shareId": share, **VIDEO_SIZE}
     first = api.post(f"/v1/recordings/{RECORDING}/uploads", json=upload, headers=auth).json()
-    etag = httpx.put(first["urls"][0]["url"], content=b"ten bytes!").headers["etag"]
+    etag = S3_HTTP.put(first["urls"][0]["url"], content=b"ten bytes!").headers["etag"]
     storage = api.app.state.cloud.storage
     real = storage.complete
     inside = threading.Event()

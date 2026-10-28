@@ -40,9 +40,31 @@ def chunk(text: str, **changes: object) -> dict:
 
 
 def test_healthz_answers_without_a_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    from snapbak_backend.config.settings import code_version
+
     with serve(monkeypatch) as client:
         response = client.get("/healthz")
-    assert (response.status_code, response.json()) == (200, {"ok": True})
+    assert (response.status_code, response.json()) == (200, {"ok": True, "code": code_version()})
+
+
+def test_the_code_version_is_a_hash_of_the_source_so_a_stale_process_shows(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The founder's stale-process guard: a server or worker started before a change answers and logs the old hash.
+    It is worked out once, on first use, never on import (grading round 2), so a dictation never pays for it."""
+    import re
+    import subprocess
+    import sys
+
+    from snapbak_backend.config.settings import code_version
+
+    imported = "import snapbak_backend.config.settings as s; print(s.code_version.cache_info().currsize)"
+    assert subprocess.run([sys.executable, "-c", imported], capture_output=True, text=True).stdout.strip() == "0"
+    assert re.fullmatch(r"[0-9a-f]{12}", code_version())
+    caplog.set_level(logging.INFO)
+    with serve(monkeypatch):
+        pass
+    assert f"code={code_version()}" in caplog.text
 
 
 def test_healthz_warms_each_provider_connection_at_most_every_half_minute(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -74,7 +96,7 @@ def test_healthz_answers_when_warming_fails(monkeypatch: pytest.MonkeyPatch) -> 
     with respx.mock() as mock, serve(monkeypatch, **models) as client:
         mock.head("https://api.openai.com/v1/chat/completions").mock(side_effect=httpx.ConnectError("down"))
         response = client.get("/healthz")
-    assert (response.status_code, response.json()) == (200, {"ok": True})
+    assert (response.status_code, response.json()["ok"]) == (200, True)
 
 
 def test_polish_answers_the_contract_request(monkeypatch: pytest.MonkeyPatch) -> None:

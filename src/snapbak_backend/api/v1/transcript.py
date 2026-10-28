@@ -24,7 +24,8 @@ from snapbak_backend.schemas.cloud import (
     TransliterateResponse,
     WordOut,
 )
-from snapbak_backend.services import recordings, transliteration
+from snapbak_backend.services import meetings, recordings, speaker_loop, transliteration
+from snapbak_backend.services.events import publish
 from snapbak_backend.services.failures import CloudFailure
 
 router = APIRouter(route_class=LoggedRoute)
@@ -69,11 +70,9 @@ async def ready_job(db: Session, recording_id: UUID) -> TranscriptionJob:
 
 @router.get("/v1/recordings/{recording_id}/transcript")
 async def transcript(recording_id: UUID, device: Caller, db: Session) -> TranscriptResponse:
-    await recordings.owned(db, device.id, recording_id)
+    recording = await recordings.owned(db, device.id, recording_id)
     job = await ready_job(db, recording_id)
-    speakers = await db.scalars(
-        select(Speaker).where(Speaker.recording_id == recording_id, Speaker.deleted_at.is_(None))
-    )
+    speakers = (await recordings.speakers_of(db, recording_id)).values()
     lines = await recordings.live_lines(db, recording_id)
     lines_out = [
         LineOut(
@@ -97,14 +96,15 @@ async def transcript(recording_id: UUID, device: Caller, db: Session) -> Transcr
         script=job.script,
         speakers=speakers_out,
         lines=lines_out,
+        speakerPass=speaker_loop.pass_or_none(recording),
     )
     return answer
 
 
 @router.patch("/v1/lines/{line_id}")
-async def patch_line(line_id: UUID, body: LineRequest, device: Caller, db: Session) -> LineResponse:
+async def patch_line(line_id: UUID, body: LineRequest, device: Caller, db: Session, request: Request) -> LineResponse:
     """The whole line replaces the stored one; its Roman words are cleared, since they no longer match, and the
-    next transliteration fills them again."""
+    next transliteration fills them again. An edit marks a meeting's minutes stale (D29)."""
     line = await recordings.owned_row(db, device.id, TranscriptLine, line_id)
     await recordings.locked(db, device.id, line.recording_id)
     line = await recordings.owned_row(db, device.id, TranscriptLine, line_id)
@@ -125,29 +125,62 @@ async def patch_line(line_id: UUID, body: LineRequest, device: Caller, db: Sessi
     line.roman_words = None
     line.rev = TranscriptLine.rev + 1
     line.updated_at = func.now()
+    bumped = await meetings.bump(db, line.recording_id)
     await db.flush()
     await db.refresh(line, ["rev"])
     rev = line.rev
     await db.commit()
+    await publish_bumped(request, bumped)
     return LineResponse(rev=rev)
 
 
+async def publish_bumped(request: Request, bumped: tuple[UUID, int] | None) -> None:
+    """The meeting's new version, when the edit reached one (D29); the minutes are stale from here on."""
+    if bumped is None:
+        return
+    meeting_id, version = bumped
+    cloud = request.app.state.cloud
+    await publish(cloud.redis, meeting_id, version)
+
+
+async def publish_renamed(request: Request, bumped: tuple[UUID, int] | None) -> None:
+    """A rename's new version, and the minutes embedded again, so search shows each person by the name they have
+    now (D41: the sections are embedded as words)."""
+    await publish_bumped(request, bumped)
+    if bumped is None:
+        return
+    meeting_id, version = bumped
+    redis = request.app.state.cloud.redis
+    await redis.enqueue_job("embed_minutes_task", meeting_id, _job_id=f"embed:{meeting_id}:{version}")
+
+
 @router.patch("/v1/speakers/{speaker_id}")
-async def rename_speaker(speaker_id: UUID, body: SpeakerNameRequest, device: Caller, db: Session) -> SpeakerOut:
+async def rename_speaker(
+    speaker_id: UUID, body: SpeakerNameRequest, device: Caller, db: Session, request: Request
+) -> SpeakerOut:
     speaker = await recordings.owned_row(db, device.id, Speaker, speaker_id)
     await recordings.locked(db, device.id, speaker.recording_id)
     speaker = await recordings.owned_row(db, device.id, Speaker, speaker_id)
     speaker.name = body.name
     speaker.name_source = "user"
+    bumped = await meetings.bump(db, speaker.recording_id)
     await db.commit()
+    await publish_renamed(request, bumped)
     return speaker_out(speaker)
 
 
 @router.put("/v1/recordings/{recording_id}/speakers/{speaker_id}")
 async def put_speaker(
-    recording_id: UUID, speaker_id: UUID, body: SpeakerRequest, device: Caller, db: Session, response: Response
+    recording_id: UUID,
+    speaker_id: UUID,
+    body: SpeakerRequest,
+    device: Caller,
+    db: Session,
+    request: Request,
+    response: Response,
 ) -> SpeakerOut:
-    """A speaker made on the Mac, idempotent by its ID. A label another speaker of the recording has is invalid."""
+    """A speaker made or renamed on the Mac, idempotent by its ID: its name the user's, unless an Undo puts back the
+    source it had (`nameSource`). A label another speaker of the recording has is invalid."""
     await recordings.locked(db, device.id, recording_id)
     await ready_job(db, recording_id)
     taken = await db.scalar(
@@ -164,11 +197,18 @@ async def put_speaker(
     if speaker is None:
         speaker = Speaker(id=speaker_id, recording_id=recording_id, vendor_label="user")
         db.add(speaker)
+    source = (body.nameSource or "user") if body.name else None
+    # A resent PUT that changes nothing (the outbox's retries) is no transcript edit: no stale mark (D29). A name's
+    # source counts only when one is sent (an Undo restoring Snapbak's guess), so a plain resend stays no edit.
+    words = (speaker.label, speaker.name, speaker.color_idx) != (body.label, body.name, body.colorIdx)
+    changed = words or (body.nameSource is not None and speaker.name_source != source)
     speaker.label = body.label
     speaker.name = body.name
-    speaker.name_source = "user" if body.name else None
+    speaker.name_source = source
     speaker.color_idx = body.colorIdx
+    bumped = await meetings.bump(db, recording_id) if changed else None
     await db.commit()
+    await publish_renamed(request, bumped)
     return speaker_out(speaker)
 
 

@@ -10,6 +10,8 @@ from typing import Any, NamedTuple, Protocol
 import httpx
 
 type Turn = tuple[str, str]
+# The values a call's `reason` may take: OpenAI's `reasoning_effort` names, or "" for none.
+EFFORTS = frozenset({"none", "minimal", "low", "medium", "high", "xhigh"})
 
 
 # Idle provider connections live 5 minutes, so the next dictation skips the TLS handshake; warming opens one at

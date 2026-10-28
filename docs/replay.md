@@ -37,6 +37,28 @@ defaults are the server's, `openai:gpt-6-luna openai:gpt-6-luna`.
 It prints one month: the English corpus as the app would send it. Reasoning
 tokens are billed only on corrections; the polish model reasons at none.
 
+## Meeting minutes v2, 26 Oct 2026
+
+The minutes are now ten calls, one per section, each sending the whole
+transcript (MEETINGS.md 7, minutes v2), so the replay prices ten prompts per
+meeting, a 1,000-token answer each, a repair on one section in five, and the
+detail guard's completion call on half the runs (the transcript, the summary
+and MoM in, 2,000 tokens out). On `gpt-6-luna` at the priority estimate: 30 min
+is 105,646 in + 10,000 out tokens, US$0.040; 2 h is 412,622 in + 10,000 out,
+US$0.117. A heavy month of 20 two-hour meetings is about US$2.34, ten times
+the single call's: the price of a section each with its own room and repair.
+
+## Meeting minutes, 25 Oct 2026 (one call, before v2)
+
+The replay also prices one meeting's minutes (MEETINGS.md 11.5): 30 min and 2 h
+of two-speaker talk drawn from the corpus (same seed), cut into 20-word lines as
+the transcript stores them, sent whole in the server's minutes prompt in one
+call (D25), with a 1,500-token answer. One run in five is assumed to need the
+repair turn, which resends the transcript and the first answer. On
+`gpt-6-luna` at the priority estimate: 30 min is 10,511 in + 1,500 out tokens,
+US$0.0044; 2 h is 41,209 in + 1,500 out, US$0.0118. A heavy month of 20
+two-hour meetings is about US$0.24.
+
 ## R7 one-model round, 15 Oct 2026
 
 With `gpt-6-luna` polishing every chunk at effort none and correcting, at the

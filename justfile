@@ -25,10 +25,10 @@ db-down:
 migrate:
     uv run alembic upgrade head
 
-# Unit, integration, functional and end-to-end tests. Tests that need the compose stack skip, with the reason, when
-# it is down; start it with `just db-up`.
+# Unit, integration, functional and end-to-end tests. A test that needs the compose stack or the AWS key fails
+# here when either is missing (a plain `uv run pytest` skips it, with the reason); start the stack with `just db-up`.
 test:
-    uv run pytest
+    SNAPBAK_REQUIRE_CLOUD=1 uv run pytest
 
 # Lint, format check and type check.
 lint:
@@ -61,3 +61,29 @@ eval-transcript *args:
 # The same AMI excerpts through the real vendors (costs money): needs both keys, a real bucket and --budget-usd.
 eval-transcript-live *args:
     uv run scripts/eval_transcript.py --live {{ args }}
+
+# Minutes (per section, details kept, probes, contradictions, Hinglish) and Ask scored on AMI, QMSum and hand-made
+# meetings, recorded answers replayed (free); fails below the baseline or a gate.
+eval-minutes *args:
+    uv run scripts/eval_minutes.py {{ args }}
+
+# The same through the server's polish model (costs money): needs OPENAI_API_KEY and --budget-usd, the ledger cap.
+# `just eval-minutes --private DIR --budget-usd USD` runs exported meetings from outside the repo instead.
+eval-minutes-live *args:
+    uv run scripts/eval_minutes.py --live {{ args }}
+
+# The speaker loop (MOM-08) on AMI with a broken diarization and on hand-made named meetings, recorded answers (free)
+eval-speakers *args:
+    uv run scripts/eval_speakers.py {{ args }}
+
+# The same on the polish model (`--budget-usd`; about $0.11 a run)
+eval-speakers-live *args:
+    uv run scripts/eval_speakers.py --live {{ args }}
+
+# MOM-04 end to end on real vendors and the real model: P95 stop to minutes for a 30 min meeting (costs money).
+stop-to-minutes *args:
+    uv run scripts/stop_to_minutes.py {{ args }}
+
+# D39's unattended success from the worker's verdict lines (`just unattended < worker.log`); exits 1 under 99 %.
+unattended *args:
+    uv run scripts/unattended.py {{ args }}

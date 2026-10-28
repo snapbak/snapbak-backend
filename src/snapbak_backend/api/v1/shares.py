@@ -10,7 +10,7 @@ from sqlalchemy import func
 from snapbak_backend.api import cloud_deps
 from snapbak_backend.api.cloud_deps import Caller, Session
 from snapbak_backend.api.logged import LoggedRoute
-from snapbak_backend.config.settings import SHARE_MAX_BYTES
+from snapbak_backend.config.settings import GIF_MAX_BYTES, SHARE_MAX_BYTES
 from snapbak_backend.db.models import Share, page_state
 from snapbak_backend.schemas.cloud import ShareRef, ShareRequest, ShareResponse, ShareUpdateRequest
 from snapbak_backend.services import recordings, shares
@@ -29,7 +29,9 @@ def answer(share: Share, base: str, poster_upload_url: str | None = None) -> Sha
     """The share as every share route answers it; `posterUploadUrl` only from create."""
     named = ref(share, base).model_dump()
     state = page_state(share, datetime.now(UTC))
-    made = ShareResponse(**named, pageState=state, expiresAt=share.expires_at, posterUploadUrl=poster_upload_url)
+    made = ShareResponse(
+        **named, pageState=state, expiresAt=share.expires_at, posterUploadUrl=poster_upload_url, type=share.type
+    )
     return made
 
 
@@ -38,13 +40,19 @@ async def create(
     recording_id: UUID, body: ShareRequest, device: Caller, db: Session, request: Request, response: Response
 ) -> ShareResponse:
     """201 with a new slug, or 200 with the recording's share, ready for the next version's poster and video."""
-    if body.bytes > SHARE_MAX_BYTES:
-        raise CloudFailure(413, "upload_too_large")
+    recording = await recordings.owned(db, device.id, recording_id)
+    gif = recording.recording_type == "gif"
+    cap = GIF_MAX_BYTES if gif else SHARE_MAX_BYTES
+    if body.bytes > cap:
+        raise CloudFailure(413, "gif_too_large" if gif else "upload_too_large")
     share, created = await shares.open_share(db, device.id, recording_id, body)
     await db.commit()
     cloud = cloud_deps.cloud(request)
+    # A GIF page's unfurl animates the GIF itself (G7): there is no poster to offer.
     poster = shares.key(share.id, share.version + 1, "poster.jpg")
-    upload_url = cloud.storage.presign_put(poster, "image/jpeg", shares.SIGNED_S)
+    upload_url = None
+    if share.type != "gif":
+        upload_url = cloud.storage.presign_put(poster, "image/jpeg", shares.SIGNED_S)
     response.status_code = 201 if created else 200
     made = answer(share, cloud.config.share_url, upload_url)
     return made

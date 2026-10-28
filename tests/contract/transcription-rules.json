@@ -1,7 +1,7 @@
 {
   "about": "Golden vectors for the transcript eval's copies of 14-transcript-editing A6 (pauses) and 15-captions C1 (caption groups and rows). Each expected value was printed by the app's own code: web/studio/src/studio/transcript/editor/cleanup.ts candidates() and apps/desktop/src/captions/layout.rs track(), byte-identical copies of the files with these SHA-256 sums, English, one whole segment at speed 1. A pause is [lo, hi], the words' gap; its cut keeps 150 ms each side. A caption is its rows of words.",
   "sources": {
-    "apps/desktop/src/captions/layout.rs": "c68979e0998f7bc7fc810a2030ae99d74612e313f7bb544b5f7d063586c37253",
+    "apps/desktop/src/captions/layout.rs": "cf4c1e38fd96ae236b28fa827fa6bef9f676f09bbd3d767ec705221d7328da8a",
     "web/studio/src/studio/transcript/editor/cleanup.ts": "2ad0f543cdaed748b40bdbf7df47ec3ce21b2ce7f4aeb5545c7039c108bb2c73",
     "web/studio/src/studio/transcript/editor/align.ts": "5aa3b8cf2e72076aa6eacade4d6f4cd1b1099a6a9cf8b73abd05aaa049304b13"
   },

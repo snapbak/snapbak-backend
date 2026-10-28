@@ -18,13 +18,13 @@ def sql(statement: ClauseElement) -> str:
     return " ".join(str(compiled).split())
 
 
-def test_cld03_the_reservation_adds_to_todays_row_only_while_it_stays_within_7200_seconds() -> None:
+def test_cld03_the_reservation_adds_to_todays_row_only_while_it_stays_within_14400_seconds() -> None:
     said = sql(reservation(DEVICE, 613))
     assert said.startswith("INSERT INTO usage_daily (device_id, day, audio_seconds) VALUES")
     assert "CAST(timezone('UTC', now()) AS DATE), 613)" in said
     assert said.endswith(
         "ON CONFLICT (device_id, day) DO UPDATE SET audio_seconds = (usage_daily.audio_seconds + "
-        "excluded.audio_seconds) WHERE usage_daily.audio_seconds + excluded.audio_seconds <= 7200 "
+        "excluded.audio_seconds) WHERE usage_daily.audio_seconds + excluded.audio_seconds <= 14400 "
         "RETURNING usage_daily.audio_seconds"
     )
 

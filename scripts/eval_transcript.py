@@ -41,7 +41,7 @@ from xml.etree import ElementTree
 
 from vendor_run import CAP_S, WORD, heard, percentile, save_answers, word_error_rate
 
-from bench import ledger_total
+from bench import append_ledger, ledger_total, require_budget
 from snapbak_backend.config.settings import load
 from snapbak_backend.services.storage import Storage, s3_client
 from snapbak_backend.transcription.assemblyai_pyannote import AssemblyAiPyannoteStrategy
@@ -57,6 +57,7 @@ LEDGER = Path.home() / ".snapbak-bench" / "spend.jsonl"
 SEED = 13
 # AMI's spellings of a hesitation. "Mm-hmm" and "uh-huh" mean yes, so they are words, not fillers.
 AMI_FILLERS = frozenset({"um", "uh", "hmm", "mm", "ah"})
+NITE_ID = "{http://nite.sourceforge.net/}id"
 
 # The errors the replay tier adds to the truth, each from what the vendors are known to do.
 # AssemblyAI hears one stream: its words keep their true order and never overlap, so a word said over someone else
@@ -144,30 +145,41 @@ def bare(said: str) -> str:
     return stripped
 
 
+def ami_speaker(root: ElementTree.Element, speaker: str) -> tuple[list[Word], list[tuple[str, int | None]]]:
+    """One speaker's timed words from AMI's `words/<meeting>.<speaker>.words.xml` (a mark joins the word before it,
+    untimed words and sounds are skipped), and each element's nite:id in file order with the index of the word it
+    is part of, or None: the dialogue acts and summaries point at those ids."""
+    spoken: list[Word] = []
+    owners: list[tuple[str, int | None]] = []
+    timed = False
+    for item in root:
+        nite_id = item.get(NITE_ID, "")
+        if item.tag != "w":
+            owners.append((nite_id, None))
+            continue
+        said = item.text or ""
+        if item.get("punc") == "true":
+            joined = timed and bool(spoken)
+            if joined:
+                spoken[-1] = replace(spoken[-1], w=spoken[-1].w + said)
+            owners.append((nite_id, len(spoken) - 1 if joined else None))
+            continue
+        start, end = float(item.get("starttime", "nan")), float(item.get("endtime", "nan"))
+        timed = math.isfinite(start) and math.isfinite(end)
+        if timed:
+            filler = bare(said) in AMI_FILLERS
+            spoken.append(Word(said, round(start * 1000), round(end * 1000), filler, 1.0, speaker))
+        owners.append((nite_id, len(spoken) - 1 if timed else None))
+    return spoken, owners
+
+
 def ami_words(archive: Path, meeting: str, start_s: int, end_s: int) -> list[Word]:
-    """The meeting's timed words between the two times, from AMI's `words/<meeting>.<speaker>.words.xml`: a mark
-    joins the word before it, untimed words and sounds are skipped, and times count from `start_s`."""
+    """The meeting's timed words between the two times (`ami_speaker`), with times counted from `start_s`."""
     words: list[Word] = []
     with zipfile.ZipFile(archive) as opened:
         names = sorted(name for name in opened.namelist() if name.startswith(f"words/{meeting}."))
         for name in names:
-            speaker = name.split(".")[1]
-            root = ElementTree.fromstring(opened.read(name))
-            spoken: list[Word] = []
-            timed = False
-            for item in root:
-                if item.tag != "w":
-                    continue
-                said = item.text or ""
-                if item.get("punc") == "true":
-                    if timed and spoken:
-                        spoken[-1] = replace(spoken[-1], w=spoken[-1].w + said)
-                    continue
-                start, end = float(item.get("starttime", "nan")), float(item.get("endtime", "nan"))
-                timed = math.isfinite(start) and math.isfinite(end)
-                if timed:
-                    filler = bare(said) in AMI_FILLERS
-                    spoken.append(Word(said, round(start * 1000), round(end * 1000), filler, 1.0, speaker))
+            spoken, _ = ami_speaker(ElementTree.fromstring(opened.read(name)), name.split(".")[1])
             words += spoken
     offset, last = start_s * 1000, end_s * 1000
     inside = [
@@ -539,19 +551,18 @@ async def live(excerpts: list[Excerpt], transcribe: Transcribe, ledger: Path, li
         else:
             note = "ok"
     finally:
-        ledger.parent.mkdir(parents=True, exist_ok=True)
-        entry = {"usd": spent, "items": sent, "spec": "eval-transcript-live", "note": note}
-        with ledger.open("a", encoding="utf-8") as written:
-            written.write(json.dumps(entry) + "\n")
+        append_ledger(ledger, spent, sent, "eval-transcript-live", note)
         print(f"$ this run: {spent:.4f}; ledger total: {before + spent:.4f}")
     return rows
 
 
-def fetch(entry: dict[str, Any]) -> Path:
-    """The manifest entry's file in the cache, downloaded if missing; a file whose SHA-256 differs is refused."""
-    path = CACHE / entry["file"]
+def fetch(entry: dict[str, Any], cache: Path | None = None) -> Path:
+    """The manifest entry's file in `cache` (the AMI cache unless given), downloaded if missing; a file whose SHA-256
+    differs is refused."""
+    cache = cache or CACHE
+    path = cache / entry["file"]
     if not path.exists():
-        CACHE.mkdir(parents=True, exist_ok=True)
+        cache.mkdir(parents=True, exist_ok=True)
         partial = path.with_name(path.name + ".part")
         print(f"downloading {entry['url']}")
         urllib.request.urlretrieve(entry["url"], partial)
@@ -590,8 +601,9 @@ def table(rows: Rows) -> str:
     return printed
 
 
-def regressions(baseline: Rows, results: Rows) -> list[str]:
-    """Every baseline metric this run made worse, and every baseline row it lacks."""
+def regressions(baseline: Rows, results: Rows, higher: Mapping[str, bool] = HIGHER) -> list[str]:
+    """Every baseline metric this run made worse, and every baseline row it lacks; `higher` says which way is
+    better."""
     found = []
     for row, metrics in baseline.items():
         now = results.get(row)
@@ -603,7 +615,7 @@ def regressions(baseline: Rows, results: Rows) -> list[str]:
             if after is None:
                 found.append(f"{row}: {metric} missing")
                 continue
-            worse = after < before if HIGHER[metric] else after > before
+            worse = after < before if higher[metric] else after > before
             if worse:
                 found.append(f"{row}: {metric} {before:.2f} -> {after:.2f}")
     return found
@@ -665,8 +677,7 @@ def cut(excerpt: Excerpt) -> Path:
 
 
 def run_live(budget_usd: float | None, ledger: Path) -> int:
-    if budget_usd is None:
-        raise SystemExit("The live tier costs money: pass --budget-usd, the most the ledger may reach.")
+    budget_usd = require_budget(budget_usd, "The live tier")
     for key in ("ASSEMBLYAI_API_KEY", "PYANNOTE_API_KEY"):
         if not os.environ.get(key):
             raise SystemExit(f"Set {key}: the live tier needs both vendors (docs/cloud.md).")

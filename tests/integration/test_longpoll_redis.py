@@ -68,9 +68,15 @@ def test_trx01_waiting_long_polls_hold_no_database_connection_or_transaction(api
     for poll in polls:
         poll.start()
     waiting_for(api, job)
-    held = sql(
-        "SELECT count(*) AS n FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid()"
-        " AND state <> 'idle'"
+    # The watcher is registered before the poll's first read, so that read may still be running: wait for it to end.
+    # A poll that held its connection through the wait would keep it past the polls' whole 3 s.
+    held = eventually(
+        lambda: sql(
+            "SELECT count(*) AS n FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid()"
+            " AND state <> 'idle'"
+        ),
+        lambda rows: rows == [{"n": 0}],
+        within_s=1.5,
     )
     started = time.monotonic()
     other = put_recording(api, auth)

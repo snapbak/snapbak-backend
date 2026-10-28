@@ -25,11 +25,8 @@ main {
   width: min(440px, 100%);
   padding: var(--sb-spacing-8);
   text-align: center;
-  border-radius: var(--sb-radius-lg);
-  border: 1px solid var(--sb-color-border);
-  background: var(--sb-color-glass);
-  box-shadow: 0 30px 90px -36px color-mix(in srgb, var(--sb-color-accent) 50%, transparent);
 }
+/* The glyph sits in a round well, lit like an LED. */
 .icon {
   display: grid;
   place-items: center;
@@ -37,9 +34,10 @@ main {
   height: 56px;
   margin: 0 auto var(--sb-spacing-4);
   border-radius: var(--sb-radius-pill);
-  color: var(--sb-color-accent);
-  background: color-mix(in srgb, var(--sb-color-accent) 16%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sb-color-accent) 30%, transparent);
+  color: var(--sb-color-led);
+}
+.icon svg {
+  filter: drop-shadow(0 0 5px var(--sb-color-accent-glow));
 }
 h1 {
   font-size: var(--sb-font-size-lg);
@@ -54,8 +52,8 @@ p {
 <body>
 <header class="bar"><a class="brand" href="$home_url?ref=share">$mark<span>Snapbak</span></a></header>
 <main>
-<div class="card">
-<div class="icon">$glyph</div>
+<div class="card plate">
+<div class="icon well">$glyph</div>
 <h1>$message</h1>
 <p>$hint</p>
 <a class="button" href="$home_url?ref=share">Get Snapbak</a>

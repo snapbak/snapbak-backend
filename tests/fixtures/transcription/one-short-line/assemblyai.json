@@ -1,0 +1,23 @@
+{
+  "id": "aai-one-short-line",
+  "status": "completed",
+  "language_confidence": 0.97,
+  "language_code": "en_us",
+  "audio_duration": 2,
+  "words": [
+    {
+      "text": "Okay,",
+      "start": 300,
+      "end": 700,
+      "confidence": 0.95,
+      "speaker": "A"
+    },
+    {
+      "text": "done.",
+      "start": 800,
+      "end": 1400,
+      "confidence": 0.95,
+      "speaker": "A"
+    }
+  ]
+}

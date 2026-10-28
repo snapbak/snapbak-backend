@@ -100,6 +100,21 @@ def test_trx08_a_new_speaker_from_the_mac_is_made_once_by_its_id(api: Any, ready
     assert labels == ["Speaker 1", "Speaker 2", "Speaker 3"]
 
 
+def test_mom08_an_undone_pick_puts_back_the_name_and_its_source_as_they_were(api: Any, ready: tuple) -> None:
+    auth, transcript = ready
+    speaker = transcript["speakers"][0]
+    path = f"/v1/recordings/{RECORDING}/speakers/{speaker['id']}"
+    picked = api.put(path, json={"label": "Speaker 1", "name": "Rabbi Ian", "colorIdx": 0}, headers=auth)
+    # The Mac's Undo of a "Who is X?" pick writes the name back with the source it had: Snapbak's guess again.
+    back = {"label": "Speaker 1", "name": "Priya", "colorIdx": 0, "nameSource": "guessed"}
+    restored = api.put(path, json=back, headers=auth)
+    assert picked.json()["nameSource"] == "user"
+    assert (restored.json()["name"], restored.json()["nameSource"]) == ("Priya", "guessed")
+    # A source comes back only with a name: none is no one's.
+    unnamed = api.put(path, json={**back, "name": None}, headers=auth)
+    assert unnamed.json()["nameSource"] is None
+
+
 def test_trx09_transliterate_returns_roman_words_for_every_line(api: Any, ready: tuple) -> None:
     auth, transcript = ready
     response = api.post(f"/v1/recordings/{RECORDING}/transliterate", json={"script": "roman"}, headers=auth)

@@ -45,6 +45,10 @@ with an arq worker on Redis (`docs/cloud.md`). The app repo lives next door in
 | `just corpus` | generate missing corpus slices with OpenAI (needs a key) |
 | `just eval-transcript` | transcript merge, lines, fillers, pauses, captions on AMI (free) |
 | `just eval-transcript-live` | the same on real vendors (keys, `--budget-usd`; costs money) |
+| `just eval-minutes` | minutes (per section, details, probes, contradictions, Hinglish) and Ask on AMI and QMSum, recorded answers (free); `--private DIR --budget-usd USD` runs exported meetings from outside the repo (costs money) |
+| `just eval-minutes-live` | the same on the polish model, P95 times, search recall (`--budget-usd`; costs money); `--smoke` (two tiny meetings, English and Hinglish, one question, under $0.01) after any change to providers, prompts, minutes or qa |
+| `just stop-to-minutes` | MOM-04's P95 stop to minutes for a 30 min meeting on real vendors and the model (`--budget-usd`; about $1) |
+| `just unattended` | D39's unattended success from the worker's verdict lines (`< worker.log`); exits 1 under 99 % |
 
 Tools are pinned in `.mise.toml`: run `mise install`, then `uv sync`. Settings
 and keys go in `.env` (copy `.env.example`); `SETUP.md` walks through each one,

@@ -27,6 +27,7 @@ def test_shr01_create_makes_an_uploading_share_with_a_poster_url_for_its_first_v
         "version": 0,
         "pageState": "uploading",
         "expiresAt": None,
+        "type": "video",
     }
     assert f"/shares/{share}/v1/poster.jpg?" in body["posterUploadUrl"]
     assert "X-Amz-Signature=" in body["posterUploadUrl"]

@@ -37,9 +37,10 @@ async def together(calls: Iterable[Coroutine[Any, Any, int]]) -> list[int]:
 
 async def generate(device: uuid.UUID, recording_id: uuid.UUID, duration_ms: int) -> int:
     """One Generate in its own session and connection: 201 or the error's status."""
-    config = load(os.environ).cloud
+    whole = load(os.environ)
+    config = whole.cloud
     assert config is not None
-    cloud = await open_cloud(config)
+    cloud = await open_cloud(config, whole.keys)
     try:
         async with cloud.sessions() as db:
             recording = Recording(
@@ -62,8 +63,8 @@ def test_trx01_two_concurrent_generates_make_one_job_and_one_409_that_reserves_n
     assert sql("SELECT audio_seconds FROM usage_daily") == [{"audio_seconds": 60}]
 
 
-def test_cld03_ten_concurrent_15_minute_generates_give_8_jobs_and_2_daily_limits(sql: Sql) -> None:
-    device, made = recording_rows(sql, 10, 900_000)
+def test_cld03_twenty_concurrent_15_minute_generates_give_16_jobs_and_4_daily_limits(sql: Sql) -> None:
+    device, made = recording_rows(sql, 20, 900_000)
     answers = asyncio.run(together(generate(device, recording, 900_000) for recording in made))
-    assert sorted(answers) == [201] * 8 + [429] * 2
-    assert sql("SELECT audio_seconds FROM usage_daily") == [{"audio_seconds": 7200}]
+    assert sorted(answers) == [201] * 16 + [429] * 4
+    assert sql("SELECT audio_seconds FROM usage_daily") == [{"audio_seconds": 14400}]

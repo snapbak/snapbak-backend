@@ -28,6 +28,9 @@ class FakeTranscriptionStrategy:
             raise ValueError(f"Unknown transcription fixture '{fixture}'; see {FIXTURES}.")
         self.transcript = json.loads((folder / "assemblyai.json").read_text())
         self.output = json.loads((folder / "pyannote.json").read_text())
+        rerun = folder / "rerun.json"
+        self.rerun = json.loads(rerun.read_text()) if rerun.is_file() else self.output
+        self.prints: list[str] = []
         toml = folder / "fixture.toml"
         settings = tomllib.loads(toml.read_text()) if toml.is_file() else {}
         self.delay_s = settings.get("delay_ms", 0) / 1000
@@ -57,6 +60,22 @@ class FakeTranscriptionStrategy:
 
     async def diarization(self, refs: Refs) -> list[dict[str, Any]]:
         return self.output.get("exclusiveDiarization") or []
+
+    async def rediarize(self, audio_url: str, count: int) -> str:
+        return f"fake-rerun-{count}"
+
+    async def rediarization(self, vendor_job: str) -> list[dict[str, Any]] | None:
+        """The fixture's turns again, or `rerun.json`'s when the fixture has one (a rerun that hears other voices)."""
+        return self.rerun.get("exclusiveDiarization") or []
+
+    async def identify(self, audio_url: str, prints: dict[str, str]) -> str:
+        self.prints = list(prints)
+        return "fake-identify"
+
+    async def identification(self, vendor_job: str) -> dict[str, Any] | None:
+        """The rerun's turns, each voice matching only its own speaker's voiceprint: nothing is one voice."""
+        voices = [{"speaker": label, "match": label, "confidence": {label: 90}} for label in self.prints]
+        return {"exclusiveDiarization": await self.rediarization(vendor_job), "voiceprints": voices}
 
     async def voiceprint(self, clip_url: str, webhook: str) -> str:
         """Calls back as pyannoteAI's webhook would."""

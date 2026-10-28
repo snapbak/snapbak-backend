@@ -63,6 +63,22 @@ class TranscriptionStrategy(Protocol):
         """pyannote's `exclusiveDiarization`, for the voiceprint spans."""
         ...
 
+    async def rediarize(self, audio_url: str, count: int) -> str:
+        """Starts pyannote again at exactly `count` voices (MOM-08); the vendor's job ID."""
+        ...
+
+    async def rediarization(self, vendor_job: str) -> list[dict[str, Any]] | None:
+        """The rerun's `exclusiveDiarization` once done, None while it runs; VendorRefused when it failed."""
+        ...
+
+    async def identify(self, audio_url: str, prints: dict[str, str]) -> str:
+        """Starts pyannote's identify with each speaker's voiceprint, by label (MOM-08); the vendor's job ID."""
+        ...
+
+    async def identification(self, vendor_job: str) -> dict[str, Any] | None:
+        """The identify output once done, None while it runs; VendorRefused when it failed."""
+        ...
+
     async def voiceprint(self, clip_url: str, webhook: str) -> str:
         """Starts a voiceprint of one speaker's clip; the vendor's job ID."""
         ...

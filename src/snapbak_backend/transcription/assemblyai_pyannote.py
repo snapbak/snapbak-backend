@@ -145,6 +145,45 @@ class AssemblyAiPyannoteStrategy:
         merged = merge(transcript, turns, refs["language"])
         return merged
 
+    async def rediarize(self, audio_url: str, count: int) -> str:
+        """Diarizes again at exactly `count` voices (MOM-08), polled rather than called back; the job's ID."""
+        body = {"url": audio_url, "model": "precision-2", "exclusive": True, "numSpeakers": count}
+        started = await call(self.pyannote, "POST", "/v1/diarize", body)
+        return started["jobId"]
+
+    async def rediarization(self, vendor_job: str) -> list[dict[str, Any]] | None:
+        """The rerun's `exclusiveDiarization` once it succeeded, None while it runs; VendorRefused when it failed."""
+        job = await call(self.pyannote, "GET", f"/v1/jobs/{vendor_job}")
+        if job["status"] in ("failed", "canceled"):
+            raise VendorRefused(f"pyannote rerun {job['status']}")
+        if job["status"] != "succeeded":
+            return None
+        return job["output"].get("exclusiveDiarization") or []
+
+    async def identify(self, audio_url: str, prints: dict[str, str]) -> str:
+        """Diarizes again and scores every voice against each speaker's voiceprint (MOM-08), `prints` by label;
+        several voices may match one voiceprint, so a voice split in two shows. Polled; the job's ID."""
+        voiceprints = [{"label": label, "voiceprint": print_} for label, print_ in prints.items()]
+        body = {
+            "url": audio_url,
+            "model": "precision-2",
+            "exclusive": True,
+            "voiceprints": voiceprints,
+            "matching": {"exclusive": False, "threshold": 0},
+        }
+        started = await call(self.pyannote, "POST", "/v1/identify", body)
+        return started["jobId"]
+
+    async def identification(self, vendor_job: str) -> dict[str, Any] | None:
+        """The identify job's output once it succeeded (`exclusiveDiarization`, `voiceprints` with each voice's
+        confidence per label), None while it runs; VendorRefused when it failed."""
+        job = await call(self.pyannote, "GET", f"/v1/jobs/{vendor_job}")
+        if job["status"] in ("failed", "canceled"):
+            raise VendorRefused(f"pyannote identify {job['status']}")
+        if job["status"] != "succeeded":
+            return None
+        return job["output"]
+
     async def voiceprint(self, clip_url: str, webhook: str) -> str:
         started = await call(self.pyannote, "POST", "/v1/voiceprint", {"url": clip_url, "webhook": webhook})
         return started["jobId"]

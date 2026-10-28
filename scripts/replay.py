@@ -12,11 +12,13 @@ import sys
 
 from bench import load
 from snapbak_backend.ai.guardrail.judge import Reason, Reject
+from snapbak_backend.ai.prompts import minutes as minutes_prompt
 from snapbak_backend.ai.prompts.examples import EXAMPLES
 from snapbak_backend.ai.prompts.polish import SYSTEM, correction, message
 from snapbak_backend.config.pricing import billed
 from snapbak_backend.config.settings import POLISH
 from snapbak_backend.schemas.polish import MAX_PRIOR_WORDS
+from snapbak_backend.services.minutes import CALLS
 
 # The PRD's cost target, shown for reference: the founder put accuracy over cost and time (11 Oct).
 TARGET = 0.50
@@ -86,6 +88,45 @@ def month(pool: list[str], polish: str, correction: str) -> dict[str, float]:
     return totals
 
 
+# Minutes v2 (MEETINGS.md 7.2): one call per section, each resending the transcript. A section's answer (the
+# summary, the MoM's topics, or one section's items with their quotes) is about 1,000 tokens; a fifth of the
+# sections go back once for repair, which resends the transcript and the first answer; and half the runs make the
+# detail guard's one completion call, which resends the transcript and the summary and MoM.
+SECTION_OUTPUT = 1000
+MINUTES_REPAIR_SHARE = 0.2
+DETAIL_SHARE = 0.5
+LINE_WORDS = 20
+
+
+def minutes_run(pool: list[str], seconds: int, engine: str) -> dict[str, float]:
+    """One meeting's minutes: `seconds` of two-speaker talk drawn from the corpus (fixed seed), cut into lines of
+    about 20 words as the transcript stores them, sent whole in each section's call (D25, minutes v2)."""
+    rng = random.Random(7)
+    words: list[str] = []
+    while len(words) < seconds * WORDS_PER_SECOND:
+        words.extend(rng.choice(pool).split())
+    per_line = LINE_WORDS / WORDS_PER_SECOND * 1000
+    lines = [
+        {
+            "i": n,
+            "s": int(n * per_line),
+            "e": int((n + 1) * per_line),
+            "sname": f"Speaker {n % 2 + 1}",
+            "text": " ".join(words[start : start + LINE_WORDS]),
+        }
+        for n, start in enumerate(range(0, len(words), LINE_WORDS))
+    ]
+    sent, dollars = 0.0, 0.0
+    for section in CALLS:
+        asked = sum(estimate(text) + MESSAGE_OVERHEAD for _, text in minutes_prompt.turns(section, "Weekly", [], lines))
+        repair = asked + SECTION_OUTPUT + estimate(minutes_prompt.correction(["decisions dec_1 had too few"]))
+        sent += asked
+        dollars += billed(engine, asked, SECTION_OUTPUT) + MINUTES_REPAIR_SHARE * billed(engine, repair, SECTION_OUTPUT)
+    guard = sum(estimate(text) + MESSAGE_OVERHEAD for _, text in minutes_prompt.completion_turns("", "", [], lines))
+    dollars += DETAIL_SHARE * billed(engine, guard + 2 * SECTION_OUTPUT, 2 * SECTION_OUTPUT)
+    return {"input": sent, "output": SECTION_OUTPUT * len(CALLS), "$": dollars}
+
+
 def main() -> int:
     polish, correction = sys.argv[1:3] if len(sys.argv) >= 3 else (POLISH, "openai:gpt-6-luna")
     pool = utterances()
@@ -102,6 +143,12 @@ def main() -> int:
         f"${totals['polish $']:.3f} polish + ${totals['correction $']:.3f} correction = ${dollars:.3f} "
         f"{'within' if passes else 'OVER'} ${TARGET:.2f}"
     )
+    for seconds in (1800, 7200):
+        run = minutes_run(pool, seconds, POLISH)
+        print(
+            f"  minutes of a {seconds // 60} min meeting on {POLISH}: {run['input']:.0f} in + {run['output']:.0f} out "
+            f"tokens over {len(CALLS)} calls, ${run['$']:.4f} with {MINUTES_REPAIR_SHARE:.0%} repaired"
+        )
     return 0
 
 

@@ -166,7 +166,7 @@ def test_trx01_generate_on_a_ready_transcript_follows_it_and_bills_nothing(
     follow(api, auth, job)
     again = create_job(api, auth)
     assert failure(again) == (409, "job_exists")
-    # Versions: made 1, audio 2, submitted 3, each vendor done 4 and 5, ready 6.
-    assert again.json()["job"] == {"jobId": job, "state": "ready", "version": 6}
+    # Versions: made 1, audio 2, submitted 3, each vendor done 4 and 5, held for the speaker loop 6, ready 7.
+    assert again.json()["job"] == {"jobId": job, "state": "ready", "version": 7}
     assert sql("SELECT audio_seconds FROM usage_daily") == [{"audio_seconds": 613}]
     assert sql("SELECT count(*) AS n FROM transcription_jobs") == [{"n": 1}]

@@ -15,12 +15,13 @@ from snapbak_backend.api import cloud_deps
 from snapbak_backend.api.cloud_deps import Caller, Session
 from snapbak_backend.api.logged import LoggedRoute
 from snapbak_backend.api.v1.shares import ref
-from snapbak_backend.config.settings import SHARE_MAX_BYTES
+from snapbak_backend.config.settings import GIF_MAX_BYTES, SHARE_MAX_BYTES
 from snapbak_backend.db.models import Share, TranscriptionJob, Upload
 from snapbak_backend.schemas.cloud import (
     AnyUpload,
     CompleteRequest,
     CompleteResponse,
+    GifUploadRequest,
     PartsRequest,
     PartUrl,
     ShareCompleteResponse,
@@ -51,9 +52,10 @@ def urls(storage: Storage, upload: Upload, numbers: list[int]) -> UploadResponse
 
 @router.post("/v1/recordings/{recording_id}/uploads", status_code=201)
 async def start(recording_id: UUID, body: AnyUpload, device: Caller, db: Session, request: Request) -> UploadResponse:
-    cap = SHARE_MAX_BYTES if body.kind == "share" else AUDIO_CAP
+    gif = body.kind == "gif"
+    cap = GIF_MAX_BYTES if gif else SHARE_MAX_BYTES if body.kind == "share" else AUDIO_CAP
     if body.bytes > cap:
-        raise CloudFailure(413, "upload_too_large")
+        raise CloudFailure(413, "gif_too_large" if gif else "upload_too_large")
     await recordings.locked(db, device.id, recording_id)
     cloud = cloud_deps.cloud(request)
     upload_id = uuid.uuid4()
@@ -66,13 +68,19 @@ async def start(recording_id: UUID, body: AnyUpload, device: Caller, db: Session
         content_type=body.contentType,
     )
     cache = None
-    if isinstance(body, ShareUploadRequest):
+    if isinstance(body, ShareUploadRequest | GifUploadRequest):
         share = await shares.for_upload(db, recording_id, body.shareId)
         await shares.abort_open_uploads(db, cloud.storage, share)
         upload.share_id = share.id
-        upload.duration_ms, upload.width, upload.height = body.durationMs, body.width, body.height
-        upload.s3_key = shares.key(share.id, share.version + 1, "video.mp4")
+        # A GIF's page animates the GIF itself, so its object is immutable like a video's (GIFS-AND-REPLAY-60, G7);
+        # a GIF has no length, only the size it draws at.
+        name = "animation.gif" if isinstance(body, GifUploadRequest) else "video.mp4"
+        upload.s3_key = shares.key(share.id, share.version + 1, name)
         cache = shares.IMMUTABLE
+        if isinstance(body, GifUploadRequest):
+            upload.width, upload.height = body.width, body.height
+        else:
+            upload.duration_ms, upload.width, upload.height = body.durationMs, body.width, body.height
     else:
         upload.s3_key = f"audio/{recording_id}/{upload_id}.m4a"
     storage = cloud.storage
@@ -108,7 +116,7 @@ async def complete(
     await recordings.lock(db, select(Upload.recording_id).where(Upload.id == upload_id).scalar_subquery())
     upload = await recordings.owned_row(db, device.id, Upload, upload_id)
     cloud = cloud_deps.cloud(request)
-    share = None if upload.kind != "share" else await shares.of_upload(db, upload)
+    share = None if upload.kind not in ("share", "gif") else await shares.of_upload(db, upload)
     if upload.state == "aborted":
         raise CloudFailure(409, "upload_state")
     if upload.state == "complete":
@@ -116,13 +124,16 @@ async def complete(
         return again
     storage = cloud.storage
     listed = [(part.n, part.etag) for part in body.parts]
-    # An earlier complete may have succeeded and lost its answer; the object's size tells.
+    # An earlier complete may have succeeded and lost its answer; the object's size tells. S3 keeps a completed
+    # upload's ID a while: asked again it answers NoSuchUpload once the ID is gone, but InvalidPart before that when
+    # the ETags differ from the ones that completed it.
     try:
         with contextlib.suppress(NoSuchUpload):
             await storage.complete(upload.s3_key, upload.upload_id, listed)
     except BadParts as error:
-        # The upload stays open: the app can complete again with the right ETags, or send the parts again.
-        raise CloudFailure(422, "invalid") from error
+        if await storage.size(upload.s3_key) != upload.bytes:
+            # The upload stays open: the app can complete again with the right ETags, or send the parts again.
+            raise CloudFailure(422, "invalid") from error
     size = await storage.size(upload.s3_key)
     if size != upload.bytes:
         upload.state = "aborted"
@@ -152,9 +163,10 @@ async def complete(
 
 
 async def share_completed(db: Session, cloud: Cloud, upload: Upload, share: Share) -> ShareCompleteResponse:
-    """Points the locked share at this version, then tags what it replaced for the bucket rule to delete."""
+    """Points the locked share at this version, then tags what it replaced for the bucket rule to delete. A GIF
+    upload has no poster (G7): its page animates the GIF itself."""
     poster = shares.key(share.id, shares.version_of(upload), "poster.jpg")
-    has_poster = await cloud.storage.size(poster) is not None
+    has_poster = upload.kind != "gif" and await cloud.storage.size(poster) is not None
     shares.adopt(share, upload, has_poster)
     await db.commit()
     await shares.retire(cloud.storage, share)

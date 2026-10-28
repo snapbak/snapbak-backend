@@ -134,7 +134,7 @@ SNAPBAK_AWS_SECRET_ACCESS_KEY=...
 ```
 
 The same key goes in production's environment. Without it the server refuses to
-start and names the missing setting, and the cloud tests skip.
+start and names the missing setting, and the cloud tests fail under `just test`.
 
 Then set the lifecycle rules, once:
 
@@ -167,7 +167,23 @@ Leave `DATABASE_URL` empty to run dictation only. The server then has no cloud
 routes, and the app's **Generate transcript** fails with "Something went wrong
 on Snapbak Cloud".
 
-## 4. Transcription
+Postgres runs the `pgvector/pgvector` image, which ships the `vector`
+extension the meetings' embedding column needs (MEETINGS.md). The migration
+creates the extension itself; on a managed database the migration role needs
+`CREATE EXTENSION` rights (RDS 17 supports pgvector).
+
+## 4. Meeting minutes, embeddings, search and Q&A
+
+```sh
+SNAPBAK_EMBEDDINGS=openai:text-embedding-3-small
+```
+
+Minutes come from the polish model (`SNAPBAK_POLISH`). Meetings, Q&A and
+search draw on the same daily caps as everything else: 50 questions and 50
+searches per device a UTC day (`docs/cloud.md`). `fake:hashed` replaces the
+embeddings with deterministic vectors for tests.
+
+## 5. Transcription
 
 ### Fake (default, free)
 
@@ -193,7 +209,7 @@ from the internet. Use a tunnel to port 8787, for example
 `cloudflared tunnel --url http://127.0.0.1:8787`. They fetch the audio from S3
 through signed URLs, which works now that the buckets are real.
 
-## 5. Secrets and URLs
+## 6. Secrets and URLs
 
 These are required once `DATABASE_URL` is set. The server refuses to start and
 names the missing one.
@@ -211,7 +227,7 @@ Polish needs a model and its key: `SNAPBAK_POLISH`, `SNAPBAK_BIG` and
 `OPENAI_API_KEY` (or the key for the provider you name). Without keys, use
 `fake:edit` for both models.
 
-## 6. Run and check
+## 7. Run and check
 
 In two terminals:
 
@@ -233,7 +249,7 @@ The app's debug build (`just dev` in `../snapbak`) talks to
 `http://127.0.0.1:8787` with no setup. A release build needs
 `SNAPBAK_BACKEND_URL`.
 
-## 7. Tests
+## 8. Tests
 
 ```sh
 just test
@@ -241,8 +257,10 @@ just test
 
 `just test` loads `.env`, so the tests use the same AWS credentials. Each run
 makes its own `snapbak-test-<random>` bucket in `ap-south-1` and deletes it at
-the end; the shared `snapbak-media` bucket is never touched. Cloud tests skip,
-and say why, when Docker is down or `SNAPBAK_AWS_ACCESS_KEY_ID` isn't set.
+the end; the shared `snapbak-media` bucket is never touched. When Docker is
+down or `SNAPBAK_AWS_ACCESS_KEY_ID` isn't set, the cloud tests fail under
+`just test` (it sets `SNAPBAK_REQUIRE_CLOUD`, so skipped coverage never reads as
+green) and skip, saying why, under a plain `uv run pytest`.
 
 A killed run can leave its buckets behind. To list and remove them:
 

@@ -6,17 +6,12 @@
 <meta name="robots" content="noindex, nofollow">
 <title>$title · Snapbak</title>
 <meta name="description" content="$summary">
-<meta property="og:type" content="video.other">
+<meta property="og:type" content="$og_type">
 <meta property="og:site_name" content="Snapbak">
 <meta property="og:title" content="$title">
 <meta property="og:description" content="$summary">
 <meta property="og:url" content="$page_url">
-$image_tags<meta property="og:video" content="$page_url/video.mp4">
-<meta property="og:video:secure_url" content="$page_url/video.mp4">
-<meta property="og:video:type" content="video/mp4">
-<meta property="og:video:width" content="$width">
-<meta property="og:video:height" content="$height">
-<meta name="twitter:card" content="summary_large_image">
+$image_tags$video_tags<meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="$title">
 <link rel="icon" href="$icon">
 <style>
@@ -32,20 +27,123 @@ body {
 main {
   width: var(--column);
 }
+/* The player is a plate; the video sits in its black stage, the audio in a well. */
 .player {
-  aspect-ratio: var(--w) / var(--h);
-  overflow: hidden;
-  border-radius: var(--sb-radius-lg);
-  border: 1px solid var(--sb-color-border);
-  background: var(--sb-color-surface);
-  box-shadow:
-    0 40px 100px -36px color-mix(in srgb, var(--sb-color-accent) 55%, transparent),
-    0 0 0 1px var(--sb-color-glass);
+  padding: var(--sb-spacing-2);
 }
-video {
+.player video {
   display: block;
   width: 100%;
+  height: auto;
+  aspect-ratio: var(--w) / var(--h);
+  border-radius: var(--sb-radius-lg);
+  background: var(--sb-color-stage);
+}
+.player.audio {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--sb-spacing-4);
+  padding: var(--sb-spacing-4) var(--sb-spacing-6) var(--sb-spacing-4) var(--sb-spacing-4);
+}
+.play {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--sb-color-on-accent);
+  background: linear-gradient(160deg, var(--sb-color-accent-top), var(--sb-color-accent-bottom));
+  box-shadow: var(--sb-shadow-primary);
+}
+.play svg {
+  margin-left: 2px;
+  fill: currentColor;
+}
+.play[data-playing] svg {
+  margin-left: 0;
+}
+.play .off,
+.play[data-playing] .on {
+  display: none;
+}
+.play[data-playing] .off {
+  display: inline;
+}
+.play:focus-visible {
+  outline: 2px solid var(--sb-color-accent);
+  outline-offset: 3px;
+}
+/* The track is a well; the lit level is the time played. The range over it takes clicks, drags and keys. */
+.track {
+  position: relative;
+  height: 22px;
+  border-radius: var(--sb-radius-pill);
+}
+.track:has(input:focus-visible) {
+  outline: 2px solid var(--sb-color-accent);
+  outline-offset: 3px;
+}
+.level {
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  width: 0;
+  max-width: calc(100% - 8px);
+  height: 4px;
+  transform: translateY(-50%);
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--sb-color-accent-bottom), var(--sb-color-accent));
+  box-shadow: 0 0 8px var(--sb-color-accent-glow);
+}
+/* A meeting's well holds its waveform: the muted bars, and inside the level a lit copy as wide as the well, so the
+   level's width uncovers the played part. */
+.track.waved {
+  height: 40px;
+  container-type: inline-size;
+}
+.wave {
+  position: absolute;
+  left: 4px;
+  top: 6px;
+  width: calc(100cqw - 8px);
+  height: 28px;
+  fill: var(--sb-color-text-muted);
+  opacity: 0.45;
+}
+.waved .level {
+  top: 0;
   height: 100%;
+  transform: none;
+  overflow: hidden;
+  background: none;
+  box-shadow: none;
+}
+/* On a phone 96 bars blur into one smear: every other one is left out. */
+@media (max-width: 480px) {
+  .wave rect:nth-child(2n) {
+    display: none;
+  }
+}
+.waved .level .wave {
+  left: 0;
+  fill: var(--sb-color-accent);
+  opacity: 1;
+}
+.track input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.time {
+  font: var(--sb-font-size-xs) var(--sb-font-mono);
+  color: var(--sb-color-text-muted);
+  font-variant-numeric: tabular-nums;
 }
 .meta {
   display: grid;
@@ -65,8 +163,169 @@ h1 {
 .sub {
   margin: var(--sb-spacing-1) 0 0;
   color: var(--sb-color-text-muted);
+  font: var(--sb-font-size-xs) var(--sb-font-mono);
+}
+/* A meeting: the player as wide as the page, then the minutes beside a transcript that stays in view. */
+body.meeting {
+  --column: min(1080px, 100% - var(--sb-spacing-8));
+}
+.cols {
+  display: grid;
+  grid-template-columns: 1fr minmax(0, 400px);
+  gap: var(--sb-spacing-6);
+  align-items: start;
+  margin: var(--sb-spacing-8) 0;
+}
+.card {
+  padding: var(--sb-spacing-6);
+  overflow-wrap: anywhere;
+}
+.card h2 {
+  margin: var(--sb-spacing-6) 0 var(--sb-spacing-2);
+  font-size: var(--sb-font-size-md);
+  font-weight: 600;
+}
+.card h2:first-child {
+  margin-top: 0;
+}
+.card h3 {
+  margin: var(--sb-spacing-4) 0 var(--sb-spacing-1);
   font-size: var(--sb-font-size-sm);
-  font-variant-numeric: tabular-nums;
+}
+.card p {
+  margin: 0 0 var(--sb-spacing-3);
+}
+.card ul {
+  display: grid;
+  gap: var(--sb-spacing-3);
+  margin: 0 0 var(--sb-spacing-3);
+  padding: 0;
+  list-style: none;
+}
+.card ul li {
+  position: relative;
+  padding-left: var(--sb-spacing-4);
+}
+.card ul li::before {
+  content: "";
+  position: absolute;
+  left: 1px;
+  top: 0.6em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sb-color-led);
+  box-shadow: 0 0 6px var(--sb-color-accent-glow);
+}
+.src {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sb-spacing-2);
+  margin-top: var(--sb-spacing-1);
+  color: var(--sb-color-text-muted);
+  font-size: var(--sb-font-size-xs);
+}
+.muted {
+  color: var(--sb-color-text-muted);
+}
+/* Speakers keep their transcript colour everywhere: the chip, and the dot on each cite. */
+.s1 { --spk: var(--sb-color-speaker-1); }
+.s2 { --spk: var(--sb-color-speaker-2); }
+.s3 { --spk: var(--sb-color-speaker-3); }
+.s4 { --spk: var(--sb-color-speaker-4); }
+.s5 { --spk: var(--sb-color-speaker-5); }
+.s6 { --spk: var(--sb-color-speaker-6); }
+.s7 { --spk: var(--sb-color-speaker-7); }
+.s8 { --spk: var(--sb-color-speaker-8); }
+.speaker {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: var(--sb-radius-pill);
+  font-size: var(--sb-font-size-2xs);
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--sb-color-speaker-ink);
+  background: var(--spk);
+  box-shadow: var(--sb-shadow-speaker);
+}
+/* A cite seeks the player to where it was said: a small raised plate that presses in. */
+.cite {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 9px 0 7px;
+  border-radius: var(--sb-radius-pill);
+  font-size: var(--sb-font-size-2xs);
+  font-weight: 500;
+  color: var(--sb-color-text-muted);
+  text-decoration: none;
+  background: linear-gradient(160deg, var(--sb-color-plate-hi), var(--sb-color-plate-lo));
+  box-shadow: var(--sb-shadow-raised-sm);
+  transition: box-shadow var(--sb-duration-base) var(--sb-easing-out);
+}
+.cite:hover {
+  color: var(--sb-color-text);
+}
+.cite:active {
+  background: var(--sb-color-well);
+  box-shadow: var(--sb-shadow-inset-sm);
+}
+.cite i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--spk, var(--sb-color-led));
+}
+.cite b,
+.at {
+  font: 400 var(--sb-font-size-2xs) var(--sb-font-mono);
+  color: var(--sb-color-text);
+}
+.at {
+  color: var(--sb-color-text-muted);
+  text-decoration: none;
+}
+.at:hover {
+  color: var(--sb-color-accent);
+}
+.tx {
+  position: sticky;
+  top: var(--sb-spacing-4);
+  max-height: calc(100dvh - var(--sb-spacing-8));
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.tx ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tx li {
+  padding: var(--sb-spacing-3) 0;
+  border-top: 1px solid var(--sb-color-separator);
+  font-size: var(--sb-font-size-sm);
+}
+.tx li:first-child {
+  border-top: 0;
+}
+.tx .who {
+  display: flex;
+  align-items: center;
+  gap: var(--sb-spacing-2);
+  margin-bottom: var(--sb-spacing-1);
+}
+@media (max-width: 860px) {
+  .cols {
+    grid-template-columns: 1fr;
+  }
+  .tx {
+    position: static;
+    max-height: none;
+  }
 }
 @media (max-width: 560px) {
   .meta {
@@ -78,18 +337,18 @@ h1 {
 }
 </style>
 </head>
-<body style="--w: $width; --h: $height">
+<body$body_class style="--w: $width; --h: $height">
 <header class="bar"><a class="brand" href="$home_url?ref=share">$mark<span>Snapbak</span></a></header>
 <main>
-<div class="player"><video controls playsinline preload="metadata"$poster_attr width="$width" height="$height" src="$video_url"></video></div>
+$player
 <div class="meta">
 <div>
 <h1 title="$title">$title</h1>
-<p class="sub"><time datetime="$created_iso">$created_text</time> · $duration</p>
+<p class="sub"><time datetime="$created_iso">$created_text</time> · $duration$people</p>
 </div>
-<a class="button" href="$page_url/download"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>Download</a>
+<a class="button" href="$page_url/download"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>$download</a>
 </div>
-</main>
+$sections</main>
 <footer><a href="$home_url?ref=share"><strong>Made with Snapbak</strong> · <span>Get Snapbak →</span></a></footer>
 <script>$script</script>
 </body>

@@ -1,0 +1,15 @@
+{
+  "meetings": [
+    "ES2004a", "ES2004b", "ES2004c", "ES2004d",
+    "ES2014a", "ES2014b", "ES2014c", "ES2014d",
+    "IS1009a", "IS1009b", "IS1009c", "IS1009d",
+    "TS3003a", "TS3003b", "TS3003c", "TS3003d",
+    "TS3007a", "TS3007b", "TS3007c", "TS3007d"
+  ],
+  "qmsum": {
+    "url": "https://raw.githubusercontent.com/Yale-LILY/QMSum/main/data/Product/jsonl/test.jsonl",
+    "file": "product-test.jsonl",
+    "sha256": "682d74d4ebe12a456303349f0004b43d3151c720500d22354a9f04b03e739222",
+    "license": "MIT, Yale-LILY/QMSum"
+  }
+}

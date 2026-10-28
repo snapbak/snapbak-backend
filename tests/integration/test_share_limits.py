@@ -74,9 +74,10 @@ def test_cld03_another_devices_shares_do_not_count(api: Any, sql: Sql) -> None:
 
 async def create(device: uuid.UUID, recording: uuid.UUID) -> uuid.UUID | int:
     """One create in its own session and connection: the share's ID, or the error's status."""
-    config = load(os.environ).cloud
+    whole = load(os.environ)
+    config = whole.cloud
     assert config is not None
-    cloud = await open_cloud(config)
+    cloud = await open_cloud(config, whole.keys)
     try:
         async with cloud.sessions() as db:
             try:

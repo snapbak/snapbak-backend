@@ -255,7 +255,7 @@ async def plan_page(session: AsyncSession, device_id: UUID, recording_id: UUID, 
         seen[line.idx] = {**found, "inflight": flight} if found is not None else {"idx": line.idx, "inflight": flight}
     day = None
     if work:
-        day = await usage.reserve_lines(session, device_id, len(work))
+        day = await usage.reserve_counted(session, device_id, "translated_lines", len(work))
         if day is None:
             await session.rollback()
             raise CloudFailure(429, "translation_limit")
@@ -317,7 +317,7 @@ async def keep_answers(
         if track is not None:
             track.lines = restored(track.lines, plan)
         if plan.day is not None:
-            await usage.refund_lines(session, device_id, plan.day, len(plan.work))
+            await usage.refund_counted(session, device_id, "translated_lines", plan.day, len(plan.work))
         await session.commit()
         raise CloudFailure(502, "provider")
     if track is None or track.deleted_at is not None:
