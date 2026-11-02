@@ -1,20 +1,18 @@
 # The API on port 80 (docs/deploy.md). deploy/setup-ubuntu.sh installs it with this box's user and repo path.
 [Unit]
-Description=Snapbak Cloud API (just serve)
+Description=Snapbak Cloud API (uvicorn)
 After=network-online.target redis-server.service
 Wants=network-online.target redis-server.service
 
 [Service]
 User=ubuntu
 WorkingDirectory=/home/ubuntu/snapbak-backend
-# systemd has no login shell: mise's shims put the pinned just, uv and Python first. .env comes in through just.
-Environment=PATH=/home/ubuntu/.local/share/mise/shims:/home/ubuntu/.local/bin:/usr/local/bin:/usr/bin:/bin
-# These win over .env. UV_NO_SYNC keeps `uv run` on the venv the setup synced.
-Environment=HOST=0.0.0.0 PORT=80 UV_NO_SYNC=1
+# systemd reads .env itself; the venv's Python runs the app, no shell or tool manager in between.
+EnvironmentFile=/home/ubuntu/snapbak-backend/.env
 # Port 80 without root.
 AmbientCapabilities=CAP_NET_BIND_SERVICE
-ExecStartPre=/home/ubuntu/.local/share/mise/shims/just migrate
-ExecStart=/home/ubuntu/.local/share/mise/shims/just serve
+ExecStartPre=/home/ubuntu/snapbak-backend/.venv/bin/python -m alembic upgrade head
+ExecStart=/home/ubuntu/snapbak-backend/.venv/bin/python -m uvicorn snapbak_backend.main:app --host 0.0.0.0 --port 80 --timeout-keep-alive 75
 Restart=always
 RestartSec=2
 

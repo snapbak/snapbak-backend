@@ -6,8 +6,8 @@ services, Redis beside them. Postgres is RDS and files are the S3 bucket
 
 | Piece    | Runs as                           | Started by                    |
 | -------- | --------------------------------- | ----------------------------- |
-| API      | `snapbak-server`, `0.0.0.0:80`    | `just migrate`, `just serve`  |
-| Worker   | `snapbak-worker`                  | `just worker`                 |
+| API      | `snapbak-server`, `0.0.0.0:80`    | alembic, then uvicorn         |
+| Worker   | `snapbak-worker`                  | arq                           |
 | Redis 7  | apt's `redis-server`, `127.0.0.1` | systemd                       |
 | Postgres | RDS 17 with pgvector              | AWS                           |
 | Files    | S3 `snapbak-media`                | created once (SETUP.md)       |
@@ -47,20 +47,22 @@ REDIS_URL=redis://127.0.0.1:6379/0
 SNAPBAK_PUBLIC_URL=http://<the box's public name>
 ```
 
-The units set `HOST=0.0.0.0` and `PORT=80` themselves, over `.env`. The server
-binds port 80 as a plain user through `CAP_NET_BIND_SERVICE`, never as root.
-Port 80 is plain HTTP: bearer tokens and webhook URLs cross the network
-unencrypted. TLS needs a load balancer or a proxy in front (then see
-`--proxy-headers` in docs/cloud.md).
+The server unit passes `--host 0.0.0.0 --port 80` itself; `HOST` and `PORT` in
+`.env` are for `just serve` only. The server binds port 80 as a plain user
+through `CAP_NET_BIND_SERVICE`, never as root. Port 80 is plain HTTP: bearer
+tokens and webhook URLs cross the network unencrypted. TLS needs a load
+balancer or a proxy in front (then see `--proxy-headers` in docs/cloud.md).
 
 ## How the units run
 
-Both units run the `just` recipes from the repo, so `.env` reaches the app
-through just's `dotenv-load`, as on a Mac. systemd has no login shell, so each
-unit puts mise's shims first on `PATH`. `UV_NO_SYNC=1` keeps `uv run` on the
-venv the setup synced. The server runs `just migrate` before it starts; the
-worker starts after the server. Both restart 2 s after any exit. On stop, arq
-cancels the jobs it holds and requeues them, and the next start picks them up.
+Both units run the venv's Python by absolute path, with no just, mise or uv in
+between: `python -m alembic upgrade head` and then `python -m uvicorn` for the
+server, and `python -m arq snapbak_backend.worker.WorkerSettings` for the
+worker. systemd reads `.env` itself (`EnvironmentFile=`), so a value with spaces
+or quotes needs single quotes, as `.env.example` does. The setup refuses to
+install a unit whose command isn't there. The worker starts after the server.
+Both restart 2 s after any exit. On stop, arq cancels the jobs it holds and
+requeues them, and the next start picks them up.
 
 ## Day to day
 
