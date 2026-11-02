@@ -19,6 +19,7 @@ from snapbak_backend.transcription.strategy import (
     VendorStatus,
     VendorUnavailable,
     assemblyai_failure,
+    assemblyai_retryable,
 )
 
 ASSEMBLYAI = "https://api.assemblyai.com"
@@ -120,8 +121,10 @@ class AssemblyAiPyannoteStrategy:
             if transcript["status"] == "completed":
                 return VendorStatus("done")
             if transcript["status"] == "error":
-                reason = assemblyai_failure(transcript.get("error") or "")
-                return VendorStatus("failed", reason)
+                said = transcript.get("error") or ""
+                if assemblyai_retryable(said):
+                    return VendorStatus("retry")
+                return VendorStatus("failed", assemblyai_failure(said))
             return VendorStatus("running")
         if await self.storage.get_json(refs["pyannote"]["rawKey"]) is not None:
             return VendorStatus("done")

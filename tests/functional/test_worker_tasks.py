@@ -758,3 +758,32 @@ def test_trx08_a_rename_racing_a_merge_that_replaces_the_speakers_is_not_found(
         merging.result()
         assert failure(renamed.result()) == (404, "not_found")
     assert [row["name"] for row in sql("SELECT name FROM speakers")] == [None]
+
+
+def test_trx01_a_transcript_the_vendor_asks_to_retry_is_sent_again_keeping_the_diarization(
+    processing: str, sql: Sql
+) -> None:
+    """AssemblyAI failed the transcript with "Internal server error. Please retry your request" (3 Nov 2026): the
+    job goes back to queued with pyannote's finished part kept, so the start sends AssemblyAI alone again."""
+    done = {**REFS, "pyannote": {**REFS["pyannote"], "status": "done"}}
+    sql("UPDATE transcription_jobs SET vendor_refs = $1", json.dumps(done))
+
+    run(worker.on_vendor_webhook, Vendors(assemblyai="retry"), processing, "assemblyai")
+
+    [job] = sql("SELECT state, failure_reason, vendor_refs FROM transcription_jobs")
+    refs = json.loads(job["vendor_refs"])
+    assert (job["state"], job["failure_reason"]) == ("queued", None)
+    assert "assemblyai" not in refs
+    assert refs["pyannote"]["status"] == "done"
+    assert refs["resubmits"] == 1
+    assert any(each.startswith(f"start:{processing}:") for each in queued_arq_jobs())
+
+
+def test_trx01_a_transcript_that_keeps_asking_to_retry_fails_after_two_resubmits(processing: str, sql: Sql) -> None:
+    sql("UPDATE transcription_jobs SET vendor_refs = $1", json.dumps({**REFS, "resubmits": 2}))
+
+    run(worker.on_vendor_webhook, Vendors(assemblyai="retry"), processing, "assemblyai")
+
+    assert sql("SELECT state, failure_reason FROM transcription_jobs") == [
+        {"state": "failed", "failure_reason": "vendor_error"}
+    ]

@@ -100,6 +100,8 @@ STALLED_START = timedelta(minutes=5)
 # The sweep fails a processing job this long after the timeout check would have.
 SWEEP_MARGIN = timedelta(minutes=5)
 # Stages past the vendors: the transcript is merging or stored, so no timeout check asks them again.
+# How often a vendor's part is sent again after it failed on the vendor's side and asked for a retry.
+RESUBMITS = 2
 HELD = ("merging", "identifying")
 # A job held for its speaker loop this long is past the loop task's timeout: that loop is over.
 HELD_LOOP_OVER = timedelta(seconds=SPEAKER_LOOP_TIMEOUT_S) + SWEEP_MARGIN
@@ -230,6 +232,9 @@ async def settle(ctx: Ctx, db: AsyncSession, job: TranscriptionJob, vendor: Vend
     status = await strategy_of(ctx).status(job.vendor_refs, vendor)
     if status.state == "running":
         return
+    if status.state == "retry":
+        await resubmitted(ctx, db, job, vendor)
+        return
     if status.state == "failed":
         if not await fail_and_publish(ctx, db, job, status.failure or "vendor_error", f"vendor:{vendor}"):
             raise Moved(job.id)
@@ -243,6 +248,25 @@ async def settle(ctx: Ctx, db: AsyncSession, job: TranscriptionJob, vendor: Vend
     await publish(cloud_of(ctx).redis, job.id, job.version)
     if both:
         await cloud_of(ctx).redis.enqueue_job("merge_and_store", job.id, _job_id=f"merge:{job.id}")
+
+
+async def resubmitted(ctx: Ctx, db: AsyncSession, job: TranscriptionJob, vendor: Vendor) -> None:
+    """A vendor that failed its part on its own side and asked for it again: the job is queued once more with the
+    other vendor's part kept, so the start sends only this one, at most RESUBMITS times; then it fails. Raises Moved
+    when another writer won."""
+    count = int(job.vendor_refs.get("resubmits", 0))
+    if count >= RESUBMITS:
+        if not await fail_and_publish(ctx, db, job, "vendor_error", f"vendor:{vendor}"):
+            raise Moved(job.id)
+        return
+    refs = {key: value for key, value in job.vendor_refs.items() if key != vendor}
+    if not await jobs.advance(db, job, state="queued", stage=None, vendor_refs={**refs, "resubmits": count + 1}):
+        raise Moved(job.id)
+    await db.commit()
+    await publish(cloud_of(ctx).redis, job.id, job.version)
+    # Its own arq job ID: the first start's result is kept for an hour.
+    again = f"start:{job.id}:{count + 1}"
+    await cloud_of(ctx).redis.enqueue_job("start_transcription", job.id, _job_id=again)
 
 
 async def on_vendor_webhook(ctx: Ctx, job_id: UUID, vendor: Vendor) -> None:

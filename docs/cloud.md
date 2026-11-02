@@ -162,7 +162,11 @@ index ignores failed rows.
 
 Failure reasons: `unsupported_language`, `too_long`, `no_speech`,
 `upload_expired`, `upload_invalid`, `vendor_error`, `vendor_timeout`,
-`internal`.
+`internal`. AssemblyAI's error text maps to them on whole words. Its "Internal
+server error. Please retry your request" is no failure: the job goes back to
+`queued` with pyannote's part kept, and the start sends the transcript again, at
+most twice (`RESUBMITS`, counted in `vendor_refs.resubmits`); a third is
+`vendor_error`.
 
 The long-poll registers its wake-up before it reads the row, answers at once
 when `version > since` or the job is final, else waits on Redis up to `wait`

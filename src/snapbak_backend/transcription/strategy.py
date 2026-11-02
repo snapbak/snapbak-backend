@@ -1,6 +1,7 @@
 """The `TranscriptionStrategy` facade (D10, Q10; docs/cloud.md): one interface in front of the vendors, so a later
 strategy (one vendor, or another pair) replaces one class."""
 
+import re
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol
 from uuid import UUID
@@ -10,7 +11,8 @@ from snapbak_backend.transcription.merge import Merged
 
 type Refs = dict[str, Any]
 type Vendor = Literal["assemblyai", "pyannote"]
-type VendorState = Literal["running", "done", "failed"]
+# `retry`: the vendor failed its part on its own side and asks for it again (an outage, not the audio).
+type VendorState = Literal["running", "done", "failed", "retry"]
 VENDORS: tuple[Vendor, ...] = ("assemblyai", "pyannote")
 
 
@@ -94,14 +96,21 @@ class TranscriptionStrategy(Protocol):
     async def aclose(self) -> None: ...
 
 
-def assemblyai_failure(error: str) -> Failure:
-    """AssemblyAI's error text as a reason. The exact strings are unverified, so this matches on substrings, and
-    `just test-cloud` records the real ones (RESEARCH.md)."""
+def assemblyai_retryable(error: str) -> bool:
+    """AssemblyAI failing a transcript on its own side, asking for it again: "Internal server error. Please retry your
+    request. ..." (seen 3 Nov 2026)."""
     said = error.lower()
-    if "language" in said:
+    return "internal server error" in said or "please retry" in said
+
+
+def assemblyai_failure(error: str) -> Failure:
+    """AssemblyAI's error text as a reason, matched on whole words ("information" is no "format"). The exact strings
+    are unverified, so `just test-cloud` records the real ones (RESEARCH.md)."""
+    words = set(re.findall(r"[a-z]+", error.lower()))
+    if "language" in words:
         return "unsupported_language"
-    if "no spoken audio" in said or "speech" in said or "silence" in said:
+    if {"speech", "silence"} & words or "no spoken audio" in error.lower():
         return "no_speech"
-    if "audio" in said or "file" in said or "download" in said or "format" in said:
+    if {"audio", "file", "download", "format"} & words:
         return "upload_invalid"
     return "vendor_error"

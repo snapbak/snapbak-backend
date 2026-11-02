@@ -122,6 +122,20 @@ async def test_trx01_a_network_failure_is_asked_again() -> None:
             VendorStatus("failed", "upload_invalid"),
         ),
         ({"status": "error", "error": "Internal"}, VendorStatus("failed", "vendor_error")),
+        # AssemblyAI's own words on 3 Nov 2026: an outage on its side that asks for a retry, never a bad file ("for
+        # more information" once read as a format problem).
+        (
+            {
+                "status": "error",
+                "error": "Internal server error. Please retry your request. If the error persists, please contact"
+                " support@assemblyai.com for more information.",
+            },
+            VendorStatus("retry"),
+        ),
+        (
+            {"status": "error", "error": "File does not appear to contain audio. Format not supported."},
+            VendorStatus("failed", "upload_invalid"),
+        ),
     ],
 )
 async def test_trx01_assemblyai_status_maps_to_a_vendor_state(answer: dict, expected: VendorStatus) -> None:
