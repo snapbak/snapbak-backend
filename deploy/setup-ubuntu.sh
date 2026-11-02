@@ -28,12 +28,19 @@ if [ ! -f .env ]; then
 fi
 chmod 600 .env
 
+# The units name just by its absolute path: systemd never searches PATH, and a bad path fails as `/just` (203/EXEC).
+just=$(command -v just)
+[ -x "$just" ] || { echo "just not found under $shims; run mise install"; exit 1; }
 for unit in snapbak-server snapbak-worker; do
     sed -e "s|/home/ubuntu/snapbak-backend|$dir|g" \
+        -e "s|/home/ubuntu/.local/share/mise/shims/just|$just|g" \
         -e "s|/home/ubuntu/.local/share/mise/shims|$shims|g" \
         -e "s|/home/ubuntu/.local/bin|$HOME/.local/bin|g" \
         -e "s|^User=ubuntu$|User=$user|" \
         "deploy/$unit.service" | sudo tee "/etc/systemd/system/$unit.service" >/dev/null
+    for bin in $(sed -n 's/^ExecStart[a-zA-Z]*=\([^ ]*\).*/\1/p' "/etc/systemd/system/$unit.service"); do
+        [ -x "$bin" ] || { echo "$unit: $bin is not an executable"; exit 1; }
+    done
 done
 sudo systemctl daemon-reload
 sudo systemctl enable snapbak-server snapbak-worker
