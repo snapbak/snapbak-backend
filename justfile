@@ -1,9 +1,8 @@
 set dotenv-load
 
-# Serve the API on HOST:PORT (default 127.0.0.1:8787; the EC2 unit sets 0.0.0.0:80, docs/deploy.md). Connections stay
-# open 75 s, longer than any hold.
+# Serve the API on 127.0.0.1 (PORT, default 8787). Connections stay open 75 s, longer than any hold.
 serve:
-    uv run uvicorn snapbak_backend.main:app --host ${HOST:-127.0.0.1} --port ${PORT:-8787} --timeout-keep-alive 75
+    uv run uvicorn snapbak_backend.main:app --host 127.0.0.1 --port ${PORT:-8787} --timeout-keep-alive 75
 
 # The arq worker for the cloud transcript (needs `just db-up` and DATABASE_URL, REDIS_URL in .env).
 worker:

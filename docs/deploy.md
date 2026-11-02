@@ -47,8 +47,8 @@ REDIS_URL=redis://127.0.0.1:6379/0
 SNAPBAK_PUBLIC_URL=http://<the box's public name>
 ```
 
-The server unit passes `--host 0.0.0.0 --port 80` itself; `HOST` and `PORT` in
-`.env` are for `just serve` only. The server binds port 80 as a plain user
+The server unit passes `--host 0.0.0.0 --port 80` itself; `PORT` in `.env` is
+for `just serve` only. The server binds port 80 as a plain user
 through `CAP_NET_BIND_SERVICE`, never as root. Port 80 is plain HTTP: bearer
 tokens and webhook URLs cross the network unencrypted. TLS needs a load
 balancer or a proxy in front (then see `--proxy-headers` in docs/cloud.md).
