@@ -65,3 +65,4 @@ AWS included. Files live on real S3, local dev and tests included.
 | When the big model runs        | `docs/escalation.md` |
 | The corpus, gates and bench    | `docs/bench.md`      |
 | The monthly cost replay        | `docs/replay.md`     |
+| The EC2 box, the two services  | `docs/deploy.md`     |

@@ -1,5 +1,7 @@
 """`just stop-to-minutes` (scripts/stop_to_minutes.py): MOM-04's P95 against 3 min, on canned stage timings."""
 
+from pathlib import Path
+
 import stop_to_minutes
 
 
@@ -26,3 +28,25 @@ def test_mom04_each_stage_s_time_names_the_slowest() -> None:
     stages = stop_to_minutes.stages(0.0, [*saves, (80.0, 0)])
     assert stages["slowest"] == "decisions" and stages["slowest s"] == 60.0
     assert stages["guard s"] == 10.0
+
+
+def test_the_meeting_encodes_with_afconvert_on_a_mac_and_ffmpeg_on_linux() -> None:
+    mac = stop_to_minutes.encoder(Path("a.wav"), Path("a.m4a"), {"afconvert"}.__contains__)
+    linux = stop_to_minutes.encoder(Path("a.wav"), Path("a.m4a"), {"ffmpeg"}.__contains__)
+    assert mac[0] == "afconvert"
+    assert linux == [
+        "ffmpeg",
+        "-nostdin",
+        "-y",
+        "-i",
+        "a.wav",
+        "-ac",
+        "1",
+        "-ar",
+        "16000",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "32k",
+        "a.m4a",
+    ]

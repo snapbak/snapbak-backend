@@ -6,6 +6,7 @@ import json
 from typing import Any
 
 import boto3
+import botocore.session
 from botocore.config import Config as BotoConfig
 from botocore.exceptions import ClientError
 
@@ -31,7 +32,10 @@ MISSING = ("404", "NoSuchKey", "NotFound")
 def s3_client(config: CloudConfig) -> Any:
     """One client per process: making one costs tens of milliseconds and some memory."""
     boto = BotoConfig(signature_version="s3v4", s3={"addressing_style": "virtual"})
-    client = boto3.client(
+    # Blind to AWS_PROFILE: a profile the box doesn't have (a fresh EC2 box) would refuse to start.
+    core = botocore.session.Session(session_vars={"profile": (None, None, None, None)})
+    session = boto3.Session(botocore_session=core)
+    client = session.client(
         "s3",
         region_name=config.s3_region,
         aws_access_key_id=config.aws_access_key_id,

@@ -14,10 +14,12 @@ import argparse
 import asyncio
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
 import wave
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -54,8 +56,30 @@ def recorded_meeting(folder: Path) -> Path:
         source.setpos(START_MS * rate // 1000)
         out.setparams(source.getparams())
         out.writeframes(source.readframes(MEETING_MS * rate // 1000))
-    subprocess.run(["afconvert", "-f", "m4af", "-d", "aac@16000", "-c", "1", "-b", "32000", clip, m4a], check=True)
+    subprocess.run(encoder(clip, m4a), check=True)
     return m4a
+
+
+def encoder(clip: Path, m4a: Path, which: Callable[[str], object] = shutil.which) -> list[str]:
+    """The app's encoder, afconvert, on a Mac; ffmpeg's AAC at the same settings elsewhere (an Ubuntu box)."""
+    if which("afconvert"):
+        return ["afconvert", "-f", "m4af", "-d", "aac@16000", "-c", "1", "-b", "32000", str(clip), str(m4a)]
+    return [
+        "ffmpeg",
+        "-nostdin",
+        "-y",
+        "-i",
+        str(clip),
+        "-ac",
+        "1",
+        "-ar",
+        "16000",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "32k",
+        str(m4a),
+    ]
 
 
 def lines_of(transcript: dict, output: dict) -> tuple[list[TranscriptLine], dict]:

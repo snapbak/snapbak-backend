@@ -482,9 +482,9 @@ fix dropped the label in the eval, which measured the same setup.
 **Stop to minutes** (MOM-04: P95 at most 3 min for a 30 min meeting). `just
 stop-to-minutes --budget-usd USD [--runs 5]` (`scripts/stop_to_minutes.py`)
 takes 30 minutes of AMI's EN2002a, encodes them as the app records a meeting (16
-kHz mono AAC, 32 kbps, `afconvert`), and times what follows Stop: the upload to
-the bucket, both real vendors (asked every 2 s, as the worker's webhooks
-answer), the merge into lines, and the live minutes call. Arq's own queueing and
+kHz mono AAC, 32 kbps, `afconvert`; ffmpeg's AAC where afconvert is missing,
+as on Linux), and times what follows Stop: the upload to the bucket, both real
+vendors (asked every 2 s, as the worker's webhooks answer), the merge into lines, and the live minutes call. Arq's own queueing and
 the webhooks' delivery are not in it. On 26 Oct 2026 (gpt-6-luna, five runs,
 $0.97): upload 1.7 to 2.5 s, vendors 21.7 to 31.1 s, merge under 0.1 s, minutes
 7.7 to 8.9 s, totals 32.2 to 40.8 s, P95 40.8 s against 180 s.

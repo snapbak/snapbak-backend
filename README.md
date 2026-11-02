@@ -98,6 +98,7 @@ curl -s localhost:8787/v1/polish -H 'Authorization: Bearer dev' \
 - [Escalation](docs/escalation.md)
 - [Bench: corpus, gates, latency and cost](docs/bench.md)
 - [Replay: a heavy user's month](docs/replay.md)
+- [Deploy: one Ubuntu EC2 box, two systemd services](docs/deploy.md)
 
 ## Development
 

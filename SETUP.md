@@ -2,7 +2,8 @@
 
 How to run Snapbak Cloud on a Mac: dictation polish, cloud transcripts and share
 links. Dictation alone needs only steps 1, 5 and 6. Transcripts and shares need
-every step.
+every step. Production on an Ubuntu EC2 box is in
+[docs/deploy.md](docs/deploy.md).
 
 | Piece             | Runs where                                  | Started by            |
 | ----------------- | ------------------------------------------- | --------------------- |
@@ -218,7 +219,7 @@ names the missing one.
 | ------------------------ | ----------------------------------------------------------- |
 | `SNAPBAK_TOKEN`          | `dev`, the token debug builds of the app send               |
 | `SNAPBAK_WEBHOOK_SECRET` | `openssl rand -hex 32`                                      |
-| `VOICEPRINT_KEYS`        | `printf '{"1": "%s"}\n' "$(openssl rand -base64 32)"`       |
+| `VOICEPRINT_KEYS`        | `printf "'{\"1\": \"%s\"}'\n" "$(openssl rand -base64 32)"`|
 | `SNAPBAK_PUBLIC_URL`     | `http://127.0.0.1:8787`, or the tunnel from step 4          |
 | `SNAPBAK_SHARE_BASE_URL` | `http://localhost:8787`                                     |
 | `SNAPBAK_HOME_URL`       | `https://snapbak.app`; never the same as the share base URL |

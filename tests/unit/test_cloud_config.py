@@ -1,5 +1,6 @@
 import base64
 import json
+from pathlib import Path
 
 import pytest
 
@@ -63,6 +64,18 @@ def test_cld01_s3_signs_with_the_snapbak_iam_user_never_the_machines_aws_credent
 ) -> None:
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "AKIADEFAULT")
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "default-secret")
+    monkeypatch.setenv("AWS_PROFILE", "default")
+    config = load(CLOUD).cloud
+    assert config is not None
+    url = Storage(s3_client(config), config.bucket).presign_get("audio/a.m4a", 60)
+    assert "X-Amz-Credential=AKIASNAPBAK%2F" in url
+
+
+def test_cld01_s3_starts_on_a_box_whose_aws_profile_names_no_profile(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("AWS_CONFIG_FILE", str(tmp_path / "config"))
+    monkeypatch.setenv("AWS_SHARED_CREDENTIALS_FILE", str(tmp_path / "credentials"))
     monkeypatch.setenv("AWS_PROFILE", "default")
     config = load(CLOUD).cloud
     assert config is not None

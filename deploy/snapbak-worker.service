@@ -1,0 +1,19 @@
+# The arq worker for cloud transcripts (docs/deploy.md), on the same box as the API and Redis.
+[Unit]
+Description=Snapbak Cloud worker (just worker)
+# After the server, so its migration has run when both start together.
+After=network-online.target redis-server.service snapbak-server.service
+Wants=network-online.target redis-server.service
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/snapbak-backend
+Environment=PATH=/home/ubuntu/.local/share/mise/shims:/home/ubuntu/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=UV_NO_SYNC=1
+# On stop arq cancels the jobs it holds and requeues them; the next start picks them up.
+ExecStart=/home/ubuntu/.local/share/mise/shims/just worker
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
