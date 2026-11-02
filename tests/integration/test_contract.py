@@ -70,6 +70,8 @@ def test_the_error_fixture_is_one_code() -> None:
         ("speaker.response.json", cloud.SpeakerOut),
         ("speaker-change.request.json", cloud.SpeakerChangeRequest),
         ("speaker-pass.response.json", cloud.SpeakerPass),
+        ("speaker-edits.request.json", cloud.SpeakerEditsRequest),
+        ("speaker-edits.response.json", cloud.SpeakerEditsResponse),
         ("transliterate.request.json", cloud.TransliterateRequest),
         ("transliterate.response.json", cloud.TransliterateResponse),
         ("share.request.json", cloud.ShareRequest),

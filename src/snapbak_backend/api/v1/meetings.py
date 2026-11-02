@@ -186,10 +186,19 @@ async def regenerate(
     job = await transcript_job(db, cloud, recording, last.language_requested, last.script) if last else None
     if job is not None and job.state == "ready":
         sections = list(body.sections) if body and body.sections else None
+        # A whole regenerate counts against the meeting's day (MOM-09); a failed section's Try again never does.
+        whole = sections is None
+        if whole and not await meetings.counted_regenerate(db, meeting.id):
+            resets = usage.resets_at(datetime.now(UTC)).strftime(UTC_FORMAT)
+            await db.rollback()
+            raise CloudFailure(429, "regenerate_limit", resetsAt=resets)
         started = await meetings.begin(db, cloud.redis, meeting.id, clicked=True, sections=sections)
         # A run is writing (and still alive): starting nothing behind a 200 left the section asked for failed with
-        # no word why.
+        # no word why. A whole one refused costs nothing.
         if started is None:
+            if whole:
+                await meetings.uncounted_regenerate(db, meeting.id)
+                await db.commit()
             raise CloudFailure(409, "minutes_running")
     elif meeting.state == "generating":
         raise CloudFailure(409, "minutes_running")

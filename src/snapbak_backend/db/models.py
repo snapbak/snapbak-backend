@@ -196,7 +196,10 @@ class Speaker(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
     deleted_at: Mapped[datetime | None]
-    __table_args__ = (UniqueConstraint("recording_id", "label"),)
+    # Unique among the live speakers only: one merged away keeps its label for an undo (TRX-11).
+    __table_args__ = (
+        Index("speakers_live_label", "recording_id", "label", unique=True, postgresql_where=text("deleted_at IS NULL")),
+    )
 
 
 class TranscriptLine(Base):
@@ -269,6 +272,9 @@ class Meeting(Base):
     # and starts a provider failure again, only while this is under meetings.MAX_ATTEMPTS.
     minutes_attempts: Mapped[int] = mapped_column(server_default="0")
     version: Mapped[int] = mapped_column(server_default="1")
+    # The UTC day of its last whole regenerate and how many that day (MOM-09, capped at DAILY_REGENERATES).
+    regenerate_day: Mapped[date | None]
+    regenerate_count: Mapped[int] = mapped_column(SmallInteger, server_default="0")
     started_at: Mapped[datetime | None]
     ended_at: Mapped[datetime | None]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())

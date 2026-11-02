@@ -7,16 +7,17 @@ sweep replaced can never write over the new one."""
 
 import uuid
 from collections.abc import Sequence
-from datetime import timedelta
+from datetime import date, timedelta
 from typing import Any
 from uuid import UUID
 
 from arq import ArqRedis
-from sqlalchemy import ARRAY, ColumnElement, Row, Text, case, cast, func, select, update
+from sqlalchemy import ARRAY, ColumnElement, Date, Row, Text, case, cast, func, select, update
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from snapbak_backend.config.settings import DAILY_REGENERATES
 from snapbak_backend.db.models import Meeting, MeetingPin, Recording
 from snapbak_backend.schemas.cloud import MinutesOut
 from snapbak_backend.services import minutes as written
@@ -189,6 +190,30 @@ async def begin(
         await session.execute(update(Recording).where(Recording.id == recording).values(speaker_pass=restarted))
     await launch(session, redis, meeting_id, row.version, run)
     return row.version
+
+
+def utc_today() -> ColumnElement[date]:
+    return cast(func.timezone("UTC", func.now()), Date)
+
+
+async def counted_regenerate(session: AsyncSession, meeting_id: UUID) -> bool:
+    """One whole regenerate more on the meeting's UTC day, in one guarded statement; False when the day has had
+    DAILY_REGENERATES already (MOM-09). The caller commits."""
+    same_day = Meeting.regenerate_day == utc_today()
+    room = same_day.is_not(True) | (Meeting.regenerate_count < DAILY_REGENERATES)
+    count = case((same_day, Meeting.regenerate_count + 1), else_=1)
+    statement = (
+        update(Meeting).where(Meeting.id == meeting_id, room).values(regenerate_day=utc_today(), regenerate_count=count)
+    )
+    row = (await session.execute(statement.returning(Meeting.id))).first()
+    return row is not None
+
+
+async def uncounted_regenerate(session: AsyncSession, meeting_id: UUID) -> None:
+    """The regenerate `counted_regenerate` took today given back: a run that never started. The caller commits."""
+    lower = func.greatest(Meeting.regenerate_count - 1, 0)
+    same_day = Meeting.regenerate_day == utc_today()
+    await session.execute(update(Meeting).where(Meeting.id == meeting_id, same_day).values(regenerate_count=lower))
 
 
 async def wait_again(session: AsyncSession, redis: ArqRedis, meeting_id: UUID) -> None:

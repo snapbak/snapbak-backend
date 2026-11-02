@@ -56,6 +56,8 @@ DAILY_TRANSLATED_LINES = 20_000
 # The meetings' LLM surfaces a device may use a UTC day (MEETINGS.md, D33): one question or search each.
 DAILY_QA_QUESTIONS = 50
 DAILY_SEARCH_QUERIES = 50
+# A meeting's whole regenerates a UTC day (MOM-09): each is every section and the speaker loop again.
+DAILY_REGENERATES = 5
 # The embeddings model (MEETINGS.md, D38) and the width it is pinned to; fake:hashed is the tests' stand-in.
 EMBED = "openai:text-embedding-3-small"
 EMBED_DIM = 1536

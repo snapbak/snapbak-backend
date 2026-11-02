@@ -256,6 +256,37 @@ def test_mom05_regenerate_while_a_run_is_going_is_a_409_and_enqueues_nothing(
     assert not any(job.startswith("minutes:") for job in queued_arq_jobs())
 
 
+def test_mom09_a_meeting_regenerates_whole_five_times_a_day_then_says_when_it_can_again(
+    api: Any, auth: dict[str, str], sql: Sql
+) -> None:
+    meeting = ready_meeting(api, auth, sql)
+    sql("UPDATE meetings SET regenerate_day = (now() AT TIME ZONE 'UTC')::date, regenerate_count = 4")
+
+    fifth = api.post(f"/v1/meetings/{meeting}/minutes/regenerate", headers=auth)
+    assert fifth.status_code == 200
+    assert sql("SELECT regenerate_count FROM meetings") == [{"regenerate_count": 5}]
+    sql("UPDATE meetings SET state = 'ready'")
+    sixth = api.post(f"/v1/meetings/{meeting}/minutes/regenerate", headers=auth)
+    assert failure(sixth) == (429, "regenerate_limit")
+    assert sixth.json()["resetsAt"] == next_midnight()
+    # A failed section's Try again is no regenerate: it never counts, and works past the cap.
+    retry = api.post(f"/v1/meetings/{meeting}/minutes/regenerate", json={"sections": ["risks"]}, headers=auth)
+    assert retry.status_code == 200
+
+
+def test_mom09_yesterday_s_regenerates_never_count_today_and_a_refused_one_costs_nothing(
+    api: Any, auth: dict[str, str], sql: Sql
+) -> None:
+    meeting = ready_meeting(api, auth, sql)
+    sql("UPDATE meetings SET regenerate_day = (now() AT TIME ZONE 'UTC')::date - 1, regenerate_count = 5")
+
+    assert api.post(f"/v1/meetings/{meeting}/minutes/regenerate", headers=auth).status_code == 200
+    assert sql("SELECT regenerate_count FROM meetings") == [{"regenerate_count": 1}]
+    # A run is writing now: the next ask is refused and the count stays.
+    assert failure(api.post(f"/v1/meetings/{meeting}/minutes/regenerate", headers=auth)) == (409, "minutes_running")
+    assert sql("SELECT regenerate_count FROM meetings") == [{"regenerate_count": 1}]
+
+
 def test_mom05_regenerate_on_a_run_stalled_past_10_minutes_starts_a_new_one(
     api: Any, auth: dict[str, str], sql: Sql
 ) -> None:

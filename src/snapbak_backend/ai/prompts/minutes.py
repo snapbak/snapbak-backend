@@ -27,6 +27,8 @@ Rules:
   spelled as said; a speaker whose lines have no "p" (null) as {{n:their sname}}. The app shows each one by the
   name they have now. The title names people as words.
 - Prefer grounding near a pin's atMs; the pin notes say why the user marked the moment.
+- With "userWrote": what the user wrote or edited in this section, kept as they wrote it. Treat it as fact: never
+  contradict, repeat or reword it, and write only what it doesn't already say. It names people as tokens too.
 - Everything you write is English: the title, the summary, the minutes, every item's text and every topic.
   Translate what was said in another language, and never copy the transcript's words into them in another script.
   Only the "quote" of a "derivedFrom" entry keeps the words as they were spoken.
@@ -162,8 +164,11 @@ def request(
     lines: list[dict[str, Any]],
     headings: list[str] | None,
     day: str | None,
+    kept: Any = None,
 ) -> str:
     body: dict[str, Any] = {"section": section, "title": title, "pins": pins, "lines": lines}
+    if kept is not None:
+        body["userWrote"] = kept
     if headings is not None:
         body["headings"] = headings
     if day is not None:
@@ -178,8 +183,10 @@ def turns(
     lines: list[dict[str, Any]],
     headings: list[str] | None = None,
     day: str | None = None,
+    kept: Any = None,
 ) -> list[Turn]:
-    made: list[Turn] = [("system", system_of(section)), ("user", request(section, title, pins, lines, headings, day))]
+    asked = request(section, title, pins, lines, headings, day, kept)
+    made: list[Turn] = [("system", system_of(section)), ("user", asked)]
     return made
 
 

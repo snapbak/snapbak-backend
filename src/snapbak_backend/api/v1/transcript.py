@@ -185,7 +185,10 @@ async def put_speaker(
     await ready_job(db, recording_id)
     taken = await db.scalar(
         select(Speaker.id).where(
-            Speaker.recording_id == recording_id, Speaker.label == body.label, Speaker.id != speaker_id
+            Speaker.recording_id == recording_id,
+            Speaker.label == body.label,
+            Speaker.id != speaker_id,
+            Speaker.deleted_at.is_(None),
         )
     )
     if taken is not None:

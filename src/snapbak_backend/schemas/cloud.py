@@ -226,6 +226,36 @@ class SpeakerRequest(Wire):
     nameSource: Literal["vendor", "guessed"] | None = None
 
 
+class EditedSpeaker(SpeakerRequest):
+    """A speaker as the app's edit leaves it (TRX-11); `deleted` when its last line went to another speaker."""
+
+    id: UUID
+    deleted: bool = False
+
+
+class MovedLine(Wire):
+    id: UUID
+    speakerId: UUID
+
+
+class SpeakerEditsRequest(Wire):
+    """One speaker edit of the app as the speakers and lines stand after it: a merge, its undo, a line given to a
+    new speaker (TRX-11). Sent again, it changes nothing."""
+
+    speakers: list[EditedSpeaker] = Field(max_length=100)
+    lines: list[MovedLine] = Field(max_length=20_000)
+
+
+class LineRev(Wire):
+    id: UUID
+    rev: int
+
+
+class SpeakerEditsResponse(Wire):
+    speakers: list[SpeakerOut]
+    lines: list[LineRev]
+
+
 class TransliterateRequest(Wire):
     script: Literal["roman"]
 

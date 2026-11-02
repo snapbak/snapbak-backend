@@ -1,0 +1,24 @@
+{
+  "speakers": [
+    {
+      "id": "0b6f7c1e-2a3d-4e5f-8a9b-0c1d2e3f4a5b",
+      "label": "Speaker 1",
+      "name": "Priya",
+      "nameSource": "vendor",
+      "colorIdx": 0
+    },
+    {
+      "id": "1c7a8d2f-3b4e-4f6a-9b0c-1d2e3f4a5b6c",
+      "label": "Speaker 2",
+      "name": "Priya",
+      "nameSource": "user",
+      "colorIdx": 1
+    }
+  ],
+  "lines": [
+    {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "rev": 2
+    }
+  ]
+}

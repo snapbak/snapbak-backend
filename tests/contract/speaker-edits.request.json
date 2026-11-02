@@ -1,0 +1,26 @@
+{
+  "speakers": [
+    {
+      "label": "Speaker 1",
+      "name": "Priya",
+      "colorIdx": 0,
+      "nameSource": null,
+      "id": "0b6f7c1e-2a3d-4e5f-8a9b-0c1d2e3f4a5b",
+      "deleted": true
+    },
+    {
+      "label": "Speaker 2",
+      "name": "Priya",
+      "colorIdx": 1,
+      "nameSource": null,
+      "id": "1c7a8d2f-3b4e-4f6a-9b0c-1d2e3f4a5b6c",
+      "deleted": false
+    }
+  ],
+  "lines": [
+    {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "speakerId": "1c7a8d2f-3b4e-4f6a-9b0c-1d2e3f4a5b6c"
+    }
+  ]
+}

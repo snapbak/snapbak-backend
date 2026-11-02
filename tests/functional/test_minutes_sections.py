@@ -51,9 +51,9 @@ def asked(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     seen: list[str] = []
     real = minutes.write_section
 
-    async def spied(tiers: Any, section: str, *args: Any) -> Any:
+    async def spied(tiers: Any, section: str, *args: Any, **kwargs: Any) -> Any:
         seen.append(section)
-        return await real(tiers, section, *args)
+        return await real(tiers, section, *args, **kwargs)
 
     monkeypatch.setattr(minutes, "write_section", spied)
     return seen
@@ -83,10 +83,10 @@ def failing(monkeypatch: pytest.MonkeyPatch, sections: set[str], code: str = "pr
 
     real = minutes.write_section
 
-    async def broken(tiers: Any, section: str, *args: Any) -> Any:
+    async def broken(tiers: Any, section: str, *args: Any, **kwargs: Any) -> Any:
         if section in sections:
             raise minutes.SectionFailed(code)
-        return await real(tiers, section, *args)
+        return await real(tiers, section, *args, **kwargs)
 
     monkeypatch.setattr(minutes, "write_section", broken)
 
@@ -224,8 +224,8 @@ def test_mom05_a_run_that_lost_its_token_stops_at_its_next_save(
     sql("UPDATE meetings SET minutes = NULL")
     real = minutes.write_section
 
-    async def taken(tiers: Any, section: str, *args: Any) -> Any:
-        made = await real(tiers, section, *args)
+    async def taken(tiers: Any, section: str, *args: Any, **kwargs: Any) -> Any:
+        made = await real(tiers, section, *args, **kwargs)
         if section == "mom":
             # From another connection, as the sweep would (the sql helper runs its own event loop).
             other = "UPDATE meetings SET minutes_run = '00000000-0000-4000-8000-000000000001'"
@@ -490,9 +490,9 @@ def test_mom05_the_worker_gives_the_calls_the_meeting_s_date(
     days: list[object] = []
     real = minutes.write_section
 
-    async def spied(tiers: Any, section: str, *args: Any) -> Any:
+    async def spied(tiers: Any, section: str, *args: Any, **kwargs: Any) -> Any:
         days.append(args[-1])
-        return await real(tiers, section, *args)
+        return await real(tiers, section, *args, **kwargs)
 
     _, meeting_id = ready_meeting(meetings_api, start_worker)
     as_generating(sql)

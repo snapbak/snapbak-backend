@@ -24,6 +24,7 @@ ALTER TABLE shares ADD CONSTRAINT shares_type_check
     CHECK (type IN ('video', 'audio', 'meeting', 'gif'));
 """
 
+
 def upgrade() -> None:
     for statement in UPGRADE.split(";")[:-1]:
         op.execute(statement)

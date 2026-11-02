@@ -273,13 +273,14 @@ async def write_section(
     calls: list[Call],
     headings: list[str] | None = None,
     day: str | None = None,
+    kept: Any = None,
 ) -> dict[str, Any]:
     """One section, corrected at most once (`headings`: the MoM's, for the agenda to name its topics by); the
     repair sees its own first answer and what was refused in it, and a repair that fails or doesn't parse leaves
     the first answer's checked items standing. SectionFailed when no acceptable answer arrives."""
     by_index = {line.idx: line for line in lines}
     chain = tiers.chain(tiers.polish)
-    turns = prompt.turns(section, title, pins, body_of(lines, speakers), headings, day)
+    turns = prompt.turns(section, title, pins, body_of(lines, speakers), headings, day, kept)
     try:
         first = await asked(chain, turns, calls)
     except ProviderFailed:
@@ -297,6 +298,20 @@ async def write_section(
     if best is None:
         raise SectionFailed("bad_answer")
     return best
+
+
+def kept_of(doc: MinutesOut, section: str) -> Any:
+    """What the user wrote or edited in `section`, sent to the model as facts to keep (MOM-09): their own items
+    without ids or evidence, or the section's text when they edited it; None when there is nothing of theirs."""
+    if section in ITEMS:
+        mine = [
+            item.model_dump(exclude={"id", "derivedFrom", "byUser"}) for item in getattr(doc, section) if item.byUser
+        ]
+        return mine or None
+    if section in doc.userEdited:
+        text: str = getattr(doc, section)
+        return text
+    return None
 
 
 def empty(pending: list[str]) -> MinutesOut:
@@ -472,7 +487,8 @@ async def run(
             # The agenda names its topics by the MoM's own headings, written before it.
             headings = [line[4:].strip() for line in doc.mom.splitlines() if line.startswith("### ")]
             named = headings if section == "agenda" else None
-            value = await write_section(tiers, section, title, pins, lines, speakers, calls, named, day)
+            kept = kept_of(doc, section)
+            value = await write_section(tiers, section, title, pins, lines, speakers, calls, named, day, kept=kept)
             doc = merged(doc, value)
         except SectionFailed as failed:
             incomplete = [item for item in doc.incomplete if item.section != section]

@@ -198,6 +198,18 @@ async def undo(db: AsyncSession, change: Change) -> None:
     # a line the user hadn't edited, and gives it back only if they still haven't.
     back = [TranscriptLine.id.in_(change.lineIds), TranscriptLine.speaker_id == change.intoId]
     if change.kind == "merge":
+        # A live speaker took its label since (a new speaker numbered after the live ones, TRX-11): bringing it back
+        # would make two of one label, so the undo waits, as under a later change.
+        merged_away = await db.get_one(Speaker, change.speakerId)
+        taken = await db.scalar(
+            select(Speaker.id).where(
+                Speaker.recording_id == merged_away.recording_id,
+                Speaker.label == merged_away.label,
+                Speaker.deleted_at.is_(None),
+            )
+        )
+        if taken is not None:
+            raise CloudFailure(409, "change_later")
         await db.execute(update(Speaker).where(Speaker.id == change.speakerId).values(deleted_at=None))
     else:
         back.append(TranscriptLine.rev <= 1)
