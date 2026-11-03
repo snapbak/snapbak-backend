@@ -1,7 +1,9 @@
 # API
 
 JSON in and out, UTF-8. Every route but `/healthz` needs `Authorization: Bearer
-<SNAPBAK_TOKEN>`. The token is compared in constant time. The shapes are pinned
+<token>`. `/v1/polish` and `/v1/command` take `SNAPBAK_TOKEN`, compared in
+constant time, or a registered device's token when the cloud is on, so the
+downloaded app carries no shared secret (3 Nov 2026). The shapes are pinned
 by `tests/contract/*.json`, which are byte-identical copies of the app's
 fixtures; `tests/integration/test_contract.py` compares them with the app's when
 `../snapbak` is checked out next door, and skips that check when it isn't.

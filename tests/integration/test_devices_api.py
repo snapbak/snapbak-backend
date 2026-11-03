@@ -1,6 +1,8 @@
 import hashlib
+import json
 import re
 import uuid
+from pathlib import Path
 from typing import Any
 
 from conftest import INSTALL, Sql, failure, register
@@ -90,3 +92,16 @@ def test_cld03_one_address_may_register_10_devices_an_hour(api: Any) -> None:
         assert made.status_code == 201
     refused = api.post("/v1/devices", json={"installId": str(uuid.uuid4()), "appVersion": "1.0.0"})
     assert (refused.status_code, refused.json()["error"]["code"]) == (429, "rate_limited")
+
+
+def test_dic17_polish_and_command_take_a_device_token_so_no_shared_secret_ships_in_the_app(api: Any, sql: Sql) -> None:
+    contract = Path(__file__).parent.parent / "contract"
+    polish = json.loads((contract / "polish.request.json").read_text())
+    command = json.loads((contract / "command.request.json").read_text())
+    auth = register(api)
+    assert api.post("/v1/polish", json=polish, headers=auth).status_code == 200
+    assert api.post("/v1/command", json=command, headers=auth).status_code == 200
+    stranger = {"Authorization": "Bearer not-a-device"}
+    assert api.post("/v1/polish", json=polish, headers=stranger).status_code == 401
+    sql("UPDATE devices SET deleted_at = now()")
+    assert api.post("/v1/polish", json=polish, headers=auth).status_code == 401
