@@ -258,7 +258,7 @@ def test_mom06_an_audio_share_is_live_at_once_and_plays_and_downloads_the_record
     put_recording(auth, meetings_api)
     upload_audio(meetings_api, auth, b"m4a bytes")
     shared = share_of(meetings_api, auth)
-    assert (shared["type"], shared["state"]) == ("audio", "live")
+    assert (shared["type"], shared["state"], shared["needsUpload"]) == ("audio", "live", False)
     page = meetings_api.get(f"/v/{shared['slug']}")
     assert page.status_code == 200 and '<audio preload="metadata"' in page.text
     fresh = meetings_api.get(f"/v/{shared['slug']}/src").json()
@@ -267,13 +267,24 @@ def test_mom06_an_audio_share_is_live_at_once_and_plays_and_downloads_the_record
     assert download.status_code == 302 and ".m4a" in download.headers["location"]
 
 
-def test_mom06_an_audio_share_before_its_audio_lands_shows_the_not_ready_page(meetings_api: Any) -> None:
+def test_mom06_an_audio_share_before_its_audio_lands_asks_for_it_and_shows_the_not_ready_page(
+    meetings_api: Any,
+) -> None:
+    """The backend, not the Mac's memory, says whether the audio is there: a Mac that sent it to another backend, or
+    never sent it, uploads it on Share."""
     auth = register(meetings_api)
     put_recording(auth, meetings_api)
     shared = share_of(meetings_api, auth)
+    assert shared["needsUpload"] is True
     page = meetings_api.get(f"/v/{shared['slug']}")
     assert page.status_code == 404
     assert "ready yet" in page.text
+    upload_audio(meetings_api, auth, b"m4a bytes")
+    again = meetings_api.post(
+        f"/v1/recordings/{RECORDING}/shares", json={"title": "Weekly sync", "bytes": 1000}, headers=auth
+    )
+    assert (again.status_code, again.json()["needsUpload"]) == (200, False)
+    assert meetings_api.get(f"/v/{shared['slug']}").status_code == 200
 
 
 def test_mom07_trash_holds_thirty_days_then_the_purge_takes_the_cloud_away(

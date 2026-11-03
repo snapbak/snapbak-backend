@@ -297,6 +297,8 @@ class ShareResponse(ShareRef):
     posterUploadUrl: str | None
     # What the page shows (D20): `video`, `audio` (live at once, on the recording's own audio) or `meeting`.
     type: Literal["video", "audio", "meeting", "gif"]
+    # From create: an audio recording's page has no audio here yet, so the Mac uploads it now.
+    needsUpload: bool = False
 
 
 class ShareUpdateRequest(Wire):

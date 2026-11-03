@@ -22,11 +22,11 @@ from snapbak_backend.api import cloud_deps
 from snapbak_backend.api.cloud_deps import Session
 from snapbak_backend.api.logged import LoggedRoute
 from snapbak_backend.api.minutes_page import Said, clock, meeting_sections, stamp
-from snapbak_backend.db.models import PageState, Recording, Share, Upload, page_state
+from snapbak_backend.db.models import PageState, Recording, Share, page_state
 from snapbak_backend.schemas.cloud import UTC_FORMAT
 from snapbak_backend.services import meetings, people, recordings
 from snapbak_backend.services.recordings import speaker_of
-from snapbak_backend.services.shares import SIGNED_S, is_slug, link
+from snapbak_backend.services.shares import SIGNED_S, audio_key, is_slug, link
 
 router = APIRouter(route_class=LoggedRoute)
 
@@ -316,12 +316,7 @@ async def media_of(db: Session, share: Share) -> tuple[str | None, Media]:
         return share.s3_key, "gif"
     if recording is None or recording.recording_type != "audio":
         return share.s3_key, "video"
-    key = await db.scalar(
-        select(Upload.s3_key)
-        .where(Upload.recording_id == share.recording_id, Upload.kind == "audio", Upload.state == "complete")
-        .order_by(Upload.completed_at.desc())
-        .limit(1)
-    )
+    key = await audio_key(db, share.recording_id)
     return key, "audio"
 
 

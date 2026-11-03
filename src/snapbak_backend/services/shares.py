@@ -106,6 +106,17 @@ async def live_count(session: AsyncSession, device_id: UUID) -> int:
     return count or 0
 
 
+async def audio_key(session: AsyncSession, recording_id: UUID) -> str | None:
+    """The recording's latest completed audio upload, which an audio share's page plays (D12, D16)."""
+    key = await session.scalar(
+        select(Upload.s3_key)
+        .where(Upload.recording_id == recording_id, Upload.kind == "audio", Upload.state == "complete")
+        .order_by(Upload.completed_at.desc())
+        .limit(1)
+    )
+    return key
+
+
 async def share_type(session: AsyncSession, recording: Recording) -> Literal["video", "audio", "meeting", "gif"]:
     """What a share of this recording shows (D20, GIFS-AND-REPLAY-60 G7): the meeting's minutes and transcript when
     it has a live meeting; else its audio, video, or the GIF itself. Derived here, never sent by the app."""

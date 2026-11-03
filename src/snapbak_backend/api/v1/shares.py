@@ -25,12 +25,17 @@ def ref(share: Share, base: str) -> ShareRef:
     return made
 
 
-def answer(share: Share, base: str, poster_upload_url: str | None = None) -> ShareResponse:
-    """The share as every share route answers it; `posterUploadUrl` only from create."""
+def answer(share: Share, base: str, poster_upload_url: str | None = None, needs_upload: bool = False) -> ShareResponse:
+    """The share as every share route answers it; `posterUploadUrl` and `needsUpload` only from create."""
     named = ref(share, base).model_dump()
     state = page_state(share, datetime.now(UTC))
     made = ShareResponse(
-        **named, pageState=state, expiresAt=share.expires_at, posterUploadUrl=poster_upload_url, type=share.type
+        **named,
+        pageState=state,
+        expiresAt=share.expires_at,
+        posterUploadUrl=poster_upload_url,
+        type=share.type,
+        needsUpload=needs_upload,
     )
     return made
 
@@ -53,8 +58,10 @@ async def create(
     upload_url = None
     if share.type != "gif":
         upload_url = cloud.storage.presign_put(poster, "image/jpeg", shares.SIGNED_S)
+    # The backend says whether it has an audio recording's audio: the Mac may have sent it elsewhere, or never.
+    needs_upload = recording.recording_type == "audio" and await shares.audio_key(db, recording_id) is None
     response.status_code = 201 if created else 200
-    made = answer(share, cloud.config.share_url, upload_url)
+    made = answer(share, cloud.config.share_url, upload_url, needs_upload)
     return made
 
 
